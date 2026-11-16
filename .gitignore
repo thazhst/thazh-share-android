@@ -1,0 +1,44 @@
+# Gradle
+.gradle/
+build/
+app/build/
+*/build/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Local configuration file (contains SDK path, machine-specific — never commit)
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystores — this project intentionally commits release-debug.keystore
+# (a throwaway, publicly-known-password signing key used only so CI can
+# produce an installable, consistently-signed APK without secrets). Any
+# OTHER keystore you add for real distribution should NOT be committed —
+# ignore those patterns below and manage real keys as CI secrets instead.
+*.jks
+*.keystore
+!release-debug.keystore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Android profiling
+*.hprof
+
+# Generated Play Store / Firebase config placeholders some templates add —
+# harmless to ignore even though this project doesn't use them.
+google-services.json

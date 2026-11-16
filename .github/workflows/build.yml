@@ -1,0 +1,191 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: {}
+
+# Cancel superseded runs on the same branch/PR to avoid wasting CI minutes
+# on a build that's about to be replaced by a newer push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build debug & release APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # android-actions/setup-android defaults `packages` to
+          # "tools platform-tools". Google discontinued the standalone
+          # `tools` package years ago, so sdkmanager now exits with
+          # "Failed to find package 'tools'" and this step fails outright.
+          # We install exactly what we need in the next step instead, so
+          # skip the action's own built-in package install here.
+          packages: ''
+
+      - name: Install required Android SDK packages
+        # android-actions/setup-android provisions the SDK *manager* and
+        # accepts licenses, but does not pre-install specific platform /
+        # build-tools versions. The Android Gradle Plugin can auto-download
+        # missing packages during the build, but doing it explicitly here
+        # fails fast with a clear step name if something's wrong, rather
+        # than surfacing as an opaque Gradle build error later.
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      # This repository's committed gradlew/gradlew.bat scripts and
+      # gradle-wrapper.jar were authored without access to a real Gradle
+      # installation or network access to Gradle's distribution servers, so
+      # they could not be verified against an actual Gradle toolchain before
+      # being committed. `gradle wrapper` below regenerates all four wrapper
+      # files (gradlew, gradlew.bat, gradle-wrapper.jar,
+      # gradle-wrapper.properties) from this job's real, verified Gradle
+      # installation, which is strictly safer than trusting the hand-authored
+      # originals. gradle/actions/setup-gradle also transparently accelerates
+      # and caches any ./gradlew invocation in this job regardless.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Regenerate Gradle wrapper from verified Gradle install
+        run: gradle wrapper --gradle-version 8.7 --distribution-type bin
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Sanity-check release keystore is present
+        run: |
+          if [ ! -f release-debug.keystore ]; then
+            echo "::error::release-debug.keystore is missing from the repository root."
+            exit 1
+          fi
+          echo "Keystore present, proceeding with build."
+
+      - name: Ensure debug keystore is present
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Lint (non-blocking)
+        run: ./gradlew lintDebug --stacktrace
+        continue-on-error: true
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build release APK (signed)
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Locate build outputs
+        id: outputs
+        run: |
+          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "debug_apk=$DEBUG_APK" >> "$GITHUB_OUTPUT"
+          echo "release_apk=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+          echo "Debug APK: $DEBUG_APK"
+          echo "Release APK: $RELEASE_APK"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: directchat-debug
+          path: ${{ steps.outputs.outputs.debug_apk }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: directchat-release
+          path: ${{ steps.outputs.outputs.release_apk }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload lint report (if generated)
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Only runs on an actual tagged release push (e.g. `git tag v1.0.0 && git push --tags`),
+  # attaching the built APKs directly to a GitHub Release for easy download.
+  attach-to-release:
+    name: Attach APKs to GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
+      - name: Install required Android SDK packages
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Regenerate Gradle wrapper from verified Gradle install
+        run: gradle wrapper --gradle-version 8.7 --distribution-type bin
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build release APK (signed)
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Locate release APK
+        id: outputs
+        run: |
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "release_apk=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+
+      - name: Create/update GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.outputs.outputs.release_apk }}
+          generate_release_notes: true
