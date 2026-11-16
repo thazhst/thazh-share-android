@@ -16,5 +16,9 @@ dependencyResolutionManagement {
 
 rootProject.name = "Thazh Share"
 include(":app")
-include(":shapes")
-include(":backdrop")
+include(":glasmio-core")
+include(":glasmio-glass")
+include(":glasmio-icons")
+include(":glasmio-ui")
+include(":glasmio-scaffold")
+include(":glasmio-preference")

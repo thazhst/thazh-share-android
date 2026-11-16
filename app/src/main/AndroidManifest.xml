@@ -91,6 +91,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.IncomingConnectionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ThazhShare.TransparentDialog" />
+
         <service
             android:name=".service.WifiDirectService"
             android:foregroundServiceType="connectedDevice"

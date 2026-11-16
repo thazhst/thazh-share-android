@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -13,13 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Devices
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,77 +22,84 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.kyant.shapes.Capsule
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.PeerStatus
 import com.thazh.share.data.SavedDevice
-import com.thazh.share.ui.cupertino.CupertinoActivityIndicator
-import com.thazh.share.ui.cupertino.CupertinoIcon
-import com.thazh.share.ui.cupertino.CupertinoText
-import com.thazh.share.ui.cupertino.LiquidActionPopover
-import com.thazh.share.ui.cupertino.LiquidButton
-import com.thazh.share.ui.cupertino.PopoverMenuItem
-import com.thazh.share.ui.cupertino.elasticHold
-import com.thazh.share.ui.theme.CupertinoTheme
+import com.thazh.share.ui.theme.ThazhSymbols
+import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.FormatUtils
+import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.glass.GlassEmphasis
+import io.github.neoruaa.glasmio.icons.SfIcon
+import io.github.neoruaa.glasmio.ui.GlasmioButton
+import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
+import io.github.neoruaa.glasmio.ui.GlasmioIconButton
+import io.github.neoruaa.glasmio.ui.GlasmioMenu
+import io.github.neoruaa.glasmio.ui.GlasmioMenuItem
+import io.github.neoruaa.glasmio.ui.glasmioGroupedListSeparator
 
 @Composable
 fun DiscoveredPeerRow(
     peer: DiscoveredPeer,
     isConnecting: Boolean,
     onConnect: () -> Unit,
-    modifier: Modifier = Modifier
+    showTopSeparator: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
     val badgeColor = when (peer.status) {
-        PeerStatus.CONNECTED -> colors.accentGreen
-        PeerStatus.INVITED -> colors.warningOrange
-        else -> colors.accentBlue
+        PeerStatus.CONNECTED -> semantic.accentGreen
+        PeerStatus.INVITED -> semantic.warningOrange
+        else -> semantic.accentBlue
     }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp)
-            .elasticHold(enabled = !isConnecting && peer.status != PeerStatus.INVITED, pressedScale = 0.97f)
+            .defaultMinSize(minHeight = 68.dp)
+            .glasmioGroupedListSeparator(colors.separator, visible = showTopSeparator, horizontalInset = 16.dp)
             .clickable(
                 enabled = !isConnecting && peer.status != PeerStatus.INVITED,
                 role = Role.Button,
-                onClick = onConnect
+                onClick = onConnect,
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(CupertinoTheme.shapes.iconBadge)
+                .clip(ContinuousRoundedRectangle(12.dp))
                 .background(badgeColor.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
-            CupertinoIcon(
-                imageVector = Icons.Rounded.WifiTethering,
+            SfIcon(
+                systemName = ThazhSymbols.WifiTethering,
                 contentDescription = null,
                 tint = badgeColor,
-                modifier = Modifier.size(22.dp)
+                size = 22.dp,
             )
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            CupertinoText(
+            Text(
                 text = peer.deviceName.ifBlank { peer.deviceAddress },
-                style = CupertinoTheme.typography.headline,
+                style = GlasmioTheme.textStyles.headline,
+                color = colors.content,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             val statusSubtitle = when (peer.status) {
                 PeerStatus.CONNECTED -> stringResource(R.string.notif_connected, peer.deviceName)
@@ -106,12 +107,12 @@ fun DiscoveredPeerRow(
                 PeerStatus.AVAILABLE -> peer.deviceAddress
                 PeerStatus.FAILED, PeerStatus.UNAVAILABLE -> peer.deviceAddress
             }
-            CupertinoText(
+            Text(
                 text = statusSubtitle,
-                style = CupertinoTheme.typography.footnote,
-                color = colors.secondaryLabel,
+                style = GlasmioTheme.textStyles.footnote,
+                color = colors.secondaryContent,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
@@ -119,26 +120,30 @@ fun DiscoveredPeerRow(
 
         when {
             isConnecting || peer.status == PeerStatus.INVITED -> {
-                CupertinoActivityIndicator(size = 20.dp, color = colors.accentBlue)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = colors.accent,
+                    strokeWidth = 2.2.dp,
+                )
             }
             peer.status == PeerStatus.CONNECTED -> {
-                CupertinoText(
+                Text(
                     text = stringResource(R.string.discover_connect),
-                    style = CupertinoTheme.typography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = colors.accentGreen
+                    style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                    color = semantic.accentGreen,
                 )
             }
             else -> {
-                LiquidButton(
+                GlasmioButton(
                     onClick = onConnect,
+                    emphasis = GlassEmphasis.Prominent,
+                    size = GlasmioButtonSize.Medium,
                     modifier = Modifier.testTag("connect_peer_button_${peer.deviceAddress}"),
-                    height = 48.dp,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    CupertinoText(
+                    Text(
                         text = stringResource(R.string.discover_connect),
-                        style = CupertinoTheme.typography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                        color = androidx.compose.ui.graphics.Color.White
+                        style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
                     )
                 }
             }
@@ -153,104 +158,106 @@ fun SavedDeviceRow(
     onConnect: () -> Unit,
     onRename: () -> Unit,
     onRemove: () -> Unit,
-    modifier: Modifier = Modifier
+    showTopSeparator: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
     var menuExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp)
-            .elasticHold(enabled = !isConnecting, pressedScale = 0.97f)
+            .defaultMinSize(minHeight = 68.dp)
+            .glasmioGroupedListSeparator(colors.separator, visible = showTopSeparator, horizontalInset = 16.dp)
             .clickable(
                 enabled = !isConnecting,
                 role = Role.Button,
-                onClick = onConnect
+                onClick = onConnect,
             )
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(CupertinoTheme.shapes.iconBadge)
-                .background(colors.accentCyan.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center
+                .clip(ContinuousRoundedRectangle(12.dp))
+                .background(semantic.accentCyan.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
         ) {
-            CupertinoIcon(
-                imageVector = Icons.Rounded.Devices,
+            SfIcon(
+                systemName = ThazhSymbols.Devices,
                 contentDescription = null,
-                tint = colors.accentBlue,
-                modifier = Modifier.size(22.dp)
+                tint = colors.accent,
+                size = 22.dp,
             )
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            CupertinoText(
+            Text(
                 text = device.effectiveName,
-                style = CupertinoTheme.typography.headline,
+                style = GlasmioTheme.textStyles.headline,
+                color = colors.content,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                CupertinoIcon(
-                    imageVector = Icons.Rounded.History,
+                SfIcon(
+                    systemName = ThazhSymbols.History,
                     contentDescription = null,
-                    tint = colors.tertiaryLabel,
-                    modifier = Modifier.size(13.dp)
+                    tint = colors.tertiaryContent,
+                    size = 13.dp,
                 )
-                CupertinoText(
+                Text(
                     text = FormatUtils.formatRelativeTime(device.lastConnectedAtEpochMs),
-                    style = CupertinoTheme.typography.footnote,
-                    color = colors.secondaryLabel,
+                    style = GlasmioTheme.textStyles.footnote,
+                    color = colors.secondaryContent,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
 
-        Box {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .elasticHold(pressedScale = 0.88f)
-                    .clip(Capsule())
-                    .clickable(
-                        role = Role.Button,
-                        onClick = { menuExpanded = true }
+        GlasmioMenu(
+            expanded = menuExpanded,
+            onExpandedChange = { menuExpanded = it },
+            itemCount = 2,
+            anchor = { onClick ->
+                GlasmioIconButton(
+                    onClick = onClick,
+                    size = 48.dp,
+                    modifier = Modifier.testTag("saved_device_menu_${device.deviceAddress}"),
+                ) {
+                    SfIcon(
+                        systemName = ThazhSymbols.MoreHoriz,
+                        contentDescription = stringResource(R.string.saved_device_rename),
+                        tint = colors.secondaryContent,
+                        size = 20.dp,
                     )
-                    .testTag("saved_device_menu_${device.deviceAddress}"),
-                contentAlignment = Alignment.Center
-            ) {
-                CupertinoIcon(
-                    imageVector = Icons.Rounded.MoreHoriz,
-                    contentDescription = stringResource(R.string.saved_device_rename),
-                    tint = colors.secondaryLabel
-                )
-            }
-
-            LiquidActionPopover(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-                items = listOf(
-                    PopoverMenuItem(
-                        label = stringResource(R.string.saved_device_rename),
-                        icon = Icons.Rounded.Edit,
-                        onClick = onRename
-                    ),
-                    PopoverMenuItem(
-                        label = stringResource(R.string.saved_device_remove),
-                        icon = Icons.Rounded.DeleteOutline,
-                        isDestructive = true,
-                        onClick = onRemove
-                    )
-                )
+                }
+            },
+        ) { _, close ->
+            GlasmioMenuItem(
+                title = stringResource(R.string.saved_device_rename),
+                systemName = ThazhSymbols.Edit,
+                onClick = {
+                    close()
+                    onRename()
+                },
+            )
+            GlasmioMenuItem(
+                title = stringResource(R.string.saved_device_remove),
+                systemName = ThazhSymbols.Delete,
+                destructive = true,
+                onClick = {
+                    close()
+                    onRemove()
+                },
             )
         }
     }

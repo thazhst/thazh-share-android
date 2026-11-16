@@ -45,10 +45,22 @@ class ShareApplication : Application() {
                 description = getString(R.string.notification_channel_received_files_desc)
             }
         )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_INCOMING_CONNECTION,
+                getString(R.string.notification_channel_incoming_connection),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.notification_channel_incoming_connection_desc)
+                enableVibration(true)
+            }
+        )
     }
 
     companion object {
         const val CHANNEL_CONNECTION_STATUS = "connection_status"
         const val CHANNEL_RECEIVED_FILES = "received_files"
+        const val CHANNEL_INCOMING_CONNECTION = "incoming_connection"
     }
 }

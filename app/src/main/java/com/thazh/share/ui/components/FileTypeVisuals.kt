@@ -11,6 +11,7 @@ import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.VideoFile
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,10 +20,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.FileCategory
-import com.thazh.share.ui.cupertino.CupertinoIcon
-import com.thazh.share.ui.theme.CupertinoTheme
+import com.thazh.share.ui.theme.ThazhTheme
+import io.github.neoruaa.glasmio.core.GlasmioTheme
 
 fun FileCategory.icon(): ImageVector = when (this) {
     FileCategory.IMAGE -> Icons.Rounded.Image
@@ -36,15 +38,15 @@ fun FileCategory.icon(): ImageVector = when (this) {
 
 @Composable
 fun FileCategory.accentColor(): Color {
-    val colors = CupertinoTheme.colors
+    val semantic = ThazhTheme.semantic
     return when (this) {
-        FileCategory.IMAGE -> colors.accentBlue
-        FileCategory.VIDEO -> Color(0xFFAF52DE)
-        FileCategory.AUDIO -> Color(0xFFFF2D55)
-        FileCategory.DOCUMENT -> Color(0xFF5856D6)
-        FileCategory.ARCHIVE -> colors.warningOrange
-        FileCategory.APK -> colors.accentGreen
-        FileCategory.OTHER -> colors.secondaryLabel
+        FileCategory.IMAGE -> semantic.accentBlue
+        FileCategory.VIDEO -> semantic.categoryVideo
+        FileCategory.AUDIO -> semantic.categoryAudio
+        FileCategory.DOCUMENT -> semantic.categoryDocument
+        FileCategory.ARCHIVE -> semantic.warningOrange
+        FileCategory.APK -> semantic.accentGreen
+        FileCategory.OTHER -> GlasmioTheme.colors.secondaryContent
     }
 }
 
@@ -62,21 +64,21 @@ fun FileCategory.labelRes(): Int = when (this) {
 fun FileTypeBadge(
     category: FileCategory,
     modifier: Modifier = Modifier,
-    size: Dp = 44.dp
+    size: Dp = 44.dp,
 ) {
     val tint = category.accentColor()
     Box(
         modifier = modifier
             .size(size)
-            .clip(CupertinoTheme.shapes.iconBadge)
+            .clip(ContinuousRoundedRectangle(12.dp))
             .background(tint.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
-        CupertinoIcon(
+        Icon(
             imageVector = category.icon(),
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(size * 0.52f)
+            modifier = Modifier.size(size * 0.52f),
         )
     }
 }

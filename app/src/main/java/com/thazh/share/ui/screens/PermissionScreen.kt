@@ -12,7 +12,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,8 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,24 +39,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.thazh.share.R
-import com.thazh.share.ui.cupertino.CupertinoIcon
-import com.thazh.share.ui.cupertino.CupertinoText
-import com.thazh.share.ui.cupertino.LiquidButton
-import com.thazh.share.ui.cupertino.LiquidCard
-import com.thazh.share.ui.theme.CupertinoTheme
+import com.thazh.share.ui.theme.ThazhSymbols
+import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.PermissionUtils
+import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.glass.GlassEmphasis
+import io.github.neoruaa.glasmio.icons.SfIcon
+import io.github.neoruaa.glasmio.ui.GlasmioButton
+import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
+import io.github.neoruaa.glasmio.ui.GlasmioCard
 
 @Composable
 fun PermissionRationaleScreen(
     onPermissionsGranted: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
     var deniedOnce by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         if (PermissionUtils.hasAllRequiredPermissions(context)) {
             onPermissionsGranted()
@@ -73,9 +75,9 @@ fun PermissionRationaleScreen(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "pulse"
+        label = "pulse",
     )
 
     Box(
@@ -83,22 +85,22 @@ fun PermissionRationaleScreen(
             .fillMaxSize()
             .safeDrawingPadding()
             .padding(24.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
-        LiquidCard(
+        GlasmioCard(
             modifier = Modifier
                 .widthIn(max = 460.dp)
-                .fillMaxWidth()
+                .fillMaxWidth(),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp, horizontal = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
                     modifier = Modifier.size(116.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val center = this.center
@@ -108,80 +110,82 @@ fun PermissionRationaleScreen(
                             val radius = maxR * (0.42f + 0.58f * phase)
                             val alpha = (1f - phase) * 0.35f
                             drawCircle(
-                                color = colors.accentBlue.copy(alpha = alpha),
+                                color = semantic.accentBlue.copy(alpha = alpha),
                                 radius = radius,
                                 center = center,
-                                style = Stroke(width = 2.dp.toPx())
+                                style = Stroke(width = 2.dp.toPx()),
                             )
                         }
                         drawCircle(
-                            color = colors.accentBlue.copy(alpha = 0.14f),
+                            color = semantic.accentBlue.copy(alpha = 0.14f),
                             radius = maxR * 0.44f,
-                            center = center
+                            center = center,
                         )
                     }
-                    CupertinoIcon(
-                        imageVector = Icons.Rounded.WifiTethering,
+                    SfIcon(
+                        systemName = ThazhSymbols.WifiTethering,
                         contentDescription = null,
-                        tint = colors.accentBlue,
-                        modifier = Modifier.size(36.dp)
+                        tint = semantic.accentBlue,
+                        size = 36.dp,
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                CupertinoText(
+                Text(
                     text = stringResource(R.string.permission_required_title),
-                    style = CupertinoTheme.typography.title1,
-                    textAlign = TextAlign.Center
+                    style = GlasmioTheme.textStyles.title1.copy(fontWeight = FontWeight.Bold),
+                    color = colors.content,
+                    textAlign = TextAlign.Center,
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                CupertinoText(
+                Text(
                     text = stringResource(R.string.permission_required_body),
-                    style = CupertinoTheme.typography.subheadline,
-                    color = colors.secondaryLabel,
-                    textAlign = TextAlign.Center
+                    style = GlasmioTheme.textStyles.subheadline,
+                    color = colors.secondaryContent,
+                    textAlign = TextAlign.Center,
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                LiquidButton(
+                GlasmioButton(
                     onClick = {
                         launcher.launch(PermissionUtils.requiredPermissions())
                     },
+                    emphasis = GlassEmphasis.Prominent,
+                    size = GlasmioButtonSize.Large,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("grant_permission_button")
+                        .testTag("grant_permission_button"),
                 ) {
-                    CupertinoText(
+                    Text(
                         text = stringResource(R.string.permission_grant),
-                        style = CupertinoTheme.typography.headline,
-                        color = Color.White
+                        style = GlasmioTheme.textStyles.headline,
+                        color = Color.White,
                     )
                 }
 
                 if (deniedOnce) {
                     Spacer(modifier = Modifier.height(10.dp))
-                    LiquidButton(
+                    GlasmioButton(
                         onClick = {
                             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                 data = Uri.fromParts("package", context.packageName, null)
                             }
                             context.startActivity(intent)
                         },
+                        emphasis = GlassEmphasis.Regular,
+                        size = GlasmioButtonSize.Large,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("open_app_settings_button"),
-                        tint = Color.Unspecified,
-                        surfaceColor = colors.fillTertiary,
-                        contentColor = colors.accentBlue
                     ) {
-                        CupertinoText(
+                        Text(
                             text = stringResource(R.string.permission_open_settings),
-                            style = CupertinoTheme.typography.headline.copy(fontWeight = FontWeight.SemiBold),
-                            color = colors.accentBlue
+                            style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.SemiBold),
+                            color = semantic.accentBlue,
                         )
                     }
                 }

@@ -13,12 +13,15 @@ import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.thazh.share.MainActivity
 import com.thazh.share.R
 import com.thazh.share.ShareApplication
 import com.thazh.share.data.ConnectionQuality
+import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
+import com.thazh.share.data.IncomingConnectionRequest
 import com.thazh.share.data.PeerStatus
 import com.thazh.share.data.PickedFile
 import com.thazh.share.data.ReceivedFile
@@ -38,12 +41,14 @@ import com.thazh.share.network.PeerConnection
 import com.thazh.share.network.SocketConnectionEvent
 import com.thazh.share.network.TransferProgressEvent
 import com.thazh.share.network.WifiDirectManager
+import com.thazh.share.ui.IncomingConnectionActivity
+import com.thazh.share.util.FileActions
 import com.thazh.share.util.FileNameUtils
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -56,6 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.UUID
 
 class WifiDirectService : Service() {
 
@@ -74,6 +80,10 @@ class WifiDirectService : Service() {
 
     private val bleDiscoveryManager: BleDiscoveryManager by lazy { BleDiscoveryManager(applicationContext) }
     private var bleFastDiscoveryEnabled = true
+    private var confirmIncomingConnectionEnabled = true
+    private var backgroundConnectionDialogEnabled = true
+    private var autoSaveToDownloadsEnabled = false
+    private var soundVibrationEnabled = true
     private var isDiscoveryActive = false
 
     private var socketEventJob: Job? = null
@@ -82,10 +92,12 @@ class WifiDirectService : Service() {
     private var distanceJob: Job? = null
     private var p2pStateJob: Job? = null
     private var peersJob: Job? = null
-    private var bleSettingJob: Job? = null
+    private var prefsJob: Job? = null
     private var nfcExchangeJob: Job? = null
     private var thisDeviceJob: Job? = null
     private var nfcTimeoutJob: Job? = null
+    private var visibilityTimerJob: Job? = null
+    private var incomingRequestTimeoutJob: Job? = null
 
     private val _connectedPeerName = MutableStateFlow<String?>(null)
     val connectedPeerName: StateFlow<String?> = _connectedPeerName.asStateFlow()
@@ -114,23 +126,45 @@ class WifiDirectService : Service() {
     private val _nfcPairingPeerName = MutableStateFlow<String?>(null)
     val nfcPairingPeerName: StateFlow<String?> = _nfcPairingPeerName.asStateFlow()
 
+    private val _visibilityMode = MutableStateFlow(DeviceVisibilityMode.TEMPORARY_10_MIN)
+    val visibilityMode: StateFlow<DeviceVisibilityMode> = _visibilityMode.asStateFlow()
+
+    private val _visibilityRemainingSeconds = MutableStateFlow<Int?>(TEMPORARY_VISIBILITY_SECONDS)
+    val visibilityRemainingSeconds: StateFlow<Int?> = _visibilityRemainingSeconds.asStateFlow()
+
+    private val _incomingConnectionRequest = MutableStateFlow<IncomingConnectionRequest?>(null)
+    val incomingConnectionRequest: StateFlow<IncomingConnectionRequest?> = _incomingConnectionRequest.asStateFlow()
+
     private data class PendingNfcMatch(
         val displayName: String,
         val wifiP2pName: String,
-        val expiresAtElapsedMs: Long
+        val expiresAtElapsedMs: Long,
     )
 
-    private var pendingNfcMatch: PendingNfcMatch? = null
+    private enum class IncomingGateState {
+        NONE,
+        WAITING_DECISION,
+        APPROVED,
+        REJECTED,
+    }
 
-    private var localDisplayName: String = Build.MODEL ?: "Thiết bị"
+    private var pendingNfcMatch: PendingNfcMatch? = null
+    private var localDisplayName: String = Build.MODEL?.takeIf { it.isNotBlank() } ?: "Thiết bị"
     private var currentGroupOwnerAddress: String? = null
     private var currentDeviceAddress: String? = null
     private var isUiBound = false
+    private var isUiInForeground = false
+    private var hasInitiatedOutgoingConnect = false
+    private var incomingGateState = IncomingGateState.NONE
+    private val queuedIncomingOffers = mutableListOf<Frame.FileOffer>()
 
     private val outputDir: File by lazy { File(filesDir, "share_files").apply { mkdirs() } }
 
+    private val app: ShareApplication
+        get() = application as ShareApplication
+
     private val receivedFilesRepository: ReceivedFilesRepository
-        get() = (application as ShareApplication).receivedFilesRepository
+        get() = app.receivedFilesRepository
 
     private val transferSendMutex = Mutex()
     private val transferSamples = HashMap<String, TransferSample>()
@@ -139,7 +173,7 @@ class WifiDirectService : Service() {
         var lastUiUpdateMs: Long,
         var lastSpeedMs: Long,
         var lastSpeedBytes: Long,
-        var speedBytesPerSec: Double
+        var speedBytesPerSec: Double,
     )
 
     override fun onCreate() {
@@ -150,16 +184,14 @@ class WifiDirectService : Service() {
         observeMergedPeers()
         observeThisDeviceForNfc()
         observeNfcExchanges()
-        bleSettingJob = serviceScope.launch {
-            (application as ShareApplication).preferencesRepository.bleFastDiscoveryEnabled.collect { enabled ->
-                bleFastDiscoveryEnabled = enabled
-                if (isDiscoveryActive) {
-                    if (enabled) bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress)
-                    else bleDiscoveryManager.stop()
-                }
-            }
-        }
+        observePreferences()
         startForegroundWithNotification(getString(R.string.notif_scanning))
+
+        serviceScope.launch {
+            val initialMode = runCatching { app.preferencesRepository.defaultVisibilityMode.first() }
+                .getOrDefault(DeviceVisibilityMode.TEMPORARY_10_MIN)
+            setVisibilityMode(initialMode)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder {
@@ -172,7 +204,23 @@ class WifiDirectService : Service() {
         return false
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_ACCEPT_INCOMING -> {
+                val peerName = _incomingConnectionRequest.value?.peerName.orEmpty()
+                acceptIncomingConnection()
+                if (peerName.isNotBlank()) {
+                    Toast.makeText(
+                        applicationContext,
+                        getString(R.string.incoming_conn_accepted_toast, peerName),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+            ACTION_DECLINE_INCOMING -> declineIncomingConnection()
+        }
+        return START_NOT_STICKY
+    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
@@ -181,14 +229,24 @@ class WifiDirectService : Service() {
 
     override fun onDestroy() {
         tearDownActiveConnection()
+        visibilityTimerJob?.cancel()
+        incomingRequestTimeoutJob?.cancel()
+        cancelIncomingConnectionNotification()
         bleDiscoveryManager.stop()
         peersJob?.cancel()
-        bleSettingJob?.cancel()
+        prefsJob?.cancel()
         nfcExchangeJob?.cancel()
         thisDeviceJob?.cancel()
         nfcTimeoutJob?.cancel()
         wifiDirectManager.teardown()
         super.onDestroy()
+    }
+
+    fun setUiInForeground(inForeground: Boolean) {
+        isUiInForeground = inForeground
+        if (inForeground) {
+            cancelIncomingConnectionNotification()
+        }
     }
 
     fun setLocalDisplayName(name: String) {
@@ -199,7 +257,70 @@ class WifiDirectService : Service() {
         }
     }
 
+    fun setVisibilityMode(mode: DeviceVisibilityMode) {
+        visibilityTimerJob?.cancel()
+        _visibilityMode.value = mode
+
+        when (mode) {
+            DeviceVisibilityMode.HIDDEN -> {
+                _visibilityRemainingSeconds.value = null
+                stopDiscoveryInternal()
+                if (incomingGateState == IncomingGateState.WAITING_DECISION) {
+                    declineIncomingConnection()
+                }
+                if (!_isSocketConnected.value) {
+                    updateNotification(getString(R.string.notif_hidden))
+                }
+            }
+
+            DeviceVisibilityMode.TEMPORARY_10_MIN -> {
+                _visibilityRemainingSeconds.value = TEMPORARY_VISIBILITY_SECONDS
+                startDiscoveryInternal { _, _ -> }
+                startVisibilityCountdown()
+            }
+
+            DeviceVisibilityMode.ALWAYS_VISIBLE -> {
+                _visibilityRemainingSeconds.value = null
+                startDiscoveryInternal { _, _ -> }
+                if (!_isSocketConnected.value) {
+                    updateNotification(getString(R.string.notif_visible_always))
+                }
+            }
+        }
+    }
+
+    private fun startVisibilityCountdown() {
+        visibilityTimerJob?.cancel()
+        visibilityTimerJob = serviceScope.launch {
+            var remaining = TEMPORARY_VISIBILITY_SECONDS
+            while (remaining > 0 && _visibilityMode.value == DeviceVisibilityMode.TEMPORARY_10_MIN) {
+                _visibilityRemainingSeconds.value = remaining
+                if (!_isSocketConnected.value) {
+                    updateNotification(getString(R.string.notif_visible_10min, formatCountdown(remaining)))
+                }
+                delay(1_000L)
+                remaining--
+            }
+            if (_visibilityMode.value == DeviceVisibilityMode.TEMPORARY_10_MIN && remaining <= 0) {
+                setVisibilityMode(DeviceVisibilityMode.HIDDEN)
+            }
+        }
+    }
+
     fun startDiscovery(onResult: (Boolean, String?) -> Unit) {
+        if (_visibilityMode.value == DeviceVisibilityMode.HIDDEN) {
+            setVisibilityMode(DeviceVisibilityMode.TEMPORARY_10_MIN)
+            onResult(true, null)
+            return
+        }
+        startDiscoveryInternal(onResult)
+    }
+
+    fun stopDiscovery() {
+        setVisibilityMode(DeviceVisibilityMode.HIDDEN)
+    }
+
+    private fun startDiscoveryInternal(onResult: (Boolean, String?) -> Unit) {
         isDiscoveryActive = true
         if (bleFastDiscoveryEnabled) {
             bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress)
@@ -207,7 +328,7 @@ class WifiDirectService : Service() {
         wifiDirectManager.startDiscovery(onResult)
     }
 
-    fun stopDiscovery() {
+    private fun stopDiscoveryInternal() {
         isDiscoveryActive = false
         bleDiscoveryManager.stop()
         wifiDirectManager.stopDiscovery()
@@ -221,6 +342,62 @@ class WifiDirectService : Service() {
         }
     }
 
+    fun acceptIncomingConnection() {
+        if (incomingGateState != IncomingGateState.WAITING_DECISION) return
+        incomingGateState = IncomingGateState.APPROVED
+        incomingRequestTimeoutJob?.cancel()
+        _incomingConnectionRequest.value = null
+        cancelIncomingConnectionNotification()
+
+        val queued = queuedIncomingOffers.toList()
+        queuedIncomingOffers.clear()
+        queued.forEach { offer -> onTransferOfferReceived(offer) }
+    }
+
+    fun declineIncomingConnection() {
+        incomingRequestTimeoutJob?.cancel()
+        incomingGateState = IncomingGateState.REJECTED
+        _incomingConnectionRequest.value = null
+        queuedIncomingOffers.clear()
+        cancelIncomingConnectionNotification()
+        disconnect()
+    }
+
+    private fun observePreferences() {
+        prefsJob?.cancel()
+        prefsJob = serviceScope.launch {
+            launch {
+                app.preferencesRepository.bleFastDiscoveryEnabled.collect { enabled ->
+                    bleFastDiscoveryEnabled = enabled
+                    if (isDiscoveryActive) {
+                        if (enabled) bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress)
+                        else bleDiscoveryManager.stop()
+                    }
+                }
+            }
+            launch {
+                app.preferencesRepository.confirmIncomingConnection.collect { enabled ->
+                    confirmIncomingConnectionEnabled = enabled
+                }
+            }
+            launch {
+                app.preferencesRepository.backgroundConnectionDialog.collect { enabled ->
+                    backgroundConnectionDialogEnabled = enabled
+                }
+            }
+            launch {
+                app.preferencesRepository.autoSaveToDownloads.collect { enabled ->
+                    autoSaveToDownloadsEnabled = enabled
+                }
+            }
+            launch {
+                app.preferencesRepository.soundVibrationEnabled.collect { enabled ->
+                    soundVibrationEnabled = enabled
+                }
+            }
+        }
+    }
+
     private fun observeThisDeviceForNfc() {
         thisDeviceJob?.cancel()
         thisDeviceJob = serviceScope.launch {
@@ -229,7 +406,7 @@ class WifiDirectService : Service() {
                     NfcConnectionCoordinator.updateLocalIdentity(
                         displayName = localDisplayName,
                         wifiP2pName = device.deviceName,
-                        deviceAddress = device.deviceAddress
+                        deviceAddress = device.deviceAddress,
                     )
                 }
             }
@@ -259,7 +436,6 @@ class WifiDirectService : Service() {
             pendingNfcMatch = null
         }
 
-        // Kick P2P discovery on both sides so Android's WiFi Direct framework resolves/accepts fast
         startDiscovery { _, _ -> }
 
         if (!exchange.initiateConnect) {
@@ -272,12 +448,10 @@ class WifiDirectService : Service() {
             return
         }
 
-        // Android 10+ may mask thisDevice.deviceAddress as 02:00:00:00:00:00.
-        // Fall back to matching the discovered peer by its exchanged P2P/display name.
         val match = PendingNfcMatch(
             displayName = exchange.peer.displayName,
             wifiP2pName = exchange.peer.wifiP2pName,
-            expiresAtElapsedMs = SystemClock.elapsedRealtime() + 15_000L
+            expiresAtElapsedMs = SystemClock.elapsedRealtime() + 15_000L,
         )
         pendingNfcMatch = match
         tryCompletePendingNfcMatch(wifiDirectManager.peers.value)
@@ -294,9 +468,7 @@ class WifiDirectService : Service() {
             .filter { it.isNotEmpty() }
         val found = availablePeers.firstOrNull { peer ->
             val pName = peer.deviceName.trim()
-            candidates.any { candidate ->
-                pName.equals(candidate, ignoreCase = true)
-            }
+            candidates.any { candidate -> pName.equals(candidate, ignoreCase = true) }
         } ?: return
 
         pendingNfcMatch = null
@@ -312,7 +484,7 @@ class WifiDirectService : Service() {
                     DiscoveredPeer(
                         deviceName = getString(R.string.ble_nearby_device),
                         deviceAddress = address,
-                        status = PeerStatus.AVAILABLE
+                        status = PeerStatus.AVAILABLE,
                     )
                 }
                 wifiPeers + bleOnly
@@ -324,11 +496,18 @@ class WifiDirectService : Service() {
     }
 
     fun connectToPeer(deviceAddress: String, onResult: (Boolean, String?) -> Unit) {
+        hasInitiatedOutgoingConnect = true
         currentDeviceAddress = deviceAddress
-        wifiDirectManager.connectTo(deviceAddress, onResult)
+        wifiDirectManager.connectTo(deviceAddress) { ok, err ->
+            if (!ok) {
+                hasInitiatedOutgoingConnect = false
+            }
+            onResult(ok, err)
+        }
     }
 
     fun disconnect() {
+        hasInitiatedOutgoingConnect = false
         tearDownActiveConnection()
         _transfers.value = emptyList()
         wifiDirectManager.disconnect()
@@ -345,10 +524,12 @@ class WifiDirectService : Service() {
                         onGroupFormed(state)
                     }
                     is P2pConnectionState.Disconnected -> {
+                        hasInitiatedOutgoingConnect = false
                         _nfcPairingPeerName.value = null
                         tearDownActiveConnection()
                     }
                     is P2pConnectionState.Failed -> {
+                        hasInitiatedOutgoingConnect = false
                         pendingNfcMatch = null
                         _nfcPairingPeerName.value = null
                         tearDownActiveConnection()
@@ -364,6 +545,20 @@ class WifiDirectService : Service() {
             Log.d(TAG, "onGroupFormed: connection already active/in progress, ignoring duplicate")
             return
         }
+
+        // Reject passive incoming connections if the user deliberately set visibility to Hidden.
+        if (!hasInitiatedOutgoingConnect && _visibilityMode.value == DeviceVisibilityMode.HIDDEN) {
+            Log.i(TAG, "Ignoring incoming P2P connection while device visibility is HIDDEN")
+            wifiDirectManager.disconnect()
+            return
+        }
+
+        incomingGateState = if (hasInitiatedOutgoingConnect || !confirmIncomingConnectionEnabled) {
+            IncomingGateState.APPROVED
+        } else {
+            IncomingGateState.WAITING_DECISION
+        }
+        queuedIncomingOffers.clear()
 
         val groupOwnerAddr = state.groupOwnerAddress
         currentGroupOwnerAddress = groupOwnerAddr
@@ -404,10 +599,11 @@ class WifiDirectService : Service() {
                     is SocketConnectionEvent.Disconnected -> {
                         _isSocketConnected.value = false
                         connectionMonitor?.onConnectionStateHint(false)
-                        updateNotification(getString(R.string.notif_disconnected))
+                        updateNotification(defaultVisibilityNotificationText())
                         if (peerConnection === connection) {
                             connectionMonitor?.stop()
                             failInFlightTransfers()
+                            resetIncomingGate()
                             peerConnection = null
                             connectionMonitor = null
                             fileTransferManager = null
@@ -430,14 +626,62 @@ class WifiDirectService : Service() {
                 _connectedPeerName.value = frame.displayName
                 _connectedPeerAddress.value = frame.deviceAddress.ifBlank { currentDeviceAddress }
                 persistSavedDevice(frame.deviceAddress.ifBlank { currentDeviceAddress.orEmpty() }, frame.displayName)
+                if (_isSocketConnected.value) {
+                    updateNotification(getString(R.string.notif_connected, frame.displayName))
+                }
+                if (incomingGateState == IncomingGateState.WAITING_DECISION) {
+                    triggerIncomingConnectionPrompt(
+                        peerName = frame.displayName.ifBlank { getString(R.string.transfer_unknown_peer) },
+                        peerAddress = frame.deviceAddress.ifBlank { currentDeviceAddress.orEmpty() },
+                    )
+                }
             }
 
             is Frame.NameChanged -> {
                 _connectedPeerName.value = frame.newDisplayName
                 _connectedPeerAddress.value?.let { persistSavedDevice(it, frame.newDisplayName) }
+                val pending = _incomingConnectionRequest.value
+                if (pending != null) {
+                    _incomingConnectionRequest.value = pending.copy(peerName = frame.newDisplayName)
+                    if (!isUiInForeground && backgroundConnectionDialogEnabled) {
+                        showIncomingConnectionNotification(_incomingConnectionRequest.value!!)
+                    }
+                }
             }
 
-            is Frame.FileOffer -> onTransferOfferReceived(frame)
+            is Frame.FileOffer -> {
+                when (incomingGateState) {
+                    IncomingGateState.WAITING_DECISION -> {
+                        queuedIncomingOffers += frame
+                        val existing = _incomingConnectionRequest.value
+                        val peerName = existing?.peerName
+                            ?: _connectedPeerName.value?.takeIf { it.isNotBlank() }
+                            ?: getString(R.string.transfer_unknown_peer)
+                        val peerAddress = existing?.peerAddress ?: _connectedPeerAddress.value.orEmpty()
+                        val updatedRequest = (existing ?: IncomingConnectionRequest(
+                            requestId = UUID.randomUUID().toString(),
+                            peerName = peerName,
+                            peerAddress = peerAddress,
+                            requestedAtEpochMs = System.currentTimeMillis(),
+                        )).copy(
+                            pendingFileCount = queuedIncomingOffers.size,
+                            pendingFileNames = queuedIncomingOffers.map { it.fileName },
+                        )
+                        _incomingConnectionRequest.value = updatedRequest
+                        if (existing == null) {
+                            launchIncomingPromptUi(updatedRequest)
+                        } else if (!isUiInForeground && backgroundConnectionDialogEnabled) {
+                            showIncomingConnectionNotification(updatedRequest)
+                        }
+                    }
+
+                    IncomingGateState.REJECTED -> Unit
+
+                    IncomingGateState.NONE, IncomingGateState.APPROVED -> {
+                        onTransferOfferReceived(frame)
+                    }
+                }
+            }
 
             is Frame.FileChunkHeader -> fileTransferManager?.onChunkHeaderReceived(frame)
 
@@ -452,6 +696,44 @@ class WifiDirectService : Service() {
 
             is Frame.Pong -> connectionMonitor?.onPongReceived(frame)
         }
+    }
+
+    private fun triggerIncomingConnectionPrompt(peerName: String, peerAddress: String) {
+        if (_incomingConnectionRequest.value != null) return
+        val request = IncomingConnectionRequest(
+            requestId = UUID.randomUUID().toString(),
+            peerName = peerName,
+            peerAddress = peerAddress,
+            requestedAtEpochMs = System.currentTimeMillis(),
+            pendingFileCount = queuedIncomingOffers.size,
+            pendingFileNames = queuedIncomingOffers.map { it.fileName },
+        )
+        _incomingConnectionRequest.value = request
+        launchIncomingPromptUi(request)
+    }
+
+    private fun launchIncomingPromptUi(request: IncomingConnectionRequest) {
+        incomingRequestTimeoutJob?.cancel()
+        incomingRequestTimeoutJob = serviceScope.launch {
+            delay(INCOMING_REQUEST_TIMEOUT_MS)
+            if (_incomingConnectionRequest.value?.requestId == request.requestId &&
+                incomingGateState == IncomingGateState.WAITING_DECISION
+            ) {
+                declineIncomingConnection()
+            }
+        }
+
+        if (!isUiInForeground && _visibilityMode.value.isVisible && backgroundConnectionDialogEnabled) {
+            showIncomingConnectionNotification(request)
+        }
+    }
+
+    private fun resetIncomingGate() {
+        incomingRequestTimeoutJob?.cancel()
+        incomingGateState = IncomingGateState.NONE
+        _incomingConnectionRequest.value = null
+        queuedIncomingOffers.clear()
+        cancelIncomingConnectionNotification()
     }
 
     private fun observeTransferProgress() {
@@ -510,7 +792,7 @@ class WifiDirectService : Service() {
                 createdAtEpochMs = now,
                 peerName = peerName,
                 peerDeviceAddress = peerAddress,
-                sourceUri = file.uri.toString()
+                sourceUri = file.uri.toString(),
             )
         }
         _transfers.value = _transfers.value + items
@@ -531,7 +813,7 @@ class WifiDirectService : Service() {
                 errorMessage = null,
                 createdAtEpochMs = System.currentTimeMillis(),
                 peerName = _connectedPeerName.value.orEmpty(),
-                peerDeviceAddress = _connectedPeerAddress.value.orEmpty()
+                peerDeviceAddress = _connectedPeerAddress.value.orEmpty(),
             )
         }
         dispatchTransferSend(transferId)
@@ -596,8 +878,8 @@ class WifiDirectService : Service() {
                         mimeType = item.mimeType,
                         messageType = "FILE",
                         timestampEpochMs = System.currentTimeMillis(),
-                        channel = Frame.CHANNEL_TRANSFER
-                    )
+                        channel = Frame.CHANNEL_TRANSFER,
+                    ),
                 )
                 if (!offerSent) {
                     failTransfer(transferId, getString(R.string.transfer_error_connection_lost))
@@ -623,7 +905,7 @@ class WifiDirectService : Service() {
                 offer = offer,
                 destinationDir = repository.directory,
                 stagingDir = repository.stagingDirectory,
-                existingNames = existingNames
+                existingNames = existingNames,
             )
             val item = TransferItem(
                 id = offer.messageId,
@@ -633,7 +915,7 @@ class WifiDirectService : Service() {
                 mimeType = offer.mimeType.ifBlank { FileNameUtils.DEFAULT_MIME_TYPE },
                 state = TransferState.IN_PROGRESS,
                 peerName = _connectedPeerName.value.orEmpty(),
-                peerDeviceAddress = _connectedPeerAddress.value.orEmpty()
+                peerDeviceAddress = _connectedPeerAddress.value.orEmpty(),
             )
             _transfers.value = _transfers.value.filterNot { it.id == item.id } + item
             transferSamples.remove(item.id)
@@ -648,7 +930,7 @@ class WifiDirectService : Service() {
                 state = TransferState.FAILED,
                 peerName = _connectedPeerName.value.orEmpty(),
                 peerDeviceAddress = _connectedPeerAddress.value.orEmpty(),
-                errorMessage = e.message ?: getString(R.string.transfer_error_no_space)
+                errorMessage = e.message ?: getString(R.string.transfer_error_no_space),
             )
             _transfers.value = _transfers.value.filterNot { it.id == failedItem.id } + failedItem
             serviceScope.launch { peerConnection?.send(Frame.FileAck(failedItem.id, success = false)) }
@@ -668,7 +950,7 @@ class WifiDirectService : Service() {
                             it.copy(
                                 state = if (ack.cancelled) TransferState.CANCELLED else TransferState.FAILED,
                                 speedBytesPerSec = 0L,
-                                errorMessage = if (ack.cancelled) null else getString(R.string.transfer_error_receiver_failed)
+                                errorMessage = if (ack.cancelled) null else getString(R.string.transfer_error_receiver_failed),
                             )
                         }
                     }
@@ -682,7 +964,7 @@ class WifiDirectService : Service() {
                         it.copy(
                             state = if (ack.cancelled) TransferState.CANCELLED else TransferState.FAILED,
                             speedBytesPerSec = 0L,
-                            errorMessage = if (ack.cancelled) null else getString(R.string.transfer_error_sender_failed)
+                            errorMessage = if (ack.cancelled) null else getString(R.string.transfer_error_sender_failed),
                         )
                     }
                 }
@@ -747,9 +1029,14 @@ class WifiDirectService : Service() {
             peerName = transfer.peerName,
             peerDeviceAddress = transfer.peerDeviceAddress,
             receivedAtEpochMs = System.currentTimeMillis(),
-            seen = false
+            seen = false,
         )
-        serviceScope.launch { receivedFilesRepository.add(record) }
+        serviceScope.launch {
+            receivedFilesRepository.add(record)
+            if (autoSaveToDownloadsEnabled) {
+                FileActions.exportToDownloads(applicationContext, file, file.name, transfer.mimeType)
+            }
+        }
 
         updateTransfer(transfer.id) {
             it.copy(
@@ -759,13 +1046,13 @@ class WifiDirectService : Service() {
                 state = TransferState.COMPLETED,
                 speedBytesPerSec = 0L,
                 localPath = file.absolutePath,
-                errorMessage = null
+                errorMessage = null,
             )
         }
         serviceScope.launch { peerConnection?.send(Frame.FileAck(transfer.id, success = true)) }
 
         _receivedFileEvents.tryEmit(file.name)
-        if (!isUiBound) showFileReceivedNotification(transfer.peerName, file.name)
+        if (!isUiInForeground) showFileReceivedNotification(transfer.peerName, file.name)
     }
 
     private fun onTransferFailed(transfer: TransferItem, reason: String) {
@@ -804,7 +1091,6 @@ class WifiDirectService : Service() {
 
     private fun persistSavedDevice(address: String, name: String) {
         if (address.isBlank()) return
-        val app = application as ShareApplication
         serviceScope.launch {
             val currentNickname = app.preferencesRepository.savedDevices
                 .first()
@@ -816,8 +1102,8 @@ class WifiDirectService : Service() {
                     deviceAddress = address,
                     displayName = name,
                     nickname = currentNickname,
-                    lastConnectedAtEpochMs = System.currentTimeMillis()
-                )
+                    lastConnectedAtEpochMs = System.currentTimeMillis(),
+                ),
             )
         }
     }
@@ -825,6 +1111,7 @@ class WifiDirectService : Service() {
     private fun tearDownActiveConnection() {
         connectionMonitor?.stop()
         failInFlightTransfers()
+        resetIncomingGate()
         peerConnection?.close()
         socketEventJob?.cancel()
         progressEventJob?.cancel()
@@ -840,6 +1127,15 @@ class WifiDirectService : Service() {
 
     // ---- Notifications ----
 
+    private fun defaultVisibilityNotificationText(): String = when (_visibilityMode.value) {
+        DeviceVisibilityMode.HIDDEN -> getString(R.string.notif_hidden)
+        DeviceVisibilityMode.TEMPORARY_10_MIN -> getString(
+            R.string.notif_visible_10min,
+            formatCountdown(_visibilityRemainingSeconds.value ?: TEMPORARY_VISIBILITY_SECONDS),
+        )
+        DeviceVisibilityMode.ALWAYS_VISIBLE -> getString(R.string.notif_visible_always)
+    }
+
     private fun startForegroundWithNotification(contentText: String) {
         runCatching {
             val notification = buildNotification(contentText)
@@ -847,7 +1143,7 @@ class WifiDirectService : Service() {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
@@ -866,11 +1162,12 @@ class WifiDirectService : Service() {
 
     private fun buildNotification(contentText: String): Notification {
         val openIntent = PendingIntent.getActivity(
-            this, 0,
+            this,
+            0,
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
         return NotificationCompat.Builder(this, ShareApplication.CHANNEL_CONNECTION_STATUS)
@@ -879,33 +1176,104 @@ class WifiDirectService : Service() {
             .setContentText(contentText)
             .setContentIntent(openIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
     private fun openAppPendingIntent(requestCode: Int, openReceivedFiles: Boolean = false): PendingIntent =
         PendingIntent.getActivity(
-            this, requestCode,
+            this,
+            requestCode,
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 if (openReceivedFiles) putExtra(MainActivity.EXTRA_OPEN_RECEIVED_FILES, true)
             },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-    private fun showFileReceivedNotification(senderName: String, fileName: String) {
-        val sender = senderName.ifBlank { getString(R.string.transfer_unknown_peer) }
-        val notification = NotificationCompat.Builder(this, ShareApplication.CHANNEL_RECEIVED_FILES)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.notif_file_received_title))
-            .setContentText(getString(R.string.notif_file_received_text, fileName, sender))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setContentIntent(openAppPendingIntent(5, openReceivedFiles = true))
-            .setAutoCancel(true)
-            .build()
+    private fun showIncomingConnectionNotification(request: IncomingConnectionRequest) {
+        runCatching {
+            val openDialogIntent = PendingIntent.getActivity(
+                this,
+                10,
+                Intent(this, IncomingConnectionActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val acceptIntent = PendingIntent.getService(
+                this,
+                11,
+                Intent(this, WifiDirectService::class.java).setAction(ACTION_ACCEPT_INCOMING),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val declineIntent = PendingIntent.getService(
+                this,
+                12,
+                Intent(this, WifiDirectService::class.java).setAction(ACTION_DECLINE_INCOMING),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
 
-        getSystemService(NotificationManager::class.java)?.notify(NEW_FILE_NOTIFICATION_ID, notification)
+            val body = if (request.pendingFileCount > 0) {
+                getString(R.string.incoming_conn_message_files, request.peerName, request.pendingFileCount)
+            } else {
+                getString(R.string.incoming_conn_notif_body)
+            }
+
+            val builder = NotificationCompat.Builder(this, ShareApplication.CHANNEL_INCOMING_CONNECTION)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(getString(R.string.incoming_conn_notif_title, request.peerName))
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setContentIntent(openDialogIntent)
+                .addAction(0, getString(R.string.incoming_conn_accept), acceptIntent)
+                .addAction(0, getString(R.string.incoming_conn_decline), declineIntent)
+                .setOngoing(true)
+                .setAutoCancel(false)
+
+            if (!soundVibrationEnabled) {
+                builder.setSilent(true)
+            } else {
+                builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            }
+
+            getSystemService(NotificationManager::class.java)
+                ?.notify(INCOMING_CONN_NOTIFICATION_ID, builder.build())
+        }.onFailure {
+            Log.w(TAG, "showIncomingConnectionNotification failed: ${it.message}")
+        }
+    }
+
+    private fun cancelIncomingConnectionNotification() {
+        runCatching {
+            getSystemService(NotificationManager::class.java)?.cancel(INCOMING_CONN_NOTIFICATION_ID)
+        }
+    }
+
+    private fun showFileReceivedNotification(senderName: String, fileName: String) {
+        runCatching {
+            val sender = senderName.ifBlank { getString(R.string.transfer_unknown_peer) }
+            val builder = NotificationCompat.Builder(this, ShareApplication.CHANNEL_RECEIVED_FILES)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(getString(R.string.notif_file_received_title))
+                .setContentText(getString(R.string.notif_file_received_text, fileName, sender))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setContentIntent(openAppPendingIntent(5, openReceivedFiles = true))
+                .setAutoCancel(true)
+
+            if (!soundVibrationEnabled) {
+                builder.setSilent(true)
+            }
+
+            getSystemService(NotificationManager::class.java)?.notify(NEW_FILE_NOTIFICATION_ID, builder.build())
+        }.onFailure {
+            Log.w(TAG, "showFileReceivedNotification failed: ${it.message}")
+        }
     }
 
     inner class LocalBinder : Binder() {
@@ -915,10 +1283,22 @@ class WifiDirectService : Service() {
     companion object {
         private const val TAG = "WifiDirectService"
         private const val NOTIFICATION_ID = 1001
+        private const val INCOMING_CONN_NOTIFICATION_ID = 1003
         private const val NEW_FILE_NOTIFICATION_ID = 1004
         private const val PROGRESS_UI_INTERVAL_MS = 150L
+        private const val TEMPORARY_VISIBILITY_SECONDS = 10 * 60
+        private const val INCOMING_REQUEST_TIMEOUT_MS = 60_000L
+        const val ACTION_ACCEPT_INCOMING = "com.thazh.share.action.ACCEPT_INCOMING"
+        const val ACTION_DECLINE_INCOMING = "com.thazh.share.action.DECLINE_INCOMING"
         const val WILDCARD_BIND_ADDRESS = "0.0.0.0"
         const val DEFAULT_GROUP_OWNER_IP = "192.168.49.1"
+
+        fun formatCountdown(seconds: Int): String {
+            val safe = seconds.coerceAtLeast(0)
+            val m = safe / 60
+            val s = safe % 60
+            return String.format(java.util.Locale.US, "%02d:%02d", m, s)
+        }
 
         fun bind(context: Context, connection: android.content.ServiceConnection) {
             val intent = Intent(context, WifiDirectService::class.java)

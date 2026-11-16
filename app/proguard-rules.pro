@@ -29,8 +29,10 @@
     static ** CREATOR;
 }
 
-# Keep LiquidGlass Backdrop & Shapes classes
--keep class com.kyant.** { *; }
+# Keep Glasmio & geometry classes
+-keep class io.github.neoruaa.glasmio.** { *; }
+-keep class com.kyant.capsule.** { *; }
+-keep class com.kyant.shapes.** { *; }
 
 -dontoptimize
 -dontwarn org.jetbrains.annotations.**

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,16 +19,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kyant.capsule.ContinuousCapsule
 import com.thazh.share.R
 import com.thazh.share.data.ConnectionQuality
-import com.thazh.share.ui.cupertino.CupertinoText
-import com.thazh.share.ui.theme.CupertinoTheme
+import io.github.neoruaa.glasmio.core.GlasmioTheme
 
 @Composable
 fun ConnectionQualityIndicator(
     quality: ConnectionQuality,
     modifier: Modifier = Modifier,
-    showLabel: Boolean = true
+    showLabel: Boolean = true,
 ) {
     val labelText = when (quality) {
         ConnectionQuality.STRONG -> stringResource(R.string.quality_strong)
@@ -36,16 +37,16 @@ fun ConnectionQualityIndicator(
         ConnectionQuality.POOR -> stringResource(R.string.quality_poor)
         ConnectionQuality.DISCONNECTED -> stringResource(R.string.quality_disconnected)
     }
-    val inactiveColor = CupertinoTheme.colors.tertiaryLabel
+    val inactiveColor = GlasmioTheme.colors.tertiaryContent
 
     Row(
         modifier = modifier
-            .clip(CupertinoTheme.shapes.pill)
+            .clip(ContinuousCapsule)
             .background(quality.color.copy(alpha = 0.14f))
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .semantics { contentDescription = labelText },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Canvas(modifier = Modifier.size(width = 16.dp, height = 12.dp)) {
             val barCount = 4
@@ -60,16 +61,16 @@ fun ConnectionQualityIndicator(
                     color = if (i < quality.barsFilled) quality.color else inactiveColor,
                     topLeft = Offset(left, top),
                     size = Size(barWidth, barHeight),
-                    cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
+                    cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
                 )
             }
         }
         if (showLabel) {
-            CupertinoText(
+            Text(
                 text = labelText,
-                style = CupertinoTheme.typography.caption.copy(fontWeight = FontWeight.SemiBold),
+                style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                 color = quality.color,
-                maxLines = 1
+                maxLines = 1,
             )
         }
     }

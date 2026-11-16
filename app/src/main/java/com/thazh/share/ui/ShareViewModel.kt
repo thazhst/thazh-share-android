@@ -10,7 +10,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.thazh.share.ShareApplication
 import com.thazh.share.data.ConnectionQuality
+import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
+import com.thazh.share.data.IncomingConnectionRequest
 import com.thazh.share.data.PickedFile
 import com.thazh.share.data.ReceivedFile
 import com.thazh.share.data.RenameResult
@@ -48,6 +50,7 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
 
     private var service: WifiDirectService? = null
     private var isServiceBound = false
+    private var latestUiInForeground = false
     private val bridgeJobs = mutableListOf<kotlinx.coroutines.Job>()
 
     private val _isServiceReady = MutableStateFlow(false)
@@ -64,6 +67,36 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
 
     val bleFastDiscoveryEnabled: StateFlow<Boolean> = app.preferencesRepository.bleFastDiscoveryEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val reduceTransparency: StateFlow<Boolean> = app.preferencesRepository.reduceTransparency
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val liquidGlassEnabled: StateFlow<Boolean> = app.preferencesRepository.liquidGlassEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val defaultVisibilityMode: StateFlow<DeviceVisibilityMode> = app.preferencesRepository.defaultVisibilityMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DeviceVisibilityMode.TEMPORARY_10_MIN)
+
+    val confirmIncomingConnection: StateFlow<Boolean> = app.preferencesRepository.confirmIncomingConnection
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val backgroundConnectionDialog: StateFlow<Boolean> = app.preferencesRepository.backgroundConnectionDialog
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val autoSaveToDownloads: StateFlow<Boolean> = app.preferencesRepository.autoSaveToDownloads
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val soundVibrationEnabled: StateFlow<Boolean> = app.preferencesRepository.soundVibrationEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    private val _visibilityMode = MutableStateFlow(DeviceVisibilityMode.TEMPORARY_10_MIN)
+    val visibilityMode: StateFlow<DeviceVisibilityMode> = _visibilityMode.asStateFlow()
+
+    private val _visibilityRemainingSeconds = MutableStateFlow<Int?>(600)
+    val visibilityRemainingSeconds: StateFlow<Int?> = _visibilityRemainingSeconds.asStateFlow()
+
+    private val _incomingConnectionRequest = MutableStateFlow<IncomingConnectionRequest?>(null)
+    val incomingConnectionRequest: StateFlow<IncomingConnectionRequest?> = _incomingConnectionRequest.asStateFlow()
 
     private val _peers = MutableStateFlow<List<DiscoveredPeer>>(emptyList())
     val peers: StateFlow<List<DiscoveredPeer>> = _peers.asStateFlow()
@@ -117,12 +150,14 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             val localBinder = binder as? WifiDirectService.LocalBinder ?: return
-            service = localBinder.getService()
+            val bound = localBinder.getService()
+            service = bound
+            bound.setUiInForeground(latestUiInForeground)
             _isServiceReady.value = true
             bridgeServiceFlows()
             viewModelScope.launch {
                 val display = displayName.value.ifBlank { app.preferencesRepository.displayName.first() }
-                service?.setLocalDisplayName(display)
+                bound.setLocalDisplayName(display)
             }
         }
 
@@ -144,12 +179,20 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         isServiceBound = false
     }
 
+    fun setUiInForeground(inForeground: Boolean) {
+        latestUiInForeground = inForeground
+        service?.setUiInForeground(inForeground)
+    }
+
     private fun bridgeServiceFlows() {
         bridgeJobs.forEach { it.cancel() }
         bridgeJobs.clear()
         val s = service ?: return
         bridgeJobs += viewModelScope.launch { s.peers.collect { _peers.value = it } }
         bridgeJobs += viewModelScope.launch { s.wifiDirectManager.isDiscovering.collect { _isDiscovering.value = it } }
+        bridgeJobs += viewModelScope.launch { s.visibilityMode.collect { _visibilityMode.value = it } }
+        bridgeJobs += viewModelScope.launch { s.visibilityRemainingSeconds.collect { _visibilityRemainingSeconds.value = it } }
+        bridgeJobs += viewModelScope.launch { s.incomingConnectionRequest.collect { _incomingConnectionRequest.value = it } }
         bridgeJobs += viewModelScope.launch { s.connectedPeerName.collect { _connectedPeerName.value = it } }
         bridgeJobs += viewModelScope.launch {
             s.isSocketConnected.collect { connected ->
@@ -178,6 +221,48 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun setVisibilityMode(mode: DeviceVisibilityMode) {
+        service?.setVisibilityMode(mode)
+    }
+
+    fun setDefaultVisibilityMode(mode: DeviceVisibilityMode) {
+        viewModelScope.launch {
+            app.preferencesRepository.setDefaultVisibilityMode(mode)
+        }
+    }
+
+    fun setConfirmIncomingConnection(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setConfirmIncomingConnection(enabled)
+        }
+    }
+
+    fun setBackgroundConnectionDialog(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setBackgroundConnectionDialog(enabled)
+        }
+    }
+
+    fun setAutoSaveToDownloads(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setAutoSaveToDownloads(enabled)
+        }
+    }
+
+    fun setSoundVibrationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setSoundVibrationEnabled(enabled)
+        }
+    }
+
+    fun acceptIncomingConnection() {
+        service?.acceptIncomingConnection()
+    }
+
+    fun declineIncomingConnection() {
+        service?.declineIncomingConnection()
     }
 
     fun refreshNfcState() {
@@ -231,14 +316,9 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Shares one or more [ReceivedFile]s over Wi-Fi Direct in a single operation.
-     * - If a Wi-Fi Direct socket connection is already active, dispatches all files immediately.
-     * - Otherwise queues them so they are automatically sent the moment a peer connects, and starts discovery.
-     */
     fun shareReceivedFilesViaWifiDirect(
         files: List<ReceivedFile>,
-        onResult: (sentImmediately: Boolean, count: Int) -> Unit = { _, _ -> }
+        onResult: (sentImmediately: Boolean, count: Int) -> Unit = { _, _ -> },
     ) {
         if (files.isEmpty()) return
         viewModelScope.launch {
@@ -250,7 +330,7 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
                         uri = Uri.fromFile(diskFile),
                         name = rf.fileName,
                         sizeBytes = diskFile.length().coerceAtLeast(rf.sizeBytes),
-                        mimeType = rf.mimeType
+                        mimeType = rf.mimeType,
                     )
                 }
             }
@@ -347,9 +427,39 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clearSavedDevices(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            app.preferencesRepository.clearSavedDevices()
+            onDone()
+        }
+    }
+
+    fun clearTempStagingCache(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                app.receivedFilesRepository.stagingDirectory.listFiles()?.forEach { file ->
+                    runCatching { file.deleteRecursively() }
+                }
+            }
+            onDone()
+        }
+    }
+
     fun setBleFastDiscoveryEnabled(enabled: Boolean) {
         viewModelScope.launch {
             app.preferencesRepository.setBleFastDiscoveryEnabled(enabled)
+        }
+    }
+
+    fun setReduceTransparency(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setReduceTransparency(enabled)
+        }
+    }
+
+    fun setLiquidGlassEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setLiquidGlassEnabled(enabled)
         }
     }
 
@@ -361,6 +471,6 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        stopDiscovery()
+        service?.setUiInForeground(false)
     }
 }

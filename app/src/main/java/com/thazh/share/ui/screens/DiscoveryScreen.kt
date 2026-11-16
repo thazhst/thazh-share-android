@@ -10,35 +10,25 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Radar
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.WifiOff
-import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,42 +37,51 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.capsule.ContinuousCapsule
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
+import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.SavedDevice
 import com.thazh.share.ui.ConnectScreenState
 import com.thazh.share.ui.components.DiscoveredPeerRow
 import com.thazh.share.ui.components.NfcTapCard
 import com.thazh.share.ui.components.SavedDeviceRow
-import com.thazh.share.ui.cupertino.CupertinoActivityIndicator
-import com.thazh.share.ui.cupertino.CupertinoDivider
-import com.thazh.share.ui.cupertino.CupertinoIcon
-import com.thazh.share.ui.cupertino.CupertinoText
-import com.thazh.share.ui.cupertino.CupertinoTextField
-import com.thazh.share.ui.cupertino.CupertinoTopBar
-import com.thazh.share.ui.cupertino.LiquidAlertDialog
-import com.thazh.share.ui.cupertino.LiquidButton
-import com.thazh.share.ui.cupertino.LiquidCard
-import com.thazh.share.ui.cupertino.LiquidIconButton
-import com.thazh.share.ui.theme.CupertinoTheme
-import com.thazh.share.ui.theme.LocalAppBackdrop
+import com.thazh.share.ui.components.VisibilitySelectorCard
+import com.thazh.share.ui.theme.ThazhSymbols
+import com.thazh.share.ui.theme.ThazhTheme
+import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.glass.GlassEmphasis
+import io.github.neoruaa.glasmio.icons.SfIcon
+import io.github.neoruaa.glasmio.scaffold.GlasmioPinnedListPage
+import io.github.neoruaa.glasmio.ui.GlasmioAlertButtonRole
+import io.github.neoruaa.glasmio.ui.GlasmioAlertButtonSpec
+import io.github.neoruaa.glasmio.ui.GlasmioAlertDialog
+import io.github.neoruaa.glasmio.ui.GlasmioAlertFieldGroup
+import io.github.neoruaa.glasmio.ui.GlasmioAlertTextField
+import io.github.neoruaa.glasmio.ui.GlasmioButton
+import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
+import io.github.neoruaa.glasmio.ui.GlasmioCard
+import io.github.neoruaa.glasmio.ui.GlasmioGroupedList
+import io.github.neoruaa.glasmio.ui.GlasmioIconButton
+import io.github.neoruaa.glasmio.ui.GlasmioSectionTitle
 
 @Composable
 fun DiscoveryScreen(
     displayName: String,
+    visibilityMode: DeviceVisibilityMode,
+    visibilityRemainingSeconds: Int?,
     peers: List<DiscoveredPeer>,
     savedDevices: List<SavedDevice>,
     isDiscovering: Boolean,
@@ -91,7 +90,9 @@ fun DiscoveryScreen(
     isNfcEnabled: Boolean,
     nfcPairingPeerName: String?,
     pendingWifiDirectFilesCount: Int = 0,
+    bottomBarPadding: Dp = 96.dp,
     onCancelPendingFiles: () -> Unit = {},
+    onSelectVisibilityMode: (DeviceVisibilityMode) -> Unit,
     onStartDiscovery: () -> Unit,
     onStopDiscovery: () -> Unit,
     onConnectPeer: (DiscoveredPeer) -> Unit,
@@ -101,10 +102,12 @@ fun DiscoveryScreen(
     onOpenActiveSession: () -> Unit,
     onOpenNfcSettings: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
+    val appearance = GlasmioTheme.appearance
+    val semantic = ThazhTheme.semantic
     val wifiManager = remember(context) {
         context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
     }
@@ -114,409 +117,449 @@ fun DiscoveryScreen(
     val isConnecting = screenState is ConnectScreenState.Connecting
 
     var deviceToRename by remember { mutableStateOf<SavedDevice?>(null) }
-    var renameDraft by remember { mutableStateOf("") }
-
-    val density = LocalDensity.current
-    var topBarHeightPx by remember { mutableIntStateOf(0) }
-    val topPadding = if (topBarHeightPx > 0) {
-        with(density) { topBarHeightPx.toDp() } + 16.dp
-    } else {
-        112.dp
+    var lastRenameTarget by remember { mutableStateOf<SavedDevice?>(null) }
+    if (deviceToRename != null) {
+        lastRenameTarget = deviceToRename
     }
+    var renameDraft by remember { mutableStateOf(TextFieldValue("")) }
 
-    val contentBackdrop = rememberLayerBackdrop()
-    val barBackdrop = rememberCombinedBackdrop(LocalAppBackdrop.current, contentBackdrop)
+    val cardShape = ContinuousRoundedRectangle(GlasmioTheme.dimensions.regularCornerRadius)
+    val badgeShape = ContinuousRoundedRectangle(12.dp)
 
     Box(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(contentBackdrop),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .widthIn(max = 600.dp)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = topPadding,
-                    bottom = 176.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                    if (screenState is ConnectScreenState.Connected) {
-                        item(key = "active_session_banner") {
-                            LiquidCard(
-                                onClick = onOpenActiveSession,
-                                surfaceColor = colors.accentGreen.copy(alpha = 0.16f),
-                                borderColor = colors.accentGreen.copy(alpha = 0.4f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("active_session_banner")
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .clip(CupertinoTheme.shapes.iconBadge)
-                                            .background(colors.accentGreen.copy(alpha = 0.22f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CupertinoIcon(
-                                            imageVector = Icons.Rounded.Share,
-                                            contentDescription = null,
-                                            tint = colors.accentGreen
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        CupertinoText(
-                                            text = stringResource(R.string.discover_active_session, screenState.peerName),
-                                            style = CupertinoTheme.typography.headline,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        CupertinoText(
-                                            text = stringResource(R.string.discover_active_session_action),
-                                            style = CupertinoTheme.typography.footnote,
-                                            color = colors.secondaryLabel
-                                        )
-                                    }
-                                    CupertinoIcon(
-                                        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = colors.secondaryLabel
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (pendingWifiDirectFilesCount > 0) {
-                        item(key = "pending_wifi_direct_files_banner") {
-                            LiquidCard(
-                                surfaceColor = colors.accentBlue.copy(alpha = 0.14f),
-                                borderColor = colors.accentBlue.copy(alpha = 0.38f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("pending_wifi_direct_files_banner")
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .clip(CupertinoTheme.shapes.iconBadge)
-                                            .background(colors.accentBlue.copy(alpha = 0.20f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CupertinoIcon(
-                                            imageVector = Icons.Rounded.Share,
-                                            contentDescription = null,
-                                            tint = colors.accentBlue
-                                        )
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        CupertinoText(
-                                            text = stringResource(
-                                                R.string.discover_pending_files_title,
-                                                pendingWifiDirectFilesCount
-                                            ),
-                                            style = CupertinoTheme.typography.headline
-                                        )
-                                        CupertinoText(
-                                            text = stringResource(R.string.discover_pending_files_subtitle),
-                                            style = CupertinoTheme.typography.footnote,
-                                            color = colors.secondaryLabel
-                                        )
-                                    }
-                                    LiquidIconButton(
-                                        onClick = onCancelPendingFiles,
-                                        icon = Icons.Rounded.Close,
-                                        contentDescription = stringResource(R.string.discover_pending_files_cancel),
-                                        tint = colors.destructiveRed,
-                                        modifier = Modifier.testTag("cancel_pending_wifi_direct_files_button")
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (!isWifiEnabled) {
-                        item(key = "wifi_off_warning") {
-                            LiquidCard(
-                                surfaceColor = colors.warningOrange.copy(alpha = 0.14f),
-                                borderColor = colors.warningOrange.copy(alpha = 0.35f),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    CupertinoIcon(
-                                        imageVector = Icons.Rounded.WifiOff,
-                                        contentDescription = null,
-                                        tint = colors.warningOrange
-                                    )
-                                    CupertinoText(
-                                        text = stringResource(R.string.discover_wifi_off),
-                                        style = CupertinoTheme.typography.subheadline,
-                                        color = colors.label,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    item(key = "radar_hero") {
-                        DiscoveryRadarCard(
-                            displayName = displayName,
-                            isDiscovering = isDiscovering,
-                            errorMessage = (screenState as? ConnectScreenState.Error)?.message
-                        )
-                    }
-
-                    if (isNfcSupported) {
-                        item(key = "nfc_tap_card") {
-                            NfcTapCard(
-                                isNfcEnabled = isNfcEnabled,
-                                nfcPairingPeerName = nfcPairingPeerName,
-                                onOpenNfcSettings = onOpenNfcSettings
-                            )
-                        }
-                    }
-
-                    if (savedDevices.isNotEmpty()) {
-                        item(key = "saved_header") {
-                            SectionHeader(title = stringResource(R.string.discover_saved_devices))
-                        }
-                        item(key = "saved_list") {
-                            LiquidCard(
-                                contentPadding = PaddingValues(0.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                savedDevices.forEachIndexed { index, device ->
-                                    SavedDeviceRow(
-                                        device = device,
-                                        isConnecting = isConnecting,
-                                        onConnect = { onConnectSavedDevice(device) },
-                                        onRename = {
-                                            deviceToRename = device
-                                            renameDraft = device.nickname.orEmpty().ifBlank { device.displayName }
-                                        },
-                                        onRemove = { onRemoveSavedDevice(device.deviceAddress) }
-                                    )
-                                    if (index < savedDevices.lastIndex) {
-                                        CupertinoDivider(startIndent = 72.dp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    item(key = "nearby_header") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            SectionHeader(title = stringResource(R.string.discover_available_devices))
-                            if (isDiscovering) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    CupertinoActivityIndicator(size = 15.dp, color = colors.accentBlue)
-                                    CupertinoText(
-                                        text = stringResource(R.string.discover_scanning),
-                                        style = CupertinoTheme.typography.caption,
-                                        color = colors.accentBlue
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    item(key = "nearby_list") {
-                        LiquidCard(
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (peers.isEmpty()) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 24.dp, vertical = 28.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    CupertinoIcon(
-                                        imageVector = Icons.Rounded.Radar,
-                                        contentDescription = null,
-                                        tint = colors.tertiaryLabel,
-                                        modifier = Modifier.size(34.dp)
-                                    )
-                                    CupertinoText(
-                                        text = stringResource(R.string.discover_no_peers),
-                                        style = CupertinoTheme.typography.subheadline,
-                                        color = colors.secondaryLabel,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            } else {
-                                peers.forEachIndexed { index, peer ->
-                                    DiscoveredPeerRow(
-                                        peer = peer,
-                                        isConnecting = isConnecting,
-                                        onConnect = { onConnectPeer(peer) }
-                                    )
-                                    if (index < peers.lastIndex) {
-                                        CupertinoDivider(startIndent = 72.dp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-        }
-
-        // Floating LiquidGlass TopBar + Scan Pill refracting live scrollable content beneath them
-        CompositionLocalProvider(LocalAppBackdrop provides barBackdrop) {
-            CupertinoTopBar(
-                title = stringResource(R.string.discover_title),
-                subtitle = stringResource(R.string.discover_subtitle),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .onSizeChanged { topBarHeightPx = it.height },
-                actions = {
-                    LiquidIconButton(
-                        onClick = onOpenSettings,
-                        icon = Icons.Rounded.Settings,
+        GlasmioPinnedListPage(
+            title = stringResource(R.string.discover_title),
+            subtitle = stringResource(R.string.discover_subtitle),
+            bottomPadding = bottomBarPadding + 72.dp,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            backgroundColor = colors.groupedBackground.copy(
+                alpha = if (appearance.reduceTransparency) 1f else 0.78f,
+            ),
+            modifier = Modifier.fillMaxSize(),
+            actions = {
+                GlasmioIconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.testTag("open_settings_button"),
+                ) {
+                    SfIcon(
+                        systemName = ThazhSymbols.Settings,
                         contentDescription = stringResource(R.string.settings_title),
-                        modifier = Modifier.testTag("open_settings_button")
                     )
                 }
-            )
+            },
+        ) {
+            if (screenState is ConnectScreenState.Connected) {
+                item(key = "active_session_banner") {
+                    CenteredDiscoveryContent {
+                        GlasmioCard(
+                            onClick = onOpenActiveSession,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("active_session_banner"),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(semantic.accentGreen.copy(alpha = 0.14f), cardShape)
+                                    .border(1.dp, semantic.accentGreen.copy(alpha = 0.35f), cardShape)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(badgeShape)
+                                        .background(semantic.accentGreen.copy(alpha = 0.22f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    SfIcon(
+                                        systemName = ThazhSymbols.Share,
+                                        contentDescription = null,
+                                        tint = semantic.accentGreen,
+                                        size = 22.dp,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.discover_active_session, screenState.peerName),
+                                        style = GlasmioTheme.textStyles.headline,
+                                        color = colors.content,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.discover_active_session_action),
+                                        style = GlasmioTheme.textStyles.footnote,
+                                        color = colors.secondaryContent,
+                                    )
+                                }
+                                SfIcon(
+                                    systemName = ThazhSymbols.ChevronRight,
+                                    contentDescription = null,
+                                    tint = colors.secondaryContent,
+                                    size = 18.dp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(start = 24.dp, end = 24.dp, bottom = 92.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                LiquidButton(
-                    onClick = { if (isDiscovering) onStopDiscovery() else onStartDiscovery() },
-                    modifier = Modifier
-                        .widthIn(min = 210.dp, max = 320.dp)
-                        .fillMaxWidth(0.76f)
-                        .testTag("toggle_scan_button"),
-                    tint = if (isDiscovering) colors.destructiveRed else colors.accentBlue,
-                    height = 54.dp
-                ) {
-                    if (isDiscovering) {
-                        CupertinoIcon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        CupertinoText(
-                            text = stringResource(R.string.discover_stop_scan),
-                            style = CupertinoTheme.typography.headline,
-                            color = Color.White
-                        )
-                    } else {
-                        CupertinoIcon(
-                            imageVector = Icons.Rounded.WifiTethering,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        CupertinoText(
-                            text = stringResource(R.string.discover_start_scan),
-                            style = CupertinoTheme.typography.headline,
-                            color = Color.White
+            if (pendingWifiDirectFilesCount > 0) {
+                item(key = "pending_wifi_direct_files_banner") {
+                    CenteredDiscoveryContent {
+                        GlasmioCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("pending_wifi_direct_files_banner"),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(semantic.accentBlue.copy(alpha = 0.14f), cardShape)
+                                    .border(1.dp, semantic.accentBlue.copy(alpha = 0.35f), cardShape)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(badgeShape)
+                                        .background(semantic.accentBlue.copy(alpha = 0.20f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    SfIcon(
+                                        systemName = ThazhSymbols.Share,
+                                        contentDescription = null,
+                                        tint = semantic.accentBlue,
+                                        size = 22.dp,
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.discover_pending_files_title,
+                                            pendingWifiDirectFilesCount,
+                                        ),
+                                        style = GlasmioTheme.textStyles.headline,
+                                        color = colors.content,
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.discover_pending_files_subtitle),
+                                        style = GlasmioTheme.textStyles.footnote,
+                                        color = colors.secondaryContent,
+                                    )
+                                }
+                                GlasmioIconButton(
+                                    onClick = onCancelPendingFiles,
+                                    size = 48.dp,
+                                    modifier = Modifier.testTag("cancel_pending_wifi_direct_files_button"),
+                                ) {
+                                    SfIcon(
+                                        systemName = ThazhSymbols.Close,
+                                        contentDescription = stringResource(R.string.discover_pending_files_cancel),
+                                        tint = colors.destructive,
+                                        size = 20.dp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!isWifiEnabled) {
+                item(key = "wifi_off_warning") {
+                    CenteredDiscoveryContent {
+                        GlasmioCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(semantic.warningOrange.copy(alpha = 0.14f), cardShape)
+                                    .border(1.dp, semantic.warningOrange.copy(alpha = 0.35f), cardShape)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                SfIcon(
+                                    systemName = ThazhSymbols.WifiOff,
+                                    contentDescription = null,
+                                    tint = semantic.warningOrange,
+                                    size = 22.dp,
+                                )
+                                Text(
+                                    text = stringResource(R.string.discover_wifi_off),
+                                    style = GlasmioTheme.textStyles.subheadline,
+                                    color = colors.content,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "radar_hero") {
+                CenteredDiscoveryContent {
+                    DiscoveryRadarCard(
+                        displayName = displayName,
+                        isDiscovering = isDiscovering,
+                        errorMessage = (screenState as? ConnectScreenState.Error)?.message,
+                    )
+                }
+            }
+
+            item(key = "visibility_selector") {
+                CenteredDiscoveryContent {
+                    VisibilitySelectorCard(
+                        mode = visibilityMode,
+                        remainingSeconds = visibilityRemainingSeconds,
+                        onSelectMode = onSelectVisibilityMode,
+                    )
+                }
+            }
+
+            if (isNfcSupported) {
+                item(key = "nfc_tap_card") {
+                    CenteredDiscoveryContent {
+                        NfcTapCard(
+                            isNfcEnabled = isNfcEnabled,
+                            nfcPairingPeerName = nfcPairingPeerName,
+                            onOpenNfcSettings = onOpenNfcSettings,
                         )
                     }
                 }
             }
+
+            if (savedDevices.isNotEmpty()) {
+                item(key = "saved_header") {
+                    CenteredDiscoveryContent {
+                        GlasmioSectionTitle(title = stringResource(R.string.discover_saved_devices))
+                    }
+                }
+                item(key = "saved_list") {
+                    CenteredDiscoveryContent {
+                        GlasmioGroupedList(modifier = Modifier.fillMaxWidth()) {
+                            savedDevices.forEachIndexed { index, device ->
+                                SavedDeviceRow(
+                                    device = device,
+                                    isConnecting = isConnecting,
+                                    onConnect = { onConnectSavedDevice(device) },
+                                    onRename = {
+                                        val initial = device.nickname.orEmpty().ifBlank { device.displayName }
+                                        renameDraft = TextFieldValue(initial, TextRange(initial.length))
+                                        deviceToRename = device
+                                    },
+                                    onRemove = { onRemoveSavedDevice(device.deviceAddress) },
+                                    showTopSeparator = index > 0,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "nearby_header") {
+                CenteredDiscoveryContent {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        GlasmioSectionTitle(
+                            title = stringResource(R.string.discover_available_devices),
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (isDiscovering) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(end = 6.dp),
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(15.dp),
+                                    color = semantic.accentBlue,
+                                    strokeWidth = 2.dp,
+                                )
+                                Text(
+                                    text = stringResource(R.string.discover_scanning),
+                                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Medium),
+                                    color = semantic.accentBlue,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "nearby_list") {
+                CenteredDiscoveryContent {
+                    if (peers.isEmpty()) {
+                        GlasmioCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 28.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                SfIcon(
+                                    systemName = ThazhSymbols.Radar,
+                                    contentDescription = null,
+                                    tint = colors.tertiaryContent,
+                                    size = 34.dp,
+                                )
+                                Text(
+                                    text = stringResource(
+                                        if (visibilityMode == DeviceVisibilityMode.HIDDEN) {
+                                            R.string.discover_no_peers_hidden
+                                        } else {
+                                            R.string.discover_no_peers
+                                        },
+                                    ),
+                                    style = GlasmioTheme.textStyles.subheadline,
+                                    color = colors.secondaryContent,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    } else {
+                        GlasmioGroupedList(modifier = Modifier.fillMaxWidth()) {
+                            peers.forEachIndexed { index, peer ->
+                                DiscoveredPeerRow(
+                                    peer = peer,
+                                    isConnecting = isConnecting,
+                                    onConnect = { onConnectPeer(peer) },
+                                    showTopSeparator = index > 0,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 24.dp, end = 24.dp, bottom = bottomBarPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            GlasmioButton(
+                onClick = { if (isDiscovering) onStopDiscovery() else onStartDiscovery() },
+                emphasis = GlassEmphasis.Prominent,
+                destructive = isDiscovering,
+                navigationSurfaceColor = if (isDiscovering) colors.destructive else semantic.accentBlue,
+                size = GlasmioButtonSize.Large,
+                modifier = Modifier
+                    .widthIn(min = 210.dp, max = 320.dp)
+                    .fillMaxWidth(0.76f)
+                    .testTag("toggle_scan_button"),
+            ) {
+                SfIcon(
+                    systemName = if (isDiscovering) ThazhSymbols.Close else ThazhSymbols.WifiTethering,
+                    contentDescription = null,
+                    tint = Color.White,
+                    size = 20.dp,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(
+                        if (isDiscovering) R.string.discover_stop_scan else R.string.discover_start_scan,
+                    ),
+                    style = GlasmioTheme.textStyles.headline,
+                    color = Color.White,
+                )
+            }
         }
     }
 
-    deviceToRename?.let { target ->
-        LiquidAlertDialog(
-            onDismissRequest = { deviceToRename = null },
-            title = stringResource(R.string.saved_device_rename),
-            confirmText = stringResource(R.string.save),
-            onConfirm = {
-                onRenameSavedDevice(target.deviceAddress, renameDraft.trim())
-                deviceToRename = null
-            },
-            dismissText = stringResource(R.string.cancel)
-        ) {
-            CupertinoTextField(
+    val renameTarget = lastRenameTarget
+    GlasmioAlertDialog(
+        visible = deviceToRename != null && renameTarget != null,
+        onDismissRequest = { deviceToRename = null },
+        title = stringResource(R.string.saved_device_rename),
+        buttons = listOf(
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.cancel),
+                onClick = { deviceToRename = null },
+                role = GlasmioAlertButtonRole.Cancel,
+            ),
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.save),
+                onClick = {
+                    renameTarget?.let { onRenameSavedDevice(it.deviceAddress, renameDraft.text.trim()) }
+                    deviceToRename = null
+                },
+                role = GlasmioAlertButtonRole.Default,
+            ),
+        ),
+    ) {
+        GlasmioAlertFieldGroup {
+            GlasmioAlertTextField(
                 value = renameDraft,
                 onValueChange = { renameDraft = it },
-                placeholder = target.displayName,
+                placeholder = renameTarget?.displayName.orEmpty(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    onRenameSavedDevice(target.deviceAddress, renameDraft.trim())
-                    deviceToRename = null
-                }),
-                modifier = Modifier.testTag("rename_saved_device_input")
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        renameTarget?.let { onRenameSavedDevice(it.deviceAddress, renameDraft.text.trim()) }
+                        deviceToRename = null
+                    },
+                ),
+                modifier = Modifier.testTag("rename_saved_device_input"),
             )
         }
     }
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    CupertinoText(
-        text = title.uppercase(),
-        style = CupertinoTheme.typography.caption.copy(fontWeight = FontWeight.SemiBold),
-        color = CupertinoTheme.colors.secondaryLabel,
-        modifier = Modifier.padding(horizontal = 6.dp)
-    )
+private fun CenteredDiscoveryContent(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 600.dp)
+                .fillMaxWidth(),
+        ) {
+            content()
+        }
+    }
 }
 
 @Composable
 private fun DiscoveryRadarCard(
     displayName: String,
     isDiscovering: Boolean,
-    errorMessage: String?
+    errorMessage: String?,
 ) {
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
     val transition = rememberInfiniteTransition(label = "radar_wave")
     val wave by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "wave"
+        label = "wave",
     )
 
-    LiquidCard(modifier = Modifier.fillMaxWidth()) {
+    GlasmioCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
                 modifier = Modifier.size(104.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val maxR = size.minDimension / 2f
@@ -526,28 +569,28 @@ private fun DiscoveryRadarCard(
                             val radius = maxR * (0.36f + 0.64f * phase)
                             val alpha = (1f - phase) * 0.42f
                             drawCircle(
-                                color = colors.accentBlue.copy(alpha = alpha),
+                                color = semantic.accentBlue.copy(alpha = alpha),
                                 radius = radius,
-                                style = Stroke(width = 2.dp.toPx())
+                                style = Stroke(width = 2.dp.toPx()),
                             )
                         }
                     } else {
                         drawCircle(
-                            color = colors.accentBlue.copy(alpha = 0.16f),
+                            color = semantic.accentBlue.copy(alpha = 0.16f),
                             radius = maxR * 0.72f,
-                            style = Stroke(width = 1.5.dp.toPx())
+                            style = Stroke(width = 1.5.dp.toPx()),
                         )
                     }
                     drawCircle(
-                        color = colors.accentBlue.copy(alpha = 0.16f),
-                        radius = maxR * 0.38f
+                        color = semantic.accentBlue.copy(alpha = 0.16f),
+                        radius = maxR * 0.38f,
                     )
                 }
-                CupertinoIcon(
-                    imageVector = Icons.Rounded.WifiTethering,
+                SfIcon(
+                    systemName = ThazhSymbols.WifiTethering,
                     contentDescription = null,
-                    tint = colors.accentBlue,
-                    modifier = Modifier.size(30.dp)
+                    tint = semantic.accentBlue,
+                    size = 30.dp,
                 )
             }
 
@@ -556,26 +599,26 @@ private fun DiscoveryRadarCard(
             if (displayName.isNotBlank()) {
                 Box(
                     modifier = Modifier
-                        .clip(CupertinoTheme.shapes.pill)
-                        .background(colors.accentBlue.copy(alpha = 0.12f))
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .clip(ContinuousCapsule)
+                        .background(semantic.accentBlue.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                 ) {
-                    CupertinoText(
+                    Text(
                         text = displayName,
-                        style = CupertinoTheme.typography.caption.copy(fontWeight = FontWeight.SemiBold),
-                        color = colors.accentBlue,
+                        style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                        color = semantic.accentBlue,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            CupertinoText(
+            Text(
                 text = errorMessage ?: stringResource(R.string.discover_intro),
-                style = CupertinoTheme.typography.subheadline,
-                color = if (errorMessage != null) colors.destructiveRed else colors.secondaryLabel,
-                textAlign = TextAlign.Center
+                style = GlasmioTheme.textStyles.subheadline,
+                color = if (errorMessage != null) colors.destructive else colors.secondaryContent,
+                textAlign = TextAlign.Center,
             )
         }
     }

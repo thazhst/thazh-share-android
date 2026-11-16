@@ -7,15 +7,47 @@
     <string name="notification_channel_connection_desc">Hiển thị trạng thái kết nối WiFi Direct đang hoạt động</string>
     <string name="notification_channel_received_files">Tệp nhận được</string>
     <string name="notification_channel_received_files_desc">Thông báo khi nhận xong một tệp từ thiết bị khác</string>
+    <string name="notification_channel_incoming_connection">Yêu cầu kết nối đến</string>
+    <string name="notification_channel_incoming_connection_desc">Hiển thị hộp thoại yêu cầu xác nhận khi thiết bị khác kết nối để gửi tệp trong lúc bạn dùng ứng dụng khác</string>
 
     <!-- Foreground service notification -->
     <string name="notif_scanning">Sẵn sàng chia sẻ tệp…</string>
+    <string name="notif_visible_10min">Đang hiển thị cho thiết bị xung quanh (%1$s)</string>
+    <string name="notif_visible_always">Luôn hiển thị cho thiết bị xung quanh</string>
+    <string name="notif_hidden">Thiết bị đang ở chế độ Ẩn</string>
     <string name="ble_nearby_device">Thiết bị gần đây (BLE)</string>
     <string name="notif_connecting">Đang kết nối tới thiết bị…</string>
     <string name="notif_connected">Đã kết nối với %1$s</string>
     <string name="notif_disconnected">Mất kết nối</string>
     <string name="notif_file_received_title">Đã nhận tệp mới</string>
     <string name="notif_file_received_text">%1$s • từ %2$s</string>
+
+    <!-- Visibility modes -->
+    <string name="visibility_card_title">Trạng thái hiển thị thiết bị</string>
+    <string name="visibility_mode_hidden">Ẩn</string>
+    <string name="visibility_mode_10min">10 phút</string>
+    <string name="visibility_mode_always">Không giới hạn</string>
+    <string name="visibility_mode_hidden_long">Ẩn thiết bị</string>
+    <string name="visibility_mode_10min_long">Tìm thấy trong 10 phút</string>
+    <string name="visibility_mode_always_long">Luôn cho phép tìm thấy (không giới hạn)</string>
+    <string name="visibility_desc_hidden">Thiết bị của bạn đang ẩn. Các máy xung quanh sẽ không thể tìm thấy hoặc gửi yêu cầu nhận tệp.</string>
+    <string name="visibility_desc_10min">Đang cho phép các thiết bị lân cận tìm thấy bạn. Tự động ẩn sau %1$s.</string>
+    <string name="visibility_desc_always">Luôn cho phép mọi thiết bị lân cận tìm thấy bạn mà không giới hạn thời gian.</string>
+    <string name="visibility_timer_badge">Còn %1$s</string>
+    <string name="visibility_timer_reset">Làm mới 10p</string>
+    <string name="visibility_enable_prompt">Bật 10 phút</string>
+
+    <!-- Incoming connection request dialog & prompt -->
+    <string name="incoming_conn_title">Yêu cầu kết nối nhận tệp</string>
+    <string name="incoming_conn_message">%1$s muốn kết nối với bạn qua Wi-Fi Direct để gửi tệp.</string>
+    <string name="incoming_conn_message_files">%1$s muốn kết nối và gửi %2$d tệp cho bạn.</string>
+    <string name="incoming_conn_device_address">Địa chỉ: %1$s</string>
+    <string name="incoming_conn_pending_files">Tệp đang chờ (%1$d): %2$s</string>
+    <string name="incoming_conn_accept">Chấp nhận</string>
+    <string name="incoming_conn_decline">Từ chối</string>
+    <string name="incoming_conn_notif_title">Yêu cầu nhận tệp từ %1$s</string>
+    <string name="incoming_conn_notif_body">Chạm để mở hộp thoại xác nhận hoặc chọn Chấp nhận / Từ chối bên dưới.</string>
+    <string name="incoming_conn_accepted_toast">Đã chấp nhận kết nối từ %1$s</string>
 
     <!-- Discovery / Home screen -->
     <string name="discover_title">Thazh Share</string>
@@ -24,6 +56,7 @@
     <string name="discover_start_scan">Tìm thiết bị</string>
     <string name="discover_stop_scan">Dừng tìm</string>
     <string name="discover_no_peers">Không tìm thấy thiết bị nào gần đây.\nĐảm bảo thiết bị kia cũng đang mở Thazh Share và bật WiFi.</string>
+    <string name="discover_no_peers_hidden">Thiết bị đang ở chế độ Ẩn.\nBật "10 phút" hoặc "Không giới hạn" hoặc chạm "Tìm thiết bị" để dò tìm các máy xung quanh.</string>
     <string name="discover_available_devices">Thiết bị xung quanh</string>
     <string name="discover_saved_devices">Thiết bị đã lưu</string>
     <string name="discover_connect">Kết nối</string>
@@ -48,6 +81,39 @@
 
     <!-- Settings -->
     <string name="settings_title">Cài đặt</string>
+    <string name="settings_section_visibility">Hiển thị &amp; Tìm thấy</string>
+    <string name="settings_current_visibility">Trạng thái hiển thị hiện tại</string>
+    <string name="settings_default_visibility">Chế độ hiển thị khi mở ứng dụng</string>
+    <string name="settings_visibility_footer">Ở chế độ 10 phút, thiết bị sẽ tự động ẩn sau khi hết thời gian đếm ngược để bảo vệ quyền riêng tư.</string>
+    <string name="settings_section_transfer_security">Nhận tệp &amp; Xác nhận</string>
+    <string name="settings_confirm_incoming">Xác nhận trước khi nhận tệp</string>
+    <string name="settings_confirm_incoming_desc">Hỏi xác nhận kết nối khi có thiết bị khác yêu cầu gửi tệp đến bạn</string>
+    <string name="settings_background_prompt">Hộp thoại khi dùng ứng dụng khác</string>
+    <string name="settings_background_prompt_desc">Hiển thị thông báo yêu cầu kết nối nổi kèm nút Chấp nhận / Từ chối khi Thazh Share chạy nền và vẫn bật hiển thị</string>
+    <string name="settings_auto_save_downloads">Tự động lưu vào Tải xuống</string>
+    <string name="settings_auto_save_downloads_desc">Tự động xuất bản sao mọi tệp nhận được vào Tải xuống/Thazh Share</string>
+    <string name="settings_sound_vibration">Âm thanh &amp; rung thông báo</string>
+    <string name="settings_sound_vibration_desc">Phát âm báo và rung nhẹ khi có yêu cầu kết nối hoặc nhận xong tệp</string>
+    <string name="settings_section_appearance">Giao diện &amp; Hiệu ứng</string>
+    <string name="settings_reduce_transparency">Giảm độ trong suốt</string>
+    <string name="settings_reduce_transparency_desc">Tắt hiệu ứng trong suốt và Liquid Glass, dùng nền đặc dễ đọc hơn</string>
+    <string name="settings_liquid_glass">Hiệu ứng Liquid Glass</string>
+    <string name="settings_liquid_glass_desc">Khúc xạ ánh sáng và ống kính thủy tinh trên thanh điều hướng và nút bấm</string>
+    <string name="settings_section_device">Thiết bị</string>
+    <string name="settings_section_connectivity">Kết nối</string>
+    <string name="settings_section_storage_about">Lưu trữ &amp; Thông tin</string>
+    <string name="settings_section_system">Hệ thống</string>
+    <string name="settings_received_storage_title">Tệp đã nhận trong bộ nhớ</string>
+    <string name="settings_received_storage_summary">%1$d tệp • %2$s (chạm để mở quản lý tệp)</string>
+    <string name="settings_clear_temp_cache">Dọn tệp tạm truyền dở</string>
+    <string name="settings_clear_temp_cache_desc">Xóa các tệp tạm bị gián đoạn trong bộ nhớ đệm .incoming</string>
+    <string name="settings_clear_temp_cache_done">Đã dọn sạch bộ nhớ tạm</string>
+    <string name="settings_clear_saved_devices">Xóa tất cả thiết bị đã lưu</string>
+    <string name="settings_clear_saved_devices_desc">Hiện đang lưu %1$d thiết bị</string>
+    <string name="settings_clear_saved_devices_confirm">Xóa toàn bộ %1$d thiết bị đã lưu khỏi danh sách kết nối nhanh?</string>
+    <string name="settings_clear_saved_devices_done">Đã xóa danh sách thiết bị đã lưu</string>
+    <string name="settings_about_title">Thazh Share</string>
+    <string name="settings_about_desc">Phiên bản %1$s • Truyền tệp trực tiếp tốc độ cao qua Wi-Fi Direct, BLE &amp; NFC HCE</string>
     <string name="settings_display_name">Tên thiết bị hiển thị</string>
     <string name="settings_display_name_desc">Tên này sẽ hiển thị với các thiết bị xung quanh khi bạn gửi hoặc nhận tệp.</string>
     <string name="settings_display_name_hint">Nhập tên thiết bị của bạn</string>
@@ -169,6 +235,7 @@
     <string name="tab_send">Gửi</string>
     <string name="tab_receive">Nhận</string>
     <string name="tab_received_files">Tệp đã nhận</string>
+    <string name="tab_received_files_count">Tệp đã nhận (%1$d)</string>
 
     <!-- NFC Tap-to-Connect -->
     <string name="nfc_service_description">Kết nối nhanh Thazh Share qua NFC</string>
@@ -187,8 +254,13 @@
     <!-- Receive tab -->
     <string name="receive_title">Nhận tệp</string>
     <string name="receive_subtitle_ready">Sẵn sàng nhận qua WiFi Direct</string>
+    <string name="receive_subtitle_10min">Cho phép tìm thấy trong 10 phút • còn %1$s</string>
+    <string name="receive_subtitle_always">Luôn cho phép tìm thấy</string>
+    <string name="receive_subtitle_hidden">Đang ở chế độ Ẩn</string>
     <string name="receive_ready_title">Đang hiển thị với tên \"%1$s\"</string>
+    <string name="receive_ready_hidden_title">Đang ẩn thiết bị \"%1$s\"</string>
     <string name="receive_ready_body">Các thiết bị gần đây có thể tìm thấy và gửi tệp cho bạn ngay bây giờ, hoặc chạm lưng qua NFC để kết nối nhanh.</string>
+    <string name="receive_ready_hidden_body">Chuyển sang "10 phút" hoặc "Không giới hạn" để các thiết bị xung quanh tìm thấy bạn và gửi tệp.</string>
     <string name="receive_connected_title">Đang kết nối với %1$s</string>
     <string name="receive_connected_body">Đường truyền tốc độ cao đã sẵn sàng. Tệp gửi tới sẽ được tự động lưu và hiển thị tại đây.</string>
     <string name="receive_empty_title">Đang chờ tệp gửi tới…</string>

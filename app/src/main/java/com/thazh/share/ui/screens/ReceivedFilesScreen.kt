@@ -14,7 +14,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -22,39 +21,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Checklist
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Devices
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.RadioButtonUnchecked
-import androidx.compose.material.icons.rounded.SelectAll
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,23 +40,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.shapes.Capsule
+import com.kyant.capsule.ContinuousCapsule
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.FileCategory
@@ -88,24 +64,30 @@ import com.thazh.share.data.RenameResult
 import com.thazh.share.data.SavedDevice
 import com.thazh.share.ui.components.FileTypeBadge
 import com.thazh.share.ui.components.labelRes
-import com.thazh.share.ui.cupertino.CupertinoDivider
-import com.thazh.share.ui.cupertino.CupertinoFilterPill
-import com.thazh.share.ui.cupertino.CupertinoIcon
-import com.thazh.share.ui.cupertino.CupertinoSearchField
-import com.thazh.share.ui.cupertino.CupertinoText
-import com.thazh.share.ui.cupertino.CupertinoTextField
-import com.thazh.share.ui.cupertino.CupertinoTopBar
-import com.thazh.share.ui.cupertino.LiquidActionPopover
-import com.thazh.share.ui.cupertino.LiquidAlertDialog
-import com.thazh.share.ui.cupertino.LiquidButton
-import com.thazh.share.ui.cupertino.LiquidCard
-import com.thazh.share.ui.cupertino.LiquidIconButton
-import com.thazh.share.ui.cupertino.PopoverMenuItem
-import com.thazh.share.ui.cupertino.elasticHold
-import com.thazh.share.ui.theme.CupertinoTheme
-import com.thazh.share.ui.theme.LocalAppBackdrop
+import com.thazh.share.ui.theme.ThazhSymbols
+import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.FileActions
 import com.thazh.share.util.FormatUtils
+import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.core.segmentedControlBackground
+import io.github.neoruaa.glasmio.glass.GlassEmphasis
+import io.github.neoruaa.glasmio.icons.SfIcon
+import io.github.neoruaa.glasmio.scaffold.GlasmioPinnedListPage
+import io.github.neoruaa.glasmio.ui.GlasmioAlertButtonRole
+import io.github.neoruaa.glasmio.ui.GlasmioAlertButtonSpec
+import io.github.neoruaa.glasmio.ui.GlasmioAlertDialog
+import io.github.neoruaa.glasmio.ui.GlasmioAlertFieldGroup
+import io.github.neoruaa.glasmio.ui.GlasmioAlertTextField
+import io.github.neoruaa.glasmio.ui.GlasmioButton
+import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
+import io.github.neoruaa.glasmio.ui.GlasmioCard
+import io.github.neoruaa.glasmio.ui.GlasmioGroupedList
+import io.github.neoruaa.glasmio.ui.GlasmioIconButton
+import io.github.neoruaa.glasmio.ui.GlasmioMenu
+import io.github.neoruaa.glasmio.ui.GlasmioMenuItem
+import io.github.neoruaa.glasmio.ui.GlasmioScrollableTabRow
+import io.github.neoruaa.glasmio.ui.GlasmioSearchBar
+import io.github.neoruaa.glasmio.ui.glasmioGroupedListSeparator
 import java.io.File
 
 private enum class ReceivedSortOrder { NEWEST, OLDEST, NAME, SIZE }
@@ -116,6 +98,7 @@ fun ReceivedFilesScreen(
     isSocketConnected: Boolean = false,
     peers: List<DiscoveredPeer> = emptyList(),
     savedDevices: List<SavedDevice> = emptyList(),
+    bottomBarPadding: Dp = 96.dp,
     onBack: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
     onMarkAllSeen: () -> Unit,
@@ -125,16 +108,19 @@ fun ReceivedFilesScreen(
     onDeleteFiles: (List<ReceivedFile>, onDone: (Int) -> Unit) -> Unit,
     onRenameFile: (ReceivedFile, String, onDone: (RenameResult) -> Unit) -> Unit,
     onSaveToDownloads: (List<ReceivedFile>, onDone: (Int, Int) -> Unit) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
+    val appearance = GlasmioTheme.appearance
+    val semantic = ThazhTheme.semantic
 
     DisposableEffect(Unit) {
         onDispose { onMarkAllSeen() }
     }
 
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
+    var searchActive by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<FileCategory?>(null) }
     var sortOrder by remember { mutableStateOf(ReceivedSortOrder.NEWEST) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -161,15 +147,34 @@ fun ReceivedFilesScreen(
     }
 
     var filesToDelete by remember { mutableStateOf<List<ReceivedFile>?>(null) }
+    var lastDeleteTargets by remember { mutableStateOf<List<ReceivedFile>>(emptyList()) }
+    if (filesToDelete != null) {
+        lastDeleteTargets = filesToDelete.orEmpty()
+    }
+
     var filesPendingPeerPick by remember { mutableStateOf<List<ReceivedFile>?>(null) }
+    var lastPeerPickTargets by remember { mutableStateOf<List<ReceivedFile>>(emptyList()) }
+    if (filesPendingPeerPick != null) {
+        lastPeerPickTargets = filesPendingPeerPick.orEmpty()
+    }
+
     var fileToRename by remember { mutableStateOf<ReceivedFile?>(null) }
-    var renameDraft by remember { mutableStateOf("") }
+    var lastRenameFile by remember { mutableStateOf<ReceivedFile?>(null) }
+    if (fileToRename != null) {
+        lastRenameFile = fileToRename
+    }
+    var renameDraft by remember { mutableStateOf(TextFieldValue("")) }
     var renameError by remember { mutableStateOf<String?>(null) }
+
     var fileDetails by remember { mutableStateOf<ReceivedFile?>(null) }
+    var lastFileDetails by remember { mutableStateOf<ReceivedFile?>(null) }
+    if (fileDetails != null) {
+        lastFileDetails = fileDetails
+    }
 
     var pendingDownloadsExport by remember { mutableStateOf<List<ReceivedFile>?>(null) }
     val storagePermLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
+        contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         val pending = pendingDownloadsExport
         pendingDownloadsExport = null
@@ -186,7 +191,7 @@ fun ReceivedFilesScreen(
             Toast.makeText(
                 context,
                 context.getString(R.string.received_files_storage_permission_denied),
-                Toast.LENGTH_SHORT
+                Toast.LENGTH_SHORT,
             ).show()
         }
     }
@@ -194,7 +199,10 @@ fun ReceivedFilesScreen(
     val triggerSaveToDownloads: (List<ReceivedFile>) -> Unit = { target ->
         if (target.isNotEmpty()) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ) != PackageManager.PERMISSION_GRANTED
             ) {
                 pendingDownloadsExport = target
                 storagePermLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -222,8 +230,8 @@ fun ReceivedFilesScreen(
         }
     }
 
-    val filteredFiles = remember(files, searchQuery, selectedCategory, sortOrder) {
-        val query = searchQuery.trim().lowercase()
+    val filteredFiles = remember(files, searchQuery.text, selectedCategory, sortOrder) {
+        val query = searchQuery.text.trim().lowercase()
         val matched = files.filter { f ->
             val catOk = selectedCategory == null || f.category == selectedCategory
             val queryOk = query.isEmpty() ||
@@ -254,137 +262,297 @@ fun ReceivedFilesScreen(
         FileCategory.entries.filter { cat -> files.any { it.category == cat } }
     }
 
-    val density = LocalDensity.current
-    var topBarHeightPx by remember { mutableIntStateOf(0) }
-    val topPadding = if (topBarHeightPx > 0) {
-        with(density) { topBarHeightPx.toDp() } + 12.dp
-    } else {
-        108.dp
+    val allLabel = stringResource(R.string.received_files_filter_all)
+    val categoryTabs = remember(availableCategories, allLabel) {
+        buildList<Pair<FileCategory?, String>> {
+            add(null to allLabel)
+            availableCategories.forEach { cat ->
+                add(cat to context.getString(cat.labelRes()))
+            }
+        }
     }
-    val contentBackdrop = rememberLayerBackdrop()
-    val barBackdrop = rememberCombinedBackdrop(LocalAppBackdrop.current, contentBackdrop)
+
+    val topBarTitle = if (inSelectionMode) {
+        if (selectedIds.isEmpty()) {
+            stringResource(R.string.received_files_select_mode)
+        } else {
+            stringResource(R.string.received_files_selected_count, selectedIds.size)
+        }
+    } else {
+        stringResource(R.string.received_files_title)
+    }
+
+    val allFilteredIds = remember(filteredFiles) { filteredFiles.map { it.id }.toSet() }
+    val allSelected = allFilteredIds.isNotEmpty() && selectedIds.containsAll(allFilteredIds)
 
     Box(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(contentBackdrop),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .widthIn(max = 600.dp)
-                    .fillMaxSize()
-                    .navigationBarsPadding(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = topPadding,
-                    bottom = if (selectedFiles.isNotEmpty()) 176.dp else 112.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (files.isNotEmpty()) {
-                    item(key = "search_header") {
-                        CupertinoSearchField(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            placeholder = stringResource(R.string.received_files_search_hint),
-                            modifier = Modifier.testTag("received_files_search_input")
+        GlasmioPinnedListPage(
+            title = topBarTitle,
+            subtitle = if (inSelectionMode) null else subtitle,
+            onNavigateBack = if (inSelectionMode) exitSelectionMode else onBack,
+            navigateBackContentDescription = stringResource(
+                if (inSelectionMode) R.string.cancel else R.string.back,
+            ),
+            bottomPadding = bottomBarPadding + if (selectedFiles.isNotEmpty()) 72.dp else 0.dp,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            backgroundColor = colors.groupedBackground.copy(
+                alpha = if (appearance.reduceTransparency) 1f else 0.78f,
+            ),
+            modifier = Modifier.fillMaxSize(),
+            actions = {
+                if (inSelectionMode) {
+                    GlasmioIconButton(
+                        onClick = {
+                            selectedIds = if (allSelected) {
+                                selectedIds - allFilteredIds
+                            } else {
+                                selectedIds + allFilteredIds
+                            }
+                        },
+                        modifier = Modifier.testTag("select_all_received_files_button"),
+                    ) {
+                        SfIcon(
+                            systemName = ThazhSymbols.SelectAll,
+                            contentDescription = stringResource(R.string.received_files_select_all),
+                            tint = if (allSelected) colors.accent else colors.content,
                         )
                     }
-
-                    if (availableCategories.size > 1) {
-                        item(key = "category_filters") {
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    GlasmioIconButton(
+                        onClick = { triggerShareViaWifiDirect(selectedFiles) },
+                        enabled = selectedFiles.isNotEmpty(),
+                        modifier = Modifier.testTag("top_bar_share_wifi_direct_button"),
+                    ) {
+                        SfIcon(
+                            systemName = ThazhSymbols.WifiTethering,
+                            contentDescription = stringResource(R.string.received_files_share_wifi_direct),
+                            tint = colors.accent,
+                        )
+                    }
+                    GlasmioIconButton(
+                        onClick = {
+                            FileActions.shareFiles(
+                                context,
+                                selectedFiles.map { File(it.filePath) to it.mimeType },
+                                context.getString(R.string.received_files_share_chooser),
+                            )
+                        },
+                        enabled = selectedFiles.isNotEmpty(),
+                    ) {
+                        SfIcon(
+                            systemName = ThazhSymbols.Share,
+                            contentDescription = stringResource(R.string.received_files_share),
+                        )
+                    }
+                    GlasmioIconButton(
+                        onClick = { triggerSaveToDownloads(selectedFiles) },
+                        enabled = selectedFiles.isNotEmpty(),
+                    ) {
+                        SfIcon(
+                            systemName = ThazhSymbols.Download,
+                            contentDescription = stringResource(R.string.received_files_save),
+                        )
+                    }
+                    GlasmioIconButton(
+                        onClick = { filesToDelete = selectedFiles },
+                        enabled = selectedFiles.isNotEmpty(),
+                    ) {
+                        SfIcon(
+                            systemName = ThazhSymbols.Delete,
+                            contentDescription = stringResource(R.string.received_files_delete),
+                            tint = colors.destructive,
+                        )
+                    }
+                } else {
+                    if (files.isNotEmpty()) {
+                        GlasmioIconButton(
+                            onClick = { isSelectionModeActive = true },
+                            modifier = Modifier.testTag("received_files_enter_selection_button"),
+                        ) {
+                            SfIcon(
+                                systemName = ThazhSymbols.Checklist,
+                                contentDescription = stringResource(R.string.received_files_select_mode),
+                            )
+                        }
+                    }
+                    GlasmioMenu(
+                        expanded = showSortMenu,
+                        onExpandedChange = { showSortMenu = it },
+                        itemCount = 4,
+                        anchor = { onClick ->
+                            GlasmioIconButton(
+                                onClick = onClick,
+                                modifier = Modifier.testTag("received_files_sort_button"),
                             ) {
-                                item(key = "all") {
-                                    CupertinoFilterPill(
-                                        label = stringResource(R.string.received_files_filter_all),
-                                        selected = selectedCategory == null,
-                                        onClick = { selectedCategory = null }
-                                    )
-                                }
-                                items(availableCategories, key = { it.name }) { category ->
-                                    CupertinoFilterPill(
-                                        label = stringResource(category.labelRes()),
-                                        selected = selectedCategory == category,
-                                        onClick = {
-                                            selectedCategory = if (selectedCategory == category) null else category
-                                        }
-                                    )
-                                }
+                                SfIcon(
+                                    systemName = ThazhSymbols.Sort,
+                                    contentDescription = stringResource(R.string.received_files_sort),
+                                )
+                            }
+                        },
+                    ) { _, close ->
+                        GlasmioMenuItem(
+                            title = stringResource(R.string.received_files_sort_newest),
+                            systemName = if (sortOrder == ReceivedSortOrder.NEWEST) "checkmark" else null,
+                            onClick = {
+                                sortOrder = ReceivedSortOrder.NEWEST
+                                close()
+                            },
+                        )
+                        GlasmioMenuItem(
+                            title = stringResource(R.string.received_files_sort_oldest),
+                            systemName = if (sortOrder == ReceivedSortOrder.OLDEST) "checkmark" else null,
+                            onClick = {
+                                sortOrder = ReceivedSortOrder.OLDEST
+                                close()
+                            },
+                        )
+                        GlasmioMenuItem(
+                            title = stringResource(R.string.received_files_sort_name),
+                            systemName = if (sortOrder == ReceivedSortOrder.NAME) "checkmark" else null,
+                            onClick = {
+                                sortOrder = ReceivedSortOrder.NAME
+                                close()
+                            },
+                        )
+                        GlasmioMenuItem(
+                            title = stringResource(R.string.received_files_sort_size),
+                            systemName = if (sortOrder == ReceivedSortOrder.SIZE) "checkmark" else null,
+                            onClick = {
+                                sortOrder = ReceivedSortOrder.SIZE
+                                close()
+                            },
+                        )
+                    }
+                    if (onOpenSettings != null) {
+                        GlasmioIconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.testTag("received_open_settings_button"),
+                        ) {
+                            SfIcon(
+                                systemName = ThazhSymbols.Settings,
+                                contentDescription = stringResource(R.string.settings_title),
+                            )
+                        }
+                    }
+                }
+            },
+        ) {
+            if (files.isNotEmpty()) {
+                item(key = "search_header") {
+                    CenteredReceivedContent {
+                        GlasmioSearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            active = searchActive,
+                            onActiveChange = { searchActive = it },
+                            onClose = {
+                                searchQuery = TextFieldValue("")
+                                searchActive = false
+                            },
+                            placeholder = stringResource(R.string.received_files_search_hint),
+                            closeContentDescription = stringResource(R.string.close),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("received_files_search_input"),
+                        )
+                    }
+                }
+
+                if (availableCategories.size > 1) {
+                    item(key = "category_filters") {
+                        CenteredReceivedContent {
+                            GlasmioScrollableTabRow(
+                                items = categoryTabs,
+                                selected = selectedCategory,
+                                onSelected = { selectedCategory = it },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (files.isEmpty()) {
+                item(key = "empty") {
+                    CenteredReceivedContent {
+                        GlasmioCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 28.dp, horizontal = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                SfIcon(
+                                    systemName = ThazhSymbols.FolderOpen,
+                                    contentDescription = null,
+                                    tint = colors.tertiaryContent,
+                                    size = 38.dp,
+                                )
+                                Text(
+                                    text = stringResource(R.string.received_files_empty_title),
+                                    style = GlasmioTheme.textStyles.headline,
+                                    color = colors.content,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Text(
+                                    text = stringResource(R.string.received_files_empty_body),
+                                    style = GlasmioTheme.textStyles.subheadline,
+                                    color = colors.secondaryContent,
+                                    textAlign = TextAlign.Center,
+                                )
                             }
                         }
                     }
                 }
-
-                if (files.isEmpty()) {
-                    item(key = "empty") {
-                        LiquidCard(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 26.dp, horizontal = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                CupertinoIcon(
-                                    imageVector = Icons.Rounded.FolderOpen,
-                                    contentDescription = null,
-                                    tint = colors.tertiaryLabel,
-                                    modifier = Modifier.size(38.dp)
-                                )
-                                CupertinoText(
-                                    text = stringResource(R.string.received_files_empty_title),
-                                    style = CupertinoTheme.typography.headline,
-                                    textAlign = TextAlign.Center
-                                )
-                                CupertinoText(
-                                    text = stringResource(R.string.received_files_empty_body),
-                                    style = CupertinoTheme.typography.subheadline,
-                                    color = colors.secondaryLabel,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                } else if (filteredFiles.isEmpty()) {
-                    item(key = "no_match") {
-                        LiquidCard(modifier = Modifier.fillMaxWidth()) {
-                            CupertinoText(
+            } else if (filteredFiles.isEmpty()) {
+                item(key = "no_match") {
+                    CenteredReceivedContent {
+                        GlasmioCard(modifier = Modifier.fillMaxWidth()) {
+                            Text(
                                 text = stringResource(R.string.received_files_no_match),
-                                style = CupertinoTheme.typography.subheadline,
-                                color = colors.secondaryLabel,
+                                style = GlasmioTheme.textStyles.subheadline,
+                                color = colors.secondaryContent,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 20.dp)
+                                    .padding(vertical = 22.dp, horizontal = 16.dp),
                             )
                         }
                     }
-                } else {
-                    item(key = "files_list_card") {
-                        LiquidCard(
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                }
+            } else {
+                item(key = "files_list_card") {
+                    CenteredReceivedContent {
+                        GlasmioGroupedList(modifier = Modifier.fillMaxWidth()) {
                             filteredFiles.forEachIndexed { index, file ->
                                 val isSelected = file.id in selectedIds
                                 ReceivedFileRow(
                                     file = file,
                                     inSelectionMode = inSelectionMode,
                                     isSelected = isSelected,
+                                    showTopSeparator = index > 0,
                                     onClick = {
                                         if (inSelectionMode) {
-                                            selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id
+                                            selectedIds = if (isSelected) {
+                                                selectedIds - file.id
+                                            } else {
+                                                selectedIds + file.id
+                                            }
                                         } else {
                                             val f = File(file.filePath)
                                             if (!f.exists()) {
-                                                Toast.makeText(context, context.getString(R.string.received_files_missing), Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.received_files_missing),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
                                             } else if (!FileActions.openFile(context, f, file.mimeType)) {
-                                                Toast.makeText(context, context.getString(R.string.received_files_cannot_open), Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.received_files_cannot_open),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
                                             }
                                         }
                                     },
@@ -395,33 +563,39 @@ fun ReceivedFilesScreen(
                                     onOpen = {
                                         val f = File(file.filePath)
                                         if (!f.exists()) {
-                                            Toast.makeText(context, context.getString(R.string.received_files_missing), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.received_files_missing),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
                                         } else if (!FileActions.openFile(context, f, file.mimeType)) {
-                                            Toast.makeText(context, context.getString(R.string.received_files_cannot_open), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.received_files_cannot_open),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
                                         }
                                     },
-                                    onShareWifiDirect = {
-                                        triggerShareViaWifiDirect(listOf(file))
-                                    },
+                                    onShareWifiDirect = { triggerShareViaWifiDirect(listOf(file)) },
                                     onShare = {
                                         FileActions.shareFiles(
                                             context,
                                             listOf(File(file.filePath) to file.mimeType),
-                                            context.getString(R.string.received_files_share_chooser)
+                                            context.getString(R.string.received_files_share_chooser),
                                         )
                                     },
                                     onSave = { triggerSaveToDownloads(listOf(file)) },
                                     onRename = {
-                                        fileToRename = file
-                                        renameDraft = file.fileName
+                                        renameDraft = TextFieldValue(
+                                            file.fileName,
+                                            TextRange(file.fileName.length),
+                                        )
                                         renameError = null
+                                        fileToRename = file
                                     },
                                     onDetails = { fileDetails = file },
-                                    onDelete = { filesToDelete = listOf(file) }
+                                    onDelete = { filesToDelete = listOf(file) },
                                 )
-                                if (index < filteredFiles.lastIndex) {
-                                    CupertinoDivider(startIndent = 74.dp)
-                                }
                             }
                         }
                     }
@@ -429,380 +603,323 @@ fun ReceivedFilesScreen(
             }
         }
 
-        CompositionLocalProvider(LocalAppBackdrop provides barBackdrop) {
-            val topBarModifier = Modifier
-                .align(Alignment.TopCenter)
-                .onSizeChanged { topBarHeightPx = it.height }
-            if (inSelectionMode) {
-                val allFilteredIds = remember(filteredFiles) { filteredFiles.map { it.id }.toSet() }
-                val allSelected = allFilteredIds.isNotEmpty() && selectedIds.containsAll(allFilteredIds)
-                CupertinoTopBar(
-                    title = if (selectedIds.isEmpty()) {
-                        stringResource(R.string.received_files_select_mode)
-                    } else {
-                        stringResource(R.string.received_files_selected_count, selectedIds.size)
-                    },
-                    onBack = { exitSelectionMode() },
-                    backTestTag = "clear_selection_button",
-                    modifier = topBarModifier,
-                    actions = {
-                        LiquidIconButton(
-                            onClick = {
-                                selectedIds = if (allSelected) {
-                                    selectedIds - allFilteredIds
-                                } else {
-                                    selectedIds + allFilteredIds
-                                }
-                            },
-                            icon = Icons.Rounded.SelectAll,
-                            contentDescription = stringResource(R.string.received_files_select_all),
-                            tint = if (allSelected) colors.accentBlue else colors.label,
-                            modifier = Modifier.testTag("select_all_received_files_button")
-                        )
-                        LiquidIconButton(
-                            onClick = { triggerShareViaWifiDirect(selectedFiles) },
-                            enabled = selectedFiles.isNotEmpty(),
-                            icon = Icons.Rounded.WifiTethering,
-                            contentDescription = stringResource(R.string.received_files_share_wifi_direct),
-                            tint = colors.accentBlue,
-                            modifier = Modifier.testTag("top_bar_share_wifi_direct_button")
-                        )
-                        LiquidIconButton(
-                            onClick = {
-                                FileActions.shareFiles(
-                                    context,
-                                    selectedFiles.map { File(it.filePath) to it.mimeType },
-                                    context.getString(R.string.received_files_share_chooser)
-                                )
-                            },
-                            enabled = selectedFiles.isNotEmpty(),
-                            icon = Icons.Rounded.Share,
-                            contentDescription = stringResource(R.string.received_files_share)
-                        )
-                        LiquidIconButton(
-                            onClick = { triggerSaveToDownloads(selectedFiles) },
-                            enabled = selectedFiles.isNotEmpty(),
-                            icon = Icons.Rounded.Download,
-                            contentDescription = stringResource(R.string.received_files_save)
-                        )
-                        LiquidIconButton(
-                            onClick = { filesToDelete = selectedFiles },
-                            enabled = selectedFiles.isNotEmpty(),
-                            icon = Icons.Rounded.DeleteOutline,
-                            contentDescription = stringResource(R.string.received_files_delete),
-                            tint = colors.destructiveRed
-                        )
-                    }
-                )
-            } else {
-                CupertinoTopBar(
-                    title = stringResource(R.string.received_files_title),
-                    subtitle = subtitle,
-                    onBack = onBack,
-                    backTestTag = "received_files_back_button",
-                    modifier = topBarModifier,
-                    actions = {
-                        if (files.isNotEmpty()) {
-                            LiquidIconButton(
-                                onClick = { isSelectionModeActive = true },
-                                icon = Icons.Rounded.Checklist,
-                                contentDescription = stringResource(R.string.received_files_select_mode),
-                                modifier = Modifier.testTag("received_files_enter_selection_button")
-                            )
-                        }
-                        Box {
-                            LiquidIconButton(
-                                onClick = { showSortMenu = true },
-                                icon = Icons.Rounded.Sort,
-                                contentDescription = stringResource(R.string.received_files_sort),
-                                modifier = Modifier.testTag("received_files_sort_button")
-                            )
-                            LiquidActionPopover(
-                                expanded = showSortMenu,
-                                onDismissRequest = { showSortMenu = false },
-                                items = listOf(
-                                    PopoverMenuItem(
-                                        label = stringResource(R.string.received_files_sort_newest),
-                                        isSelected = sortOrder == ReceivedSortOrder.NEWEST,
-                                        onClick = { sortOrder = ReceivedSortOrder.NEWEST }
-                                    ),
-                                    PopoverMenuItem(
-                                        label = stringResource(R.string.received_files_sort_oldest),
-                                        isSelected = sortOrder == ReceivedSortOrder.OLDEST,
-                                        onClick = { sortOrder = ReceivedSortOrder.OLDEST }
-                                    ),
-                                    PopoverMenuItem(
-                                        label = stringResource(R.string.received_files_sort_name),
-                                        isSelected = sortOrder == ReceivedSortOrder.NAME,
-                                        onClick = { sortOrder = ReceivedSortOrder.NAME }
-                                    ),
-                                    PopoverMenuItem(
-                                        label = stringResource(R.string.received_files_sort_size),
-                                        isSelected = sortOrder == ReceivedSortOrder.SIZE,
-                                        onClick = { sortOrder = ReceivedSortOrder.SIZE }
-                                    )
-                                )
-                            )
-                        }
-                        if (onOpenSettings != null) {
-                            LiquidIconButton(
-                                onClick = onOpenSettings,
-                                icon = Icons.Rounded.Settings,
-                                contentDescription = stringResource(R.string.settings_title),
-                                modifier = Modifier.testTag("received_open_settings_button")
-                            )
-                        }
-                    }
-                )
-            }
-
-            if (selectedFiles.isNotEmpty()) {
-                Box(
+        if (selectedFiles.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 24.dp, end = 24.dp, bottom = bottomBarPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                GlasmioButton(
+                    onClick = { triggerShareViaWifiDirect(selectedFiles) },
+                    emphasis = GlassEmphasis.Prominent,
+                    navigationSurfaceColor = semantic.accentBlue,
+                    size = GlasmioButtonSize.Large,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(start = 24.dp, end = 24.dp, bottom = 92.dp),
-                    contentAlignment = Alignment.Center
+                        .widthIn(min = 230.dp, max = 380.dp)
+                        .fillMaxWidth(0.86f)
+                        .testTag("share_wifi_direct_button"),
                 ) {
-                    LiquidButton(
-                        onClick = { triggerShareViaWifiDirect(selectedFiles) },
-                        modifier = Modifier
-                            .widthIn(min = 230.dp, max = 380.dp)
-                            .fillMaxWidth(0.86f)
-                            .testTag("share_wifi_direct_button"),
-                        tint = colors.accentBlue,
-                        height = 54.dp
-                    ) {
-                        CupertinoIcon(
-                            imageVector = Icons.Rounded.WifiTethering,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        CupertinoText(
-                            text = stringResource(
-                                R.string.received_files_share_wifi_direct_count,
-                                selectedFiles.size
-                            ),
-                            style = CupertinoTheme.typography.headline,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    SfIcon(
+                        systemName = ThazhSymbols.WifiTethering,
+                        contentDescription = null,
+                        tint = Color.White,
+                        size = 20.dp,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.received_files_share_wifi_direct_count,
+                            selectedFiles.size,
+                        ),
+                        style = GlasmioTheme.textStyles.headline,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
     }
 
-    filesPendingPeerPick?.let { targets ->
-        LiquidAlertDialog(
-            onDismissRequest = { filesPendingPeerPick = null },
-            title = stringResource(R.string.received_files_pick_peer_title, targets.size),
-            confirmText = stringResource(R.string.received_files_open_send_tab),
-            onConfirm = {
-                filesPendingPeerPick = null
-                exitSelectionMode()
-                onShareViaWifiDirect(targets)
-            },
-            dismissText = stringResource(R.string.cancel)
+    val peerPickTargets = lastPeerPickTargets
+    GlasmioAlertDialog(
+        visible = filesPendingPeerPick != null && peerPickTargets.isNotEmpty(),
+        onDismissRequest = { filesPendingPeerPick = null },
+        title = stringResource(R.string.received_files_pick_peer_title, peerPickTargets.size),
+        message = stringResource(R.string.received_files_pick_peer_subtitle),
+        buttons = listOf(
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.cancel),
+                onClick = { filesPendingPeerPick = null },
+                role = GlasmioAlertButtonRole.Cancel,
+            ),
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.received_files_open_send_tab),
+                onClick = {
+                    filesPendingPeerPick = null
+                    exitSelectionMode()
+                    onShareViaWifiDirect(peerPickTargets)
+                },
+                role = GlasmioAlertButtonRole.Default,
+            ),
+        ),
+    ) {
+        val rowShape = ContinuousRoundedRectangle(14.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 14.dp)
+                .heightIn(max = 220.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                CupertinoText(
-                    text = stringResource(R.string.received_files_pick_peer_subtitle),
-                    style = CupertinoTheme.typography.footnote,
-                    color = colors.secondaryLabel
-                )
-                Column(
+            peers.take(4).forEach { peer ->
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 220.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .defaultMinSize(minHeight = 48.dp)
+                        .clip(rowShape)
+                        .background(colors.segmentedControlBackground)
+                        .clickable(role = Role.Button) {
+                            filesPendingPeerPick = null
+                            exitSelectionMode()
+                            onConnectPeerAndShareViaWifiDirect(peer, peerPickTargets)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    peers.take(4).forEach { peer ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .defaultMinSize(minHeight = 48.dp)
-                                .elasticHold(pressedScale = 0.96f)
-                                .clip(CupertinoTheme.shapes.input)
-                                .background(colors.fillTertiary)
-                                .clickable(role = Role.Button) {
-                                    filesPendingPeerPick = null
-                                    exitSelectionMode()
-                                    onConnectPeerAndShareViaWifiDirect(peer, targets)
-                                }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            CupertinoIcon(
-                                imageVector = Icons.Rounded.WifiTethering,
-                                contentDescription = null,
-                                tint = colors.accentBlue,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                CupertinoText(
-                                    text = peer.deviceName.ifBlank { peer.deviceAddress },
-                                    style = CupertinoTheme.typography.headline,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                CupertinoText(
-                                    text = peer.deviceAddress,
-                                    style = CupertinoTheme.typography.caption,
-                                    color = colors.secondaryLabel,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                    SfIcon(
+                        systemName = ThazhSymbols.WifiTethering,
+                        contentDescription = null,
+                        tint = colors.accent,
+                        size = 20.dp,
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = peer.deviceName.ifBlank { peer.deviceAddress },
+                            style = GlasmioTheme.textStyles.headline,
+                            color = colors.content,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = peer.deviceAddress,
+                            style = GlasmioTheme.textStyles.caption1,
+                            color = colors.secondaryContent,
+                            maxLines = 1,
+                        )
                     }
+                }
+            }
 
-                    val peerAddresses = peers.mapTo(HashSet()) { it.deviceAddress }
-                    savedDevices.filterNot { it.deviceAddress in peerAddresses }.take(3).forEach { saved ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .defaultMinSize(minHeight = 48.dp)
-                                .elasticHold(pressedScale = 0.96f)
-                                .clip(CupertinoTheme.shapes.input)
-                                .background(colors.fillTertiary)
-                                .clickable(role = Role.Button) {
-                                    filesPendingPeerPick = null
-                                    exitSelectionMode()
-                                    onConnectSavedDeviceAndShareViaWifiDirect(saved, targets)
-                                }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            CupertinoIcon(
-                                imageVector = Icons.Rounded.Devices,
-                                contentDescription = null,
-                                tint = colors.accentCyan,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                CupertinoText(
-                                    text = saved.effectiveName,
-                                    style = CupertinoTheme.typography.headline,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                CupertinoText(
-                                    text = saved.deviceAddress,
-                                    style = CupertinoTheme.typography.caption,
-                                    color = colors.secondaryLabel,
-                                    maxLines = 1
-                                )
-                            }
+            val peerAddresses = peers.mapTo(HashSet()) { it.deviceAddress }
+            savedDevices.filterNot { it.deviceAddress in peerAddresses }.take(3).forEach { saved ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp)
+                        .clip(rowShape)
+                        .background(colors.segmentedControlBackground)
+                        .clickable(role = Role.Button) {
+                            filesPendingPeerPick = null
+                            exitSelectionMode()
+                            onConnectSavedDeviceAndShareViaWifiDirect(saved, peerPickTargets)
                         }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    SfIcon(
+                        systemName = ThazhSymbols.Devices,
+                        contentDescription = null,
+                        tint = semantic.accentCyan,
+                        size = 20.dp,
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = saved.effectiveName,
+                            style = GlasmioTheme.textStyles.headline,
+                            color = colors.content,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = saved.deviceAddress,
+                            style = GlasmioTheme.textStyles.caption1,
+                            color = colors.secondaryContent,
+                            maxLines = 1,
+                        )
                     }
                 }
             }
         }
     }
 
-    filesToDelete?.let { targets ->
-        LiquidAlertDialog(
-            onDismissRequest = { filesToDelete = null },
-            title = stringResource(R.string.received_files_delete_title),
-            confirmText = stringResource(R.string.delete),
-            confirmDestructive = true,
-            onConfirm = {
-                filesToDelete = null
-                onDeleteFiles(targets) { removed ->
-                    selectedIds = selectedIds - targets.map { it.id }.toSet()
-                    if (selectedIds.isEmpty()) isSelectionModeActive = false
-                    Toast.makeText(context, context.getString(R.string.received_files_deleted, removed), Toast.LENGTH_SHORT).show()
-                }
-            },
-            dismissText = stringResource(R.string.cancel)
-        ) {
-            CupertinoText(
-                text = stringResource(R.string.received_files_delete_body, targets.size),
-                style = CupertinoTheme.typography.subheadline,
-                color = colors.secondaryLabel
-            )
-        }
-    }
-
-    fileToRename?.let { target ->
-        LiquidAlertDialog(
-            onDismissRequest = { fileToRename = null },
-            title = stringResource(R.string.received_files_rename_title),
-            confirmText = stringResource(R.string.save),
-            onConfirm = {
-                onRenameFile(target, renameDraft) { result ->
-                    when (result) {
-                        RenameResult.SUCCESS -> {
-                            fileToRename = null
-                            Toast.makeText(context, context.getString(R.string.received_files_renamed), Toast.LENGTH_SHORT).show()
-                        }
-                        RenameResult.NAME_TAKEN -> renameError = context.getString(R.string.received_files_rename_taken)
-                        RenameResult.INVALID_NAME -> renameError = context.getString(R.string.received_files_rename_invalid)
-                        else -> renameError = context.getString(R.string.received_files_rename_failed)
+    val deleteTargets = lastDeleteTargets
+    GlasmioAlertDialog(
+        visible = filesToDelete != null && deleteTargets.isNotEmpty(),
+        onDismissRequest = { filesToDelete = null },
+        title = stringResource(R.string.received_files_delete_title),
+        message = stringResource(R.string.received_files_delete_body, deleteTargets.size),
+        buttons = listOf(
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.cancel),
+                onClick = { filesToDelete = null },
+                role = GlasmioAlertButtonRole.Cancel,
+            ),
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.delete),
+                onClick = {
+                    filesToDelete = null
+                    onDeleteFiles(deleteTargets) { removed ->
+                        selectedIds = selectedIds - deleteTargets.map { it.id }.toSet()
+                        if (selectedIds.isEmpty()) isSelectionModeActive = false
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.received_files_deleted, removed),
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     }
-                }
-            },
-            dismissText = stringResource(R.string.cancel)
-        ) {
-            CupertinoTextField(
-                value = renameDraft,
-                onValueChange = {
-                    renameDraft = it
-                    renameError = null
                 },
-                placeholder = target.fileName,
-                errorText = renameError,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    onRenameFile(target, renameDraft) { result ->
-                        when (result) {
-                            RenameResult.SUCCESS -> fileToRename = null
-                            RenameResult.NAME_TAKEN -> renameError = context.getString(R.string.received_files_rename_taken)
-                            RenameResult.INVALID_NAME -> renameError = context.getString(R.string.received_files_rename_invalid)
-                            else -> renameError = context.getString(R.string.received_files_rename_failed)
-                        }
+                role = GlasmioAlertButtonRole.Destructive,
+            ),
+        ),
+    )
+
+    val renameTarget = lastRenameFile
+    val submitRename: () -> Unit = {
+        val target = renameTarget
+        if (target != null) {
+            onRenameFile(target, renameDraft.text) { result ->
+                when (result) {
+                    RenameResult.SUCCESS -> {
+                        fileToRename = null
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.received_files_renamed),
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     }
-                })
-            )
+                    RenameResult.NAME_TAKEN -> renameError = context.getString(R.string.received_files_rename_taken)
+                    RenameResult.INVALID_NAME -> renameError = context.getString(R.string.received_files_rename_invalid)
+                    else -> renameError = context.getString(R.string.received_files_rename_failed)
+                }
+            }
+        }
+    }
+    GlasmioAlertDialog(
+        visible = fileToRename != null && renameTarget != null,
+        onDismissRequest = { fileToRename = null },
+        title = stringResource(R.string.received_files_rename_title),
+        buttons = listOf(
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.cancel),
+                onClick = { fileToRename = null },
+                role = GlasmioAlertButtonRole.Cancel,
+            ),
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.save),
+                onClick = submitRename,
+                role = GlasmioAlertButtonRole.Default,
+            ),
+        ),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            GlasmioAlertFieldGroup {
+                GlasmioAlertTextField(
+                    value = renameDraft,
+                    onValueChange = {
+                        renameDraft = it
+                        renameError = null
+                    },
+                    placeholder = renameTarget?.fileName.orEmpty(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submitRename() }),
+                )
+            }
+            if (renameError != null) {
+                Text(
+                    text = renameError.orEmpty(),
+                    style = GlasmioTheme.textStyles.caption1,
+                    color = colors.destructive,
+                    modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 12.dp),
+                )
+            }
         }
     }
 
-    fileDetails?.let { detail ->
-        LiquidAlertDialog(
-            onDismissRequest = { fileDetails = null },
-            title = stringResource(R.string.received_files_details),
-            dismissText = stringResource(R.string.close)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                DetailRow(stringResource(R.string.received_files_details_name), detail.fileName)
-                DetailRow(stringResource(R.string.received_files_details_type), stringResource(detail.category.labelRes()))
-                DetailRow(stringResource(R.string.received_files_details_size), FormatUtils.formatFileSize(detail.sizeBytes))
+    val detailsTarget = lastFileDetails
+    GlasmioAlertDialog(
+        visible = fileDetails != null && detailsTarget != null,
+        onDismissRequest = { fileDetails = null },
+        title = stringResource(R.string.received_files_details),
+        buttons = listOf(
+            GlasmioAlertButtonSpec(
+                label = stringResource(R.string.close),
+                onClick = { fileDetails = null },
+                role = GlasmioAlertButtonRole.Cancel,
+            ),
+        ),
+    ) {
+        if (detailsTarget != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 8.dp, end = 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DetailRow(stringResource(R.string.received_files_details_name), detailsTarget.fileName)
+                DetailRow(
+                    stringResource(R.string.received_files_details_type),
+                    stringResource(detailsTarget.category.labelRes()),
+                )
+                DetailRow(
+                    stringResource(R.string.received_files_details_size),
+                    FormatUtils.formatFileSize(detailsTarget.sizeBytes),
+                )
                 DetailRow(
                     stringResource(R.string.received_files_details_from),
-                    detail.peerName.ifBlank { stringResource(R.string.transfer_unknown_peer) }
+                    detailsTarget.peerName.ifBlank { stringResource(R.string.transfer_unknown_peer) },
                 )
-                DetailRow(stringResource(R.string.received_files_details_time), FormatUtils.formatFullDateTime(detail.receivedAtEpochMs))
+                DetailRow(
+                    stringResource(R.string.received_files_details_time),
+                    FormatUtils.formatFullDateTime(detailsTarget.receivedAtEpochMs),
+                )
             }
         }
     }
 }
 
 @Composable
+private fun CenteredReceivedContent(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 600.dp)
+                .fillMaxWidth(),
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
 private fun DetailRow(label: String, value: String) {
+    val colors = GlasmioTheme.colors
     Column {
-        CupertinoText(
+        Text(
             text = label,
-            style = CupertinoTheme.typography.caption,
-            color = CupertinoTheme.colors.secondaryLabel
+            style = GlasmioTheme.textStyles.caption1,
+            color = colors.secondaryContent,
         )
-        CupertinoText(
+        Text(
             text = value,
-            style = CupertinoTheme.typography.subheadline
+            style = GlasmioTheme.textStyles.subheadline,
+            color = colors.content,
         )
     }
 }
@@ -813,6 +930,7 @@ private fun ReceivedFileRow(
     file: ReceivedFile,
     inSelectionMode: Boolean,
     isSelected: Boolean,
+    showTopSeparator: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onOpen: () -> Unit,
@@ -821,32 +939,32 @@ private fun ReceivedFileRow(
     onSave: () -> Unit,
     onRename: () -> Unit,
     onDetails: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
-    val colors = CupertinoTheme.colors
+    val colors = GlasmioTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 68.dp)
-            .elasticHold(pressedScale = 0.98f)
-            .background(if (isSelected) colors.accentBlue.copy(alpha = 0.12f) else Color.Transparent)
+            .glasmioGroupedListSeparator(colors.separator, visible = showTopSeparator, horizontalInset = 16.dp)
+            .background(if (isSelected) colors.accent.copy(alpha = 0.12f) else Color.Transparent)
             .combinedClickable(
                 role = Role.Button,
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = onLongClick,
             )
             .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp)
             .testTag("received_file_row_${file.id}"),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (inSelectionMode) {
-            CupertinoIcon(
-                imageVector = if (isSelected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+            SfIcon(
+                systemName = if (isSelected) ThazhSymbols.CheckCircle else ThazhSymbols.RadioUnchecked,
                 contentDescription = null,
-                tint = if (isSelected) colors.accentBlue else colors.tertiaryLabel,
-                modifier = Modifier.size(24.dp)
+                tint = if (isSelected) colors.accent else colors.tertiaryContent,
+                size = 24.dp,
             )
             Spacer(modifier = Modifier.width(12.dp))
         }
@@ -859,7 +977,7 @@ private fun ReceivedFileRow(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(46.dp)
-                    .clip(CupertinoTheme.shapes.iconBadge)
+                    .clip(ContinuousRoundedRectangle(12.dp)),
             )
         } else {
             FileTypeBadge(category = file.category, size = 46.dp)
@@ -870,79 +988,117 @@ private fun ReceivedFileRow(
         Column(modifier = Modifier.weight(1f)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                CupertinoText(
+                Text(
                     text = file.fileName,
-                    style = CupertinoTheme.typography.headline,
+                    style = GlasmioTheme.textStyles.headline,
+                    color = colors.content,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (!file.seen) {
                     Box(
                         modifier = Modifier
-                            .clip(Capsule())
-                            .background(colors.accentBlue.copy(alpha = 0.16f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .clip(ContinuousCapsule)
+                            .background(colors.accent.copy(alpha = 0.16f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        CupertinoText(
+                        Text(
                             text = stringResource(R.string.received_files_new_badge),
-                            style = CupertinoTheme.typography.caption.copy(fontWeight = FontWeight.Bold),
-                            color = colors.accentBlue
+                            style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Bold),
+                            color = colors.accent,
                         )
                     }
                 }
             }
             Spacer(modifier = Modifier.height(2.dp))
             val sender = file.peerName.ifBlank { stringResource(R.string.transfer_unknown_peer) }
-            CupertinoText(
+            Text(
                 text = "${FormatUtils.formatFileSize(file.sizeBytes)} • $sender • ${FormatUtils.formatRelativeTime(file.receivedAtEpochMs)}",
-                style = CupertinoTheme.typography.footnote,
-                color = colors.secondaryLabel,
+                style = GlasmioTheme.textStyles.footnote,
+                color = colors.secondaryContent,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
         if (!inSelectionMode) {
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .elasticHold(pressedScale = 0.88f)
-                        .clip(Capsule())
-                        .clickable(role = Role.Button, onClick = { menuExpanded = true }),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CupertinoIcon(
-                        imageVector = Icons.Rounded.MoreHoriz,
-                        contentDescription = stringResource(R.string.received_files_details),
-                        tint = colors.secondaryLabel
-                    )
-                }
-
-                LiquidActionPopover(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    items = listOf(
-                        PopoverMenuItem(stringResource(R.string.received_files_open), Icons.Rounded.OpenInNew, onClick = onOpen),
-                        PopoverMenuItem(
-                            stringResource(R.string.received_files_share_wifi_direct),
-                            Icons.Rounded.WifiTethering,
-                            onClick = onShareWifiDirect
-                        ),
-                        PopoverMenuItem(stringResource(R.string.received_files_share), Icons.Rounded.Share, onClick = onShare),
-                        PopoverMenuItem(stringResource(R.string.received_files_save), Icons.Rounded.Download, onClick = onSave),
-                        PopoverMenuItem(stringResource(R.string.received_files_rename), Icons.Rounded.Edit, onClick = onRename),
-                        PopoverMenuItem(stringResource(R.string.received_files_details), Icons.Rounded.Info, onClick = onDetails),
-                        PopoverMenuItem(
-                            label = stringResource(R.string.received_files_delete),
-                            icon = Icons.Rounded.DeleteOutline,
-                            isDestructive = true,
-                            onClick = onDelete
+            GlasmioMenu(
+                expanded = menuExpanded,
+                onExpandedChange = { menuExpanded = it },
+                itemCount = 7,
+                anchor = { onAnchorClick ->
+                    GlasmioIconButton(
+                        onClick = onAnchorClick,
+                        size = 48.dp,
+                    ) {
+                        SfIcon(
+                            systemName = ThazhSymbols.MoreHoriz,
+                            contentDescription = stringResource(R.string.received_files_details),
+                            tint = colors.secondaryContent,
+                            size = 20.dp,
                         )
-                    )
+                    }
+                },
+            ) { _, close ->
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_open),
+                    systemName = ThazhSymbols.OpenInNew,
+                    onClick = {
+                        close()
+                        onOpen()
+                    },
+                )
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_share_wifi_direct),
+                    systemName = ThazhSymbols.WifiTethering,
+                    onClick = {
+                        close()
+                        onShareWifiDirect()
+                    },
+                )
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_share),
+                    systemName = ThazhSymbols.Share,
+                    onClick = {
+                        close()
+                        onShare()
+                    },
+                )
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_save),
+                    systemName = ThazhSymbols.Download,
+                    onClick = {
+                        close()
+                        onSave()
+                    },
+                )
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_rename),
+                    systemName = ThazhSymbols.Edit,
+                    onClick = {
+                        close()
+                        onRename()
+                    },
+                )
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_details),
+                    systemName = ThazhSymbols.Info,
+                    onClick = {
+                        close()
+                        onDetails()
+                    },
+                )
+                GlasmioMenuItem(
+                    title = stringResource(R.string.received_files_delete),
+                    systemName = ThazhSymbols.Delete,
+                    destructive = true,
+                    onClick = {
+                        close()
+                        onDelete()
+                    },
                 )
             }
         }
