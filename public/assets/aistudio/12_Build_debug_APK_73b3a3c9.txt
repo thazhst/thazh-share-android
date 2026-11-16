@@ -1,0 +1,352 @@
+﻿2026-11-16T23:09:28.6152210Z ##[group]Run ./gradlew assembleDebug --stacktrace
+2026-11-16T23:09:28.6153246Z [36;1m./gradlew assembleDebug --stacktrace[0m
+2026-11-16T23:09:28.6210301Z shell: /usr/bin/bash -e {0}
+2026-11-16T23:09:28.6210703Z env:
+2026-11-16T23:09:28.6211171Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.13-9/x64
+2026-11-16T23:09:28.6211930Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.13-9/x64
+2026-11-16T23:09:28.6212634Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-11-16T23:09:28.6213011Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-11-16T23:09:28.6213397Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-11-16T23:09:28.6213760Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-11-16T23:09:28.6214145Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-11-16T23:09:28.6214629Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-11-16T23:09:28.6215317Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-11-16T23:09:28.6216072Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-11-16T23:09:28.6216623Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-11-16T23:09:28.6217034Z ##[endgroup]
+2026-11-16T23:09:30.4618452Z > Task :glasmio-core:preBuild UP-TO-DATE
+2026-11-16T23:09:30.4665546Z > Task :glasmio-core:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.4673309Z > Task :app:preBuild UP-TO-DATE
+2026-11-16T23:09:30.4708066Z > Task :app:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.4753169Z > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+2026-11-16T23:09:30.4788697Z > Task :glasmio-core:processDebugNavigationResources UP-TO-DATE
+2026-11-16T23:09:30.5635269Z > Task :glasmio-glass:preBuild UP-TO-DATE
+2026-11-16T23:09:30.5649104Z > Task :glasmio-glass:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.5723378Z > Task :glasmio-glass:processDebugNavigationResources UP-TO-DATE
+2026-11-16T23:09:30.5733032Z > Task :glasmio-icons:preBuild UP-TO-DATE
+2026-11-16T23:09:30.5756861Z > Task :glasmio-icons:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.5773083Z > Task :app:generateDebugResources
+2026-11-16T23:09:30.5803534Z > Task :glasmio-icons:processDebugNavigationResources UP-TO-DATE
+2026-11-16T23:09:30.5823033Z > Task :glasmio-preference:preBuild UP-TO-DATE
+2026-11-16T23:09:30.5844219Z > Task :glasmio-preference:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.5845311Z > Task :glasmio-preference:processDebugNavigationResources UP-TO-DATE
+2026-11-16T23:09:30.5873192Z > Task :glasmio-scaffold:preBuild UP-TO-DATE
+2026-11-16T23:09:30.5873939Z > Task :glasmio-scaffold:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.5897544Z > Task :glasmio-scaffold:processDebugNavigationResources UP-TO-DATE
+2026-11-16T23:09:30.5913034Z > Task :glasmio-ui:preBuild UP-TO-DATE
+2026-11-16T23:09:30.5944391Z > Task :glasmio-ui:preDebugBuild UP-TO-DATE
+2026-11-16T23:09:30.5957438Z > Task :glasmio-ui:processDebugNavigationResources UP-TO-DATE
+2026-11-16T23:09:30.5993196Z > Task :glasmio-core:generateDebugResources UP-TO-DATE
+2026-11-16T23:09:30.5994082Z > Task :glasmio-core:javaPreCompileDebug UP-TO-DATE
+2026-11-16T23:09:30.6020592Z > Task :glasmio-glass:generateDebugResources UP-TO-DATE
+2026-11-16T23:09:30.6048942Z > Task :glasmio-icons:generateDebugResources UP-TO-DATE
+2026-11-16T23:09:30.6066020Z > Task :glasmio-icons:javaPreCompileDebug UP-TO-DATE
+2026-11-16T23:09:30.6093156Z > Task :glasmio-glass:javaPreCompileDebug UP-TO-DATE
+2026-11-16T23:09:30.6101420Z > Task :glasmio-preference:generateDebugResources UP-TO-DATE
+2026-11-16T23:09:30.6123185Z > Task :glasmio-ui:generateDebugResources UP-TO-DATE
+2026-11-16T23:09:30.6143128Z > Task :glasmio-ui:javaPreCompileDebug UP-TO-DATE
+2026-11-16T23:09:30.6155421Z > Task :glasmio-preference:javaPreCompileDebug UP-TO-DATE
+2026-11-16T23:09:30.6184823Z > Task :glasmio-scaffold:generateDebugResources UP-TO-DATE
+2026-11-16T23:09:30.6203143Z > Task :glasmio-scaffold:javaPreCompileDebug UP-TO-DATE
+2026-11-16T23:09:30.6203992Z > Task :glasmio-core:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6223177Z > Task :glasmio-core:mergeDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6243098Z > Task :glasmio-glass:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6276769Z > Task :glasmio-glass:mergeDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6304512Z > Task :glasmio-icons:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6312660Z > Task :glasmio-icons:mergeDebugAssets
+2026-11-16T23:09:30.6325675Z > Task :glasmio-preference:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6347036Z > Task :glasmio-preference:mergeDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6377566Z > Task :glasmio-scaffold:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6397579Z > Task :glasmio-scaffold:mergeDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6416277Z > Task :glasmio-ui:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6446054Z > Task :glasmio-ui:mergeDebugAssets UP-TO-DATE
+2026-11-16T23:09:30.6487379Z > Task :glasmio-core:writeDebugAarMetadata UP-TO-DATE
+2026-11-16T23:09:30.6504431Z > Task :glasmio-glass:writeDebugAarMetadata UP-TO-DATE
+2026-11-16T23:09:30.6543246Z > Task :glasmio-icons:writeDebugAarMetadata UP-TO-DATE
+2026-11-16T23:09:30.6574379Z > Task :glasmio-preference:writeDebugAarMetadata UP-TO-DATE
+2026-11-16T23:09:30.6594668Z > Task :glasmio-scaffold:writeDebugAarMetadata UP-TO-DATE
+2026-11-16T23:09:30.6623134Z > Task :glasmio-ui:writeDebugAarMetadata UP-TO-DATE
+2026-11-16T23:09:30.6632394Z > Task :glasmio-core:extractDeepLinksDebug
+2026-11-16T23:09:30.6656549Z > Task :glasmio-core:processDebugManifest UP-TO-DATE
+2026-11-16T23:09:30.6673306Z > Task :glasmio-glass:extractDeepLinksDebug FROM-CACHE
+2026-11-16T23:09:30.6693184Z > Task :glasmio-glass:processDebugManifest UP-TO-DATE
+2026-11-16T23:09:30.6715218Z > Task :glasmio-icons:extractDeepLinksDebug FROM-CACHE
+2026-11-16T23:09:30.6716109Z > Task :glasmio-icons:processDebugManifest
+2026-11-16T23:09:30.6739305Z > Task :glasmio-preference:extractDeepLinksDebug FROM-CACHE
+2026-11-16T23:09:30.6763196Z > Task :glasmio-preference:processDebugManifest UP-TO-DATE
+2026-11-16T23:09:30.6768534Z > Task :glasmio-scaffold:extractDeepLinksDebug FROM-CACHE
+2026-11-16T23:09:30.6793129Z > Task :glasmio-scaffold:processDebugManifest UP-TO-DATE
+2026-11-16T23:09:30.6818500Z > Task :glasmio-ui:extractDeepLinksDebug FROM-CACHE
+2026-11-16T23:09:30.6838480Z > Task :glasmio-ui:processDebugManifest UP-TO-DATE
+2026-11-16T23:09:30.6845207Z > Task :glasmio-core:mapDebugSourceSetPaths
+2026-11-16T23:09:30.6846920Z > Task :app:packageDebugResources
+2026-11-16T23:09:30.6848055Z > Task :glasmio-glass:mapDebugSourceSetPaths
+2026-11-16T23:09:30.6848879Z > Task :glasmio-core:packageDebugResources UP-TO-DATE
+2026-11-16T23:09:30.6849683Z > Task :glasmio-core:parseDebugLocalResources UP-TO-DATE
+2026-11-16T23:09:30.6850474Z > Task :glasmio-core:generateDebugRFile UP-TO-DATE
+2026-11-16T23:09:31.0724434Z > Task :glasmio-core:compileDebugKotlin UP-TO-DATE
+2026-11-16T23:09:31.0733325Z > Task :glasmio-core:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:09:31.0753154Z > Task :glasmio-core:bundleLibCompileToJarDebug UP-TO-DATE
+2026-11-16T23:09:31.0758024Z > Task :glasmio-glass:packageDebugResources UP-TO-DATE
+2026-11-16T23:09:31.0773255Z > Task :glasmio-glass:parseDebugLocalResources UP-TO-DATE
+2026-11-16T23:09:31.0793324Z > Task :glasmio-glass:generateDebugRFile UP-TO-DATE
+2026-11-16T23:09:31.0813186Z > Task :glasmio-icons:packageDebugResources UP-TO-DATE
+2026-11-16T23:09:31.0828877Z > Task :glasmio-icons:parseDebugLocalResources UP-TO-DATE
+2026-11-16T23:09:31.0833203Z > Task :glasmio-icons:generateDebugRFile UP-TO-DATE
+2026-11-16T23:09:31.0853338Z > Task :glasmio-icons:compileDebugKotlin UP-TO-DATE
+2026-11-16T23:09:31.0873237Z > Task :glasmio-icons:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:09:31.0887203Z > Task :glasmio-icons:bundleLibCompileToJarDebug UP-TO-DATE
+2026-11-16T23:09:31.1633933Z > Task :glasmio-glass:compileDebugKotlin UP-TO-DATE
+2026-11-16T23:09:31.1654331Z > Task :glasmio-glass:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:09:31.1655359Z > Task :glasmio-glass:bundleLibCompileToJarDebug
+2026-11-16T23:09:31.1673617Z > Task :glasmio-preference:packageDebugResources UP-TO-DATE
+2026-11-16T23:09:31.1688184Z > Task :glasmio-preference:parseDebugLocalResources UP-TO-DATE
+2026-11-16T23:09:31.1713483Z > Task :glasmio-preference:generateDebugRFile UP-TO-DATE
+2026-11-16T23:09:31.1714362Z > Task :glasmio-ui:packageDebugResources UP-TO-DATE
+2026-11-16T23:09:31.1734159Z > Task :glasmio-ui:parseDebugLocalResources UP-TO-DATE
+2026-11-16T23:09:31.2596037Z > Task :glasmio-ui:generateDebugRFile UP-TO-DATE
+2026-11-16T23:09:52.5593901Z > Task :app:processDebugNavigationResources
+2026-11-16T23:09:52.5623043Z > Task :app:parseDebugLocalResources
+2026-11-16T23:09:52.6623689Z > Task :app:generateDebugRFile
+2026-11-16T23:09:52.6683340Z > Task :glasmio-scaffold:packageDebugResources UP-TO-DATE
+2026-11-16T23:09:52.6723523Z > Task :glasmio-scaffold:parseDebugLocalResources UP-TO-DATE
+2026-11-16T23:09:52.6763283Z > Task :glasmio-scaffold:generateDebugRFile UP-TO-DATE
+2026-11-16T23:09:52.6779157Z > Task :app:javaPreCompileDebug FROM-CACHE
+2026-11-16T23:09:52.6823101Z > Task :app:generateDebugAssets UP-TO-DATE
+2026-11-16T23:09:53.1961573Z > Task :app:mergeDebugAssets
+2026-11-16T23:09:53.2383781Z > Task :app:compressDebugAssets
+2026-11-16T23:09:53.3023892Z > Task :glasmio-glass:bundleLibRuntimeToJarDebug
+2026-11-16T23:09:57.3605046Z 
+2026-11-16T23:09:57.3653615Z > Task :glasmio-ui:compileDebugKotlin
+2026-11-16T23:09:57.3684150Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/glasmio-ui/src/main/java/io/github/neoruaa/glasmio/ui/GlasmioMessageBubble.kt:80:103 Redundant call of conversion method.
+2026-11-16T23:09:57.3726948Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/glasmio-ui/src/main/java/io/github/neoruaa/glasmio/ui/GlasmioSheetState.kt:153:17 Expression is unused.
+2026-11-16T23:09:58.5586793Z 
+2026-11-16T23:09:58.5610155Z > Task :glasmio-ui:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:09:58.5653849Z > Task :glasmio-ui:bundleLibCompileToJarDebug
+2026-11-16T23:10:01.0603745Z > Task :glasmio-preference:compileDebugKotlin
+2026-11-16T23:10:01.0622219Z > Task :glasmio-preference:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:10:01.0646967Z > Task :glasmio-preference:bundleLibCompileToJarDebug
+2026-11-16T23:10:13.6613908Z > Task :glasmio-preference:bundleLibRuntimeToJarDebug
+2026-11-16T23:10:14.1613735Z > Task :glasmio-ui:bundleLibRuntimeToJarDebug
+2026-11-16T23:10:17.3595679Z 
+2026-11-16T23:10:17.3618561Z > Task :glasmio-scaffold:compileDebugKotlin
+2026-11-16T23:10:17.3654432Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/glasmio-scaffold/src/main/java/io/github/neoruaa/glasmio/scaffold/GlasmioFloatingSearch.kt:155:19 Unnecessary safe call on a non-null receiver of type 'Window'.
+2026-11-16T23:10:17.3674528Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/glasmio-scaffold/src/main/java/io/github/neoruaa/glasmio/scaffold/GlasmioFloatingSearch.kt:163:49 Unnecessary safe call on a non-null receiver of type 'Window'.
+2026-11-16T23:10:17.3749223Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/glasmio-scaffold/src/main/java/io/github/neoruaa/glasmio/scaffold/navigation/GlasmioNavDisplay.kt:381:26 Unnecessary safe call on a non-null receiver of type 'Scene<T (of fun <T : Any> GlasmioNavDisplay)>'.
+2026-11-16T23:10:18.7582347Z 
+2026-11-16T23:10:18.7583666Z > Task :glasmio-scaffold:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:10:18.8593246Z > Task :glasmio-scaffold:bundleLibCompileToJarDebug
+2026-11-16T23:10:29.7603683Z > Task :glasmio-scaffold:bundleLibRuntimeToJarDebug
+2026-11-16T23:10:35.0603826Z > Task :glasmio-core:bundleLibRuntimeToJarDebug
+2026-11-16T23:10:35.4603810Z > Task :glasmio-icons:bundleLibRuntimeToJarDebug
+2026-11-16T23:10:36.2595520Z > Task :app:desugarDebugFileDependencies
+2026-11-16T23:10:36.2635184Z > Task :app:checkDebugAarMetadata SKIPPED
+2026-11-16T23:10:36.2636044Z > Task :app:mapDebugSourceSetPaths
+2026-11-16T23:10:36.7582443Z > Task :app:compileDebugNavigationResources
+2026-11-16T23:10:40.5014056Z > Task :app:mergeDebugResources
+2026-11-16T23:10:40.5084106Z > Task :app:createDebugCompatibleScreenManifests
+2026-11-16T23:10:40.5494387Z > Task :app:extractDeepLinksDebug
+2026-11-16T23:10:41.0865890Z > Task :app:processDebugMainManifest
+2026-11-16T23:10:41.3770132Z > Task :app:processDebugManifest
+2026-11-16T23:10:41.3772665Z > Task :app:processDebugManifestForPackage
+2026-11-16T23:10:41.3773306Z > Task :glasmio-core:compileDebugLibraryResources
+2026-11-16T23:10:41.3774009Z > Task :glasmio-glass:compileDebugLibraryResources FROM-CACHE
+2026-11-16T23:10:41.3774650Z > Task :glasmio-icons:mapDebugSourceSetPaths
+2026-11-16T23:10:41.4804486Z > Task :glasmio-icons:compileDebugLibraryResources
+2026-11-16T23:10:41.4805641Z > Task :glasmio-preference:mapDebugSourceSetPaths
+2026-11-16T23:10:41.5004428Z > Task :glasmio-preference:compileDebugLibraryResources FROM-CACHE
+2026-11-16T23:10:41.5005616Z > Task :glasmio-scaffold:mapDebugSourceSetPaths
+2026-11-16T23:10:41.5204241Z > Task :glasmio-scaffold:compileDebugLibraryResources FROM-CACHE
+2026-11-16T23:10:41.5205402Z > Task :glasmio-ui:mapDebugSourceSetPaths
+2026-11-16T23:10:41.6937920Z > Task :glasmio-ui:compileDebugLibraryResources
+2026-11-16T23:10:43.8594005Z > Task :app:processDebugResources
+2026-11-16T23:10:43.8633347Z > Task :glasmio-core:processDebugJavaRes UP-TO-DATE
+2026-11-16T23:10:43.9583743Z > Task :glasmio-glass:processDebugJavaRes
+2026-11-16T23:10:43.9613204Z > Task :glasmio-icons:processDebugJavaRes
+2026-11-16T23:10:43.9625308Z > Task :glasmio-preference:processDebugJavaRes
+2026-11-16T23:10:43.9643376Z > Task :glasmio-scaffold:processDebugJavaRes
+2026-11-16T23:10:43.9665785Z > Task :glasmio-ui:processDebugJavaRes
+2026-11-16T23:10:46.4623073Z 
+2026-11-16T23:10:46.4703594Z > Task :app:compileDebugKotlin
+2026-11-16T23:10:46.4764482Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/ConnectionMonitor.kt:93:47 'val connectionInfo: WifiInfo!' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4784439Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/WifiDirectBroadcastReceiver.kt:25:58 'class NetworkInfo : Any, Parcelable' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4787572Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/WifiDirectBroadcastReceiver.kt:46:50 'class NetworkInfo : Any, Parcelable' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4804280Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/WifiDirectBroadcastReceiver.kt:47:98 'class NetworkInfo : Any, Parcelable' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4834819Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/WifiDirectBroadcastReceiver.kt:52:86 'val isConnected: Boolean' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4854248Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/WifiDirectManager.kt:240:51 'class NetworkInfo : Any, Parcelable' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4874141Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/network/WifiDirectManager.kt:242:26 'val isConnected: Boolean' is deprecated. Deprecated in Java.
+2026-11-16T23:10:46.4894688Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/ui/components/FileTypeVisuals.kt:36:41 'val Icons.Rounded.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Rounded.InsertDriveFile.
+2026-11-16T23:10:46.4897808Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/ui/components/NfcTapCard.kt:123:105 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+2026-11-16T23:10:46.4923644Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/ui/theme/ThazhIcons.kt:118:49 'val Icons.Rounded.BluetoothSearching: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Rounded.BluetoothSearching.
+2026-11-16T23:10:46.4944588Z w: file:///home/runner/work/thazh-share-android/thazh-share-android/app/src/main/java/com/thazh/share/ui/theme/ThazhIcons.kt:141:44 'val Icons.Rounded.Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Rounded.Sort.
+2026-11-16T23:10:48.1613071Z 
+2026-11-16T23:10:48.1683788Z > Task :glasmio-scaffold:bundleLibRuntimeToDirDebug
+2026-11-16T23:10:48.2586554Z > Task :app:checkDebugDuplicateClasses
+2026-11-16T23:10:48.2623437Z > Task :app:compileDebugJavaWithJavac NO-SOURCE
+2026-11-16T23:10:53.5954137Z > Task :glasmio-preference:bundleLibRuntimeToDirDebug
+2026-11-16T23:10:54.1754190Z > Task :glasmio-ui:bundleLibRuntimeToDirDebug
+2026-11-16T23:10:56.4744658Z > Task :app:dexBuilderDebug
+2026-11-16T23:11:26.4582041Z > Task :app:mergeDebugGlobalSynthetics
+2026-11-16T23:11:35.0582962Z > Task :glasmio-glass:bundleLibRuntimeToDirDebug
+2026-11-16T23:12:27.7586624Z > Task :glasmio-core:bundleLibRuntimeToDirDebug
+2026-11-16T23:12:28.2582102Z > Task :glasmio-icons:bundleLibRuntimeToDirDebug
+2026-11-16T23:12:28.8593880Z > Task :glasmio-core:mergeDebugJniLibFolders UP-TO-DATE
+2026-11-16T23:12:28.8623589Z > Task :glasmio-core:mergeDebugNativeLibs NO-SOURCE
+2026-11-16T23:12:28.8683487Z > Task :glasmio-core:copyDebugJniLibsProjectOnly
+2026-11-16T23:12:28.8691511Z > Task :glasmio-glass:mergeDebugJniLibFolders UP-TO-DATE
+2026-11-16T23:12:28.8743344Z > Task :glasmio-glass:mergeDebugNativeLibs UP-TO-DATE
+2026-11-16T23:12:28.8803324Z > Task :glasmio-glass:copyDebugJniLibsProjectOnly
+2026-11-16T23:12:28.8823529Z > Task :glasmio-icons:mergeDebugJniLibFolders
+2026-11-16T23:12:28.8884413Z > Task :glasmio-icons:mergeDebugNativeLibs NO-SOURCE
+2026-11-16T23:12:28.8913554Z > Task :glasmio-icons:copyDebugJniLibsProjectOnly
+2026-11-16T23:12:28.8963781Z > Task :glasmio-preference:mergeDebugJniLibFolders UP-TO-DATE
+2026-11-16T23:12:28.9593958Z > Task :glasmio-preference:mergeDebugNativeLibs NO-SOURCE
+2026-11-16T23:12:28.9660867Z > Task :glasmio-preference:copyDebugJniLibsProjectOnly
+2026-11-16T23:12:28.9723664Z > Task :glasmio-scaffold:mergeDebugJniLibFolders UP-TO-DATE
+2026-11-16T23:12:28.9773871Z > Task :glasmio-scaffold:mergeDebugNativeLibs NO-SOURCE
+2026-11-16T23:12:28.9797981Z > Task :glasmio-scaffold:copyDebugJniLibsProjectOnly
+2026-11-16T23:12:28.9853506Z > Task :glasmio-ui:mergeDebugJniLibFolders UP-TO-DATE
+2026-11-16T23:12:28.9854220Z > Task :glasmio-ui:mergeDebugNativeLibs NO-SOURCE
+2026-11-16T23:12:28.9854800Z > Task :glasmio-ui:copyDebugJniLibsProjectOnly
+2026-11-16T23:12:28.9855360Z > Task :glasmio-core:checkDebugAarMetadata SKIPPED
+2026-11-16T23:12:28.9856004Z > Task :glasmio-core:stripDebugDebugSymbols NO-SOURCE
+2026-11-16T23:12:28.9856744Z > Task :glasmio-core:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
+2026-11-16T23:12:29.1594174Z > Task :glasmio-core:extractDebugAnnotations UP-TO-DATE
+2026-11-16T23:12:29.1643595Z > Task :glasmio-core:extractDeepLinksForAarDebug UP-TO-DATE
+2026-11-16T23:12:29.1663392Z > Task :glasmio-core:mergeDebugGeneratedProguardFiles UP-TO-DATE
+2026-11-16T23:12:29.1683312Z > Task :glasmio-core:mergeDebugConsumerProguardFiles UP-TO-DATE
+2026-11-16T23:12:29.1703260Z > Task :glasmio-core:prepareDebugArtProfile UP-TO-DATE
+2026-11-16T23:12:29.1723230Z > Task :glasmio-core:prepareLintJarForPublish UP-TO-DATE
+2026-11-16T23:12:29.1743152Z > Task :glasmio-core:mergeDebugJavaResource UP-TO-DATE
+2026-11-16T23:12:29.1763072Z > Task :glasmio-core:syncDebugLibJars UP-TO-DATE
+2026-11-16T23:12:29.1777142Z > Task :glasmio-core:bundleDebugAar FAILED
+2026-11-16T23:12:35.5588995Z 
+2026-11-16T23:12:35.5590248Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_7-1794870569483.json
+2026-11-16T23:12:35.5633767Z FAILURE: Build failed with an exception.
+2026-11-16T23:12:35.5725197Z 
+2026-11-16T23:12:35.5725336Z 
+2026-11-16T23:12:35.5730572Z [Incubating] Problems report is available at: file:///home/runner/work/thazh-share-android/thazh-share-android/build/reports/problems/problems-report.html
+2026-11-16T23:12:35.5774168Z * What went wrong:
+2026-11-16T23:12:35.5776679Z 147 actionable tasks: 65 executed, 9 from cache, 73 up-to-date
+2026-11-16T23:12:35.5827271Z A problem was found with the configuration of task ':glasmio-core:bundleDebugAar' (type 'BundleAar').
+2026-11-16T23:12:35.5874834Z   - In plugin 'com.android.internal.version-check' type 'com.android.build.gradle.tasks.BundleAar' property 'aarMetadataCheck' specifies directory '/home/runner/work/thazh-share-android/thazh-share-android/glasmio-core/build/intermediates/aar_metadata_check/debug/checkDebugAarMetadata' which doesn't exist.
+2026-11-16T23:12:35.5913035Z     
+2026-11-16T23:12:35.5963434Z     Reason: An input file was expected to be present but it doesn't exist.
+2026-11-16T23:12:35.6023118Z     
+2026-11-16T23:12:35.6043224Z     Possible solutions:
+2026-11-16T23:12:35.6083319Z       1. Make sure the directory exists before the task is called.
+2026-11-16T23:12:35.6114207Z       2. Make sure that the task which produces the directory is declared as an input.
+2026-11-16T23:12:35.6143057Z     
+2026-11-16T23:12:35.6178155Z     For more information, please refer to https://docs.gradle.org/9.3.1/userguide/validation_problems.html#input_file_does_not_exist in the Gradle documentation.
+2026-11-16T23:12:35.6178971Z 
+2026-11-16T23:12:35.6179096Z * Try:
+2026-11-16T23:12:35.6179687Z > Run with --scan to get full insights from a Build Scan (powered by Develocity).
+2026-11-16T23:12:35.6180110Z 
+2026-11-16T23:12:35.6180253Z * Exception is:
+2026-11-16T23:12:35.6181278Z org.gradle.internal.execution.WorkValidationException: A problem was found with the configuration of task ':glasmio-core:bundleDebugAar' (type 'BundleAar').
+2026-11-16T23:12:35.6183913Z   - In plugin 'com.android.internal.version-check' type 'com.android.build.gradle.tasks.BundleAar' property 'aarMetadataCheck' specifies directory '/home/runner/work/thazh-share-android/thazh-share-android/glasmio-core/build/intermediates/aar_metadata_check/debug/checkDebugAarMetadata' which doesn't exist.
+2026-11-16T23:12:35.6185998Z     
+2026-11-16T23:12:35.6186519Z     Reason: An input file was expected to be present but it doesn't exist.
+2026-11-16T23:12:35.6186998Z     
+2026-11-16T23:12:35.6187317Z     Possible solutions:
+2026-11-16T23:12:35.6187825Z       1. Make sure the directory exists before the task is called.
+2026-11-16T23:12:35.6188550Z       2. Make sure that the task which produces the directory is declared as an input.
+2026-11-16T23:12:35.6189075Z     
+2026-11-16T23:12:35.6190045Z     For more information, please refer to https://docs.gradle.org/9.3.1/userguide/validation_problems.html#input_file_does_not_exist in the Gradle documentation.
+2026-11-16T23:12:35.6191468Z 	at org.gradle.internal.execution.WorkValidationException$BuilderWithSummary.build(WorkValidationException.java:132)
+2026-11-16T23:12:35.6235483Z 	at org.gradle.internal.execution.WorkValidationException$BuilderWithSummary.get(WorkValidationException.java:114)
+2026-11-16T23:12:35.6237147Z 	at org.gradle.internal.execution.impl.DefaultExecutionProblemHandler.throwValidationException(DefaultExecutionProblemHandler.java:97)
+2026-11-16T23:12:35.6238783Z 	at org.gradle.internal.execution.impl.DefaultExecutionProblemHandler.handleReportedProblems(DefaultExecutionProblemHandler.java:82)
+2026-11-16T23:12:35.6240006Z 	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:62)
+2026-11-16T23:12:35.6240996Z 	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:42)
+2026-11-16T23:12:35.6242339Z 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:77)
+2026-11-16T23:12:35.6244140Z 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:46)
+2026-11-16T23:12:35.6245737Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:133)
+2026-11-16T23:12:35.6247448Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:64)
+2026-11-16T23:12:35.6248663Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
+2026-11-16T23:12:35.6250070Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+2026-11-16T23:12:35.6251506Z 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+2026-11-16T23:12:35.6293290Z 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+2026-11-16T23:12:35.6294892Z 	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:77)
+2026-11-16T23:12:35.6296317Z 	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:43)
+2026-11-16T23:12:35.6297486Z 	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:25)
+2026-11-16T23:12:35.6298785Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+2026-11-16T23:12:35.6300079Z 	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:305)
+2026-11-16T23:12:35.6301339Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+2026-11-16T23:12:35.6302819Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+2026-11-16T23:12:35.6304117Z 	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+2026-11-16T23:12:35.6305274Z 	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+2026-11-16T23:12:35.6307066Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+2026-11-16T23:12:35.6308797Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+2026-11-16T23:12:35.6310449Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+2026-11-16T23:12:35.6311812Z 	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+2026-11-16T23:12:35.6370538Z 	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+2026-11-16T23:12:35.6371677Z 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:44)
+2026-11-16T23:12:35.6372809Z 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:31)
+2026-11-16T23:12:35.6373944Z 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
+2026-11-16T23:12:35.6375396Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
+2026-11-16T23:12:35.6376871Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:121)
+2026-11-16T23:12:35.6378478Z 	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:41)
+2026-11-16T23:12:35.6380108Z 	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+2026-11-16T23:12:35.6381698Z 	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+2026-11-16T23:12:35.6383337Z 	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+2026-11-16T23:12:35.6384735Z 	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+2026-11-16T23:12:35.6386407Z 	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+2026-11-16T23:12:35.6387760Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+2026-11-16T23:12:35.6389081Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+2026-11-16T23:12:35.6390358Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+2026-11-16T23:12:35.6391855Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+2026-11-16T23:12:35.6464076Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+2026-11-16T23:12:35.6465677Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+2026-11-16T23:12:35.6467015Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+2026-11-16T23:12:35.6468344Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+2026-11-16T23:12:35.6469669Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+2026-11-16T23:12:35.6470947Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+2026-11-16T23:12:35.6472246Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+2026-11-16T23:12:35.6473634Z 	at org.gradle.execution.plan.DefaultNodeExecutor.executeLocalTaskNode(DefaultNodeExecutor.java:55)
+2026-11-16T23:12:35.6474676Z 	at org.gradle.execution.plan.DefaultNodeExecutor.execute(DefaultNodeExecutor.java:34)
+2026-11-16T23:12:35.6494186Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:355)
+2026-11-16T23:12:35.6495906Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:343)
+2026-11-16T23:12:35.6497667Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:339)
+2026-11-16T23:12:35.6499268Z 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+2026-11-16T23:12:35.6500803Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:339)
+2026-11-16T23:12:35.6517404Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
+2026-11-16T23:12:35.6519039Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+2026-11-16T23:12:35.6520183Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+2026-11-16T23:12:35.6521207Z 	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+2026-11-16T23:12:35.6522383Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
+2026-11-16T23:12:35.6523858Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
+2026-11-16T23:12:35.6524995Z 	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+2026-11-16T23:12:35.6526374Z 	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+2026-11-16T23:12:35.6527846Z 	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+2026-11-16T23:12:35.6529383Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+2026-11-16T23:12:35.6531308Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+2026-11-16T23:12:35.6633894Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+2026-11-16T23:12:35.6635458Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+2026-11-16T23:12:35.6636834Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+2026-11-16T23:12:35.6638225Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+2026-11-16T23:12:35.6639536Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+2026-11-16T23:12:35.6641017Z 	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+2026-11-16T23:12:35.6642772Z 	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+2026-11-16T23:12:35.6644228Z 	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:276)
+2026-11-16T23:12:35.6645608Z 	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:187)
+2026-11-16T23:12:35.6646826Z 	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
+2026-11-16T23:12:35.6648030Z 	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:187)
+2026-11-16T23:12:35.6649437Z 	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+2026-11-16T23:12:35.6651333Z 	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+2026-11-16T23:12:35.6673262Z 	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$withLocksAcquired$0(DefaultWorkerLeaseService.java:269)
+2026-11-16T23:12:35.6674628Z 	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:42)
+2026-11-16T23:12:35.6675919Z 	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:267)
+2026-11-16T23:12:35.6677235Z 	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:259)
+2026-11-16T23:12:35.6678578Z 	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+2026-11-16T23:12:35.6679868Z 	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+2026-11-16T23:12:35.6681100Z 	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+2026-11-16T23:12:35.6682599Z 	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+2026-11-16T23:12:35.6683962Z 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+2026-11-16T23:12:35.6685272Z 	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
+2026-11-16T23:12:35.6686616Z 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+2026-11-16T23:12:35.6687904Z 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+2026-11-16T23:12:35.6688506Z 
+2026-11-16T23:12:35.6688519Z 
+2026-11-16T23:12:35.6688711Z BUILD FAILED in 3m 6s
+2026-11-16T23:12:35.6895894Z ##[error]Process completed with exit code 1.
