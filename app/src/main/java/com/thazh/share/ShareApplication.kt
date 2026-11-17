@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import com.thazh.share.data.AppPreferencesRepository
 import com.thazh.share.data.ReceivedFilesRepository
+import com.thazh.share.data.SharedLinkRepository
 
 class ShareApplication : Application() {
 
@@ -14,6 +15,10 @@ class ShareApplication : Application() {
 
     lateinit var receivedFilesRepository: ReceivedFilesRepository
         private set
+
+    val sharedLinkRepository: SharedLinkRepository by lazy {
+        SharedLinkRepository.create(this)
+    }
 
     override fun onCreate() {
         super.onCreate()

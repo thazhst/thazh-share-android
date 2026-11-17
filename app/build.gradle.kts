@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -37,7 +38,6 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debugConfig")
         }
@@ -105,6 +105,15 @@ dependencies {
 
     // Image loading (received image thumbnails)
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Firebase Firestore, Authentication & Google Sign-In via Credential Manager
+    implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Debug tooling
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -3,7 +3,9 @@ package com.thazh.share.ui.theme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -21,6 +23,9 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DeleteSweep
@@ -36,12 +41,14 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Refresh
@@ -70,6 +77,7 @@ object ThazhSymbols {
     // Tab items map to SfSymbol enum constants (rendered cleanly via ThazhIconResolver)
     val TabSend = SfSymbol.RadioWaves
     val TabReceive = SfSymbol.DownloadFilled
+    val TabLinkShare = SfSymbol.Cloud
     val TabReceivedFiles = SfSymbol.Layers
 
     const val WifiTethering = "antenna.radiowaves.left.and.right"
@@ -78,6 +86,8 @@ object ThazhSymbols {
     const val FolderOpen = "folder"
     const val Settings = "gear"
     const val Person = "person"
+    const val AccountCircle = "person.crop.circle"
+    const val Logout = "rectangle.portrait.and.arrow.right"
     const val Bluetooth = "wave.3.right"
     const val Nfc = "sensor.tag.radiowaves.forward"
     const val BatterySaver = "battery.100.bolt"
@@ -99,7 +109,12 @@ object ThazhSymbols {
     const val OpenInNew = "arrow.up.right.square"
     const val Close = "xmark"
     const val Refresh = "arrow.clockwise"
+    const val Link = "link"
     const val LinkOff = "link.badge.minus"
+    const val CloudUpload = "icloud.and.arrow.up"
+    const val CloudDone = "checkmark.icloud"
+    const val Copy = "doc.on.doc"
+    const val QrCode = "qrcode"
     const val AttachFile = "paperclip"
     const val PhotoLibrary = "photo.on.rectangle"
     const val SwapVert = "arrow.up.arrow.down"
@@ -137,10 +152,13 @@ object ThazhIconResolver : GlasmioIconResolver {
     override fun resolve(systemName: String): ImageVector = when (systemName) {
         SfSymbol.RadioWaves.systemName, ThazhSymbols.ArrowUp -> Icons.Rounded.ArrowUpward
         SfSymbol.DownloadFilled.systemName, ThazhSymbols.ArrowDown -> Icons.Rounded.ArrowDownward
+        SfSymbol.Cloud.systemName, ThazhSymbols.Link -> Icons.Rounded.Link
         SfSymbol.Layers.systemName, ThazhSymbols.FolderOpen -> Icons.Rounded.FolderOpen
         ThazhSymbols.WifiTethering -> Icons.Rounded.WifiTethering
         ThazhSymbols.Settings, SfSymbol.Settings.systemName -> Icons.Rounded.Settings
         ThazhSymbols.Person -> Icons.Rounded.Person
+        ThazhSymbols.AccountCircle -> Icons.Rounded.AccountCircle
+        ThazhSymbols.Logout -> Icons.AutoMirrored.Rounded.Logout
         ThazhSymbols.Bluetooth -> Icons.Rounded.BluetoothSearching
         ThazhSymbols.Nfc -> Icons.Rounded.Nfc
         ThazhSymbols.BatterySaver -> Icons.Rounded.BatterySaver
@@ -163,6 +181,10 @@ object ThazhIconResolver : GlasmioIconResolver {
         ThazhSymbols.Close -> Icons.Rounded.Close
         ThazhSymbols.Refresh -> Icons.Rounded.Refresh
         ThazhSymbols.LinkOff -> Icons.Rounded.LinkOff
+        ThazhSymbols.CloudUpload -> Icons.Rounded.CloudUpload
+        ThazhSymbols.CloudDone -> Icons.Rounded.CloudDone
+        ThazhSymbols.Copy -> Icons.Rounded.ContentCopy
+        ThazhSymbols.QrCode -> Icons.Rounded.QrCode2
         ThazhSymbols.AttachFile -> Icons.Rounded.AttachFile
         ThazhSymbols.PhotoLibrary -> Icons.Rounded.PhotoLibrary
         ThazhSymbols.SwapVert -> Icons.Rounded.SwapVert

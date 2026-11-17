@@ -22,6 +22,7 @@ import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.IncomingConnectionRequest
+import com.thazh.share.data.PeerDiscoveryTransport
 import com.thazh.share.data.PeerStatus
 import com.thazh.share.data.PickedFile
 import com.thazh.share.data.ReceivedFile
@@ -262,6 +263,9 @@ class WifiDirectService : Service() {
     fun setLocalDisplayName(name: String) {
         localDisplayName = name.ifBlank { localDisplayName }
         NfcConnectionCoordinator.updateLocalIdentity(displayName = localDisplayName)
+        if (isDiscoveryActive && bleFastDiscoveryEnabled) {
+            bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress, localDisplayName)
+        }
         serviceScope.launch {
             peerConnection?.takeIf { it.isConnected }?.send(Frame.NameChanged(localDisplayName))
         }
@@ -333,7 +337,7 @@ class WifiDirectService : Service() {
     private fun startDiscoveryInternal(onResult: (Boolean, String?) -> Unit) {
         isDiscoveryActive = true
         if (bleFastDiscoveryEnabled) {
-            bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress)
+            bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress, localDisplayName)
         }
         wifiDirectManager.startDiscovery(onResult)
     }
@@ -346,9 +350,11 @@ class WifiDirectService : Service() {
 
     fun isBleFastDiscoverySupported(): Boolean = bleDiscoveryManager.isSupported()
 
+    val isBleActive: StateFlow<Boolean> get() = bleDiscoveryManager.isScanningState
+
     fun retryBleDiscovery() {
         if (isDiscoveryActive && bleFastDiscoveryEnabled) {
-            bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress)
+            bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress, localDisplayName)
         }
     }
 
@@ -380,7 +386,7 @@ class WifiDirectService : Service() {
                 app.preferencesRepository.bleFastDiscoveryEnabled.collect { enabled ->
                     bleFastDiscoveryEnabled = enabled
                     if (isDiscoveryActive) {
-                        if (enabled) bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress)
+                        if (enabled) bleDiscoveryManager.start(wifiDirectManager.thisDevice.value?.deviceAddress, localDisplayName)
                         else bleDiscoveryManager.stop()
                     }
                 }
@@ -488,16 +494,41 @@ class WifiDirectService : Service() {
     private fun observeMergedPeers() {
         peersJob?.cancel()
         peersJob = serviceScope.launch {
-            combine(wifiDirectManager.peers, bleDiscoveryManager.discoveredAddresses) { wifiPeers, bleAddresses ->
-                val alreadyKnown = wifiPeers.map { it.deviceAddress }.toSet()
-                val bleOnly = bleAddresses.filter { it !in alreadyKnown }.map { address ->
+            combine(wifiDirectManager.peers, bleDiscoveryManager.discoveredBeacons) { wifiPeers, bleBeacons ->
+                val enrichedWifi = wifiPeers.map { peer ->
+                    val matchingBeacon = bleBeacons[peer.deviceAddress.uppercase()]
+                        ?: bleBeacons.values.firstOrNull { beacon ->
+                            !beacon.displayName.isNullOrBlank() &&
+                                peer.deviceName.contains(beacon.displayName, ignoreCase = true)
+                        }
+                    if (matchingBeacon != null) {
+                        peer.copy(
+                            discoveryTransport = PeerDiscoveryTransport.WIFI_AND_BLE,
+                            rssiDbm = matchingBeacon.rssiDbm,
+                            estimatedDistanceMeters = matchingBeacon.estimatedDistanceMeters,
+                        )
+                    } else {
+                        peer
+                    }
+                }
+                val alreadyKnownAddresses = wifiPeers.map { it.deviceAddress.uppercase() }.toSet()
+                val alreadyKnownNames = wifiPeers.map { it.deviceName.lowercase() }.toSet()
+                val bleOnly = bleBeacons.values.filter { beacon ->
+                    beacon.deviceAddress.uppercase() !in alreadyKnownAddresses &&
+                        (beacon.displayName == null || beacon.displayName.lowercase() !in alreadyKnownNames)
+                }.map { beacon ->
+                    val label = beacon.displayName?.takeIf { it.isNotBlank() }
+                        ?: getString(R.string.ble_nearby_device)
                     DiscoveredPeer(
-                        deviceName = getString(R.string.ble_nearby_device),
-                        deviceAddress = address,
+                        deviceName = label,
+                        deviceAddress = beacon.deviceAddress,
                         status = PeerStatus.AVAILABLE,
+                        discoveryTransport = PeerDiscoveryTransport.BLE,
+                        rssiDbm = beacon.rssiDbm,
+                        estimatedDistanceMeters = beacon.estimatedDistanceMeters,
                     )
                 }
-                wifiPeers + bleOnly
+                enrichedWifi + bleOnly
             }.collect { merged ->
                 _peers.value = merged
                 tryCompletePendingNfcMatch(merged)

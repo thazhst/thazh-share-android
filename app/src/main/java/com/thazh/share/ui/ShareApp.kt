@@ -54,6 +54,7 @@ import com.thazh.share.R
 import com.thazh.share.ui.components.IosSwipeBackContainer
 import com.thazh.share.ui.screens.DiscoveryScreen
 import com.thazh.share.ui.screens.FileTransferScreen
+import com.thazh.share.ui.screens.LinkShareScreen
 import com.thazh.share.ui.screens.ReceiveScreen
 import com.thazh.share.ui.screens.ReceivedFilesScreen
 import com.thazh.share.ui.screens.SettingsScreen
@@ -84,7 +85,8 @@ object ShareRoutes {
 enum class ShareTab(val index: Int) {
     SEND(0),
     RECEIVE(1),
-    RECEIVED_FILES(2)
+    LINK_SHARE(2),
+    RECEIVED_FILES(3)
 }
 
 @Composable
@@ -122,7 +124,14 @@ fun ShareApp(viewModel: ShareViewModel) {
     val isNfcEnabled by viewModel.isNfcEnabled.collectAsStateWithLifecycle()
     val nfcPairingPeerName by viewModel.nfcPairingPeerName.collectAsStateWithLifecycle()
     val pendingWifiDirectFilesCount by viewModel.pendingWifiDirectFilesCount.collectAsStateWithLifecycle()
+    val selectedCatboxExpiry by viewModel.selectedCatboxExpiry.collectAsStateWithLifecycle()
+    val isUploadingCatbox by viewModel.isUploadingCatbox.collectAsStateWithLifecycle()
+    val catboxUploadProgress by viewModel.catboxUploadProgress.collectAsStateWithLifecycle()
+    val catboxUploadError by viewModel.catboxUploadError.collectAsStateWithLifecycle()
+    val sessionCatboxLinks by viewModel.sessionCatboxLinks.collectAsStateWithLifecycle()
+
     val isNfcSupported = remember { viewModel.isNfcSupported }
+    val isBleSupported = remember { viewModel.isBleFastDiscoverySupported() }
 
     var selectedTab by rememberSaveable { mutableStateOf(ShareTab.SEND) }
     var showTransferSessionOnSendTab by rememberSaveable { mutableStateOf(true) }
@@ -147,6 +156,45 @@ fun ShareApp(viewModel: ShareViewModel) {
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
         if (uris.isNotEmpty()) viewModel.sendFilesForTransfer(uris)
+    }
+
+    // Quick-send launchers for DiscoveryScreen (send immediately if connected, or queue & scan)
+    val quickFilesPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.sendOrQueueFilesForWifiDirect(uris) { sentImmediately, count ->
+                val msgRes = if (sentImmediately) {
+                    R.string.received_files_share_wifi_direct_sending
+                } else {
+                    R.string.received_files_share_wifi_direct_queued
+                }
+                Toast.makeText(
+                    context,
+                    context.getString(msgRes, count),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    val quickMediaPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.sendOrQueueFilesForWifiDirect(uris) { sentImmediately, count ->
+                val msgRes = if (sentImmediately) {
+                    R.string.received_files_share_wifi_direct_sending
+                } else {
+                    R.string.received_files_share_wifi_direct_queued
+                }
+                Toast.makeText(
+                    context,
+                    context.getString(msgRes, count),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     LaunchedEffect(nfcPairingPeerName) {
@@ -204,12 +252,22 @@ fun ShareApp(viewModel: ShareViewModel) {
             savedDevices = savedDevices,
             isDiscovering = isDiscovering,
             screenState = screenState,
+            isBleSupported = isBleSupported,
+            isBleEnabled = bleFastDiscoveryEnabled,
             isNfcSupported = isNfcSupported,
             isNfcEnabled = isNfcEnabled,
             nfcPairingPeerName = nfcPairingPeerName,
             pendingWifiDirectFilesCount = pendingWifiDirectFilesCount,
             bottomBarPadding = bottomBarPadding,
             onCancelPendingFiles = { viewModel.clearPendingWifiDirectFiles() },
+            onQuickPickFiles = { quickFilesPickerLauncher.launch("*/*") },
+            onQuickPickMedia = {
+                quickMediaPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                )
+            },
+            onOpenLinkShare = { selectedTab = ShareTab.LINK_SHARE },
+            onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(!bleFastDiscoveryEnabled) },
             onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
             onStartDiscovery = { viewModel.startDiscovery() },
             onStopDiscovery = { viewModel.stopDiscovery() },
@@ -285,13 +343,14 @@ fun ShareApp(viewModel: ShareViewModel) {
 
         val sendLabel = stringResource(R.string.tab_send)
         val receiveLabel = stringResource(R.string.tab_receive)
+        val linkShareLabel = stringResource(R.string.tab_link_share)
         val receivedFilesLabel = if (unseenReceivedCount > 0) {
             stringResource(R.string.tab_received_files_count, unseenReceivedCount)
         } else {
             stringResource(R.string.tab_received_files)
         }
 
-        val tabItems = remember(sendLabel, receiveLabel, receivedFilesLabel) {
+        val tabItems = remember(sendLabel, receiveLabel, linkShareLabel, receivedFilesLabel) {
             listOf(
                 GlasmioTabItem(
                     key = ShareTab.SEND,
@@ -304,6 +363,12 @@ fun ShareApp(viewModel: ShareViewModel) {
                     label = receiveLabel,
                     symbol = ThazhSymbols.TabReceive,
                     contentDescription = receiveLabel,
+                ),
+                GlasmioTabItem(
+                    key = ShareTab.LINK_SHARE,
+                    label = linkShareLabel,
+                    symbol = ThazhSymbols.TabLinkShare,
+                    contentDescription = linkShareLabel,
                 ),
                 GlasmioTabItem(
                     key = ShareTab.RECEIVED_FILES,
@@ -343,19 +408,54 @@ fun ShareApp(viewModel: ShareViewModel) {
                                     isSocketConnected = isSocketConnected,
                                     connectionQuality = connectionQuality,
                                     estimatedDistanceMeters = estimatedDistanceMeters,
+                                    peers = peers,
                                     transfers = transfers,
+                                    isBleSupported = isBleSupported,
+                                    isBleEnabled = bleFastDiscoveryEnabled,
                                     isNfcSupported = isNfcSupported,
                                     isNfcEnabled = isNfcEnabled,
                                     nfcPairingPeerName = nfcPairingPeerName,
                                     bottomBarPadding = bottomBarPadding,
                                     onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
                                     onStartDiscovery = { viewModel.startDiscovery() },
+                                    onConnectPeer = { viewModel.connectToPeer(it) },
+                                    onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(!bleFastDiscoveryEnabled) },
                                     onOpenNfcSettings = { viewModel.openNfcSettings() },
                                     onCancelTransfer = { viewModel.cancelTransfer(it) },
                                     onRetryTransfer = { viewModel.retryTransfer(it) },
                                     onDismissTransfer = { viewModel.dismissTransfer(it) },
                                     onClearFinished = { viewModel.clearFinishedTransfers() },
                                     onDisconnect = { viewModel.disconnect() },
+                                    onOpenSettings = openSettings,
+                                )
+                            }
+                        }
+
+                        ShareTab.LINK_SHARE -> {
+                            IosSwipeBackContainer(
+                                enabled = interactiveBackHandler,
+                                onBack = { selectedTab = ShareTab.SEND },
+                                previousContent = { RenderSendTabContent() },
+                            ) {
+                                LinkShareScreen(
+                                    selectedExpiry = selectedCatboxExpiry,
+                                    isUploading = isUploadingCatbox,
+                                    uploadProgress = catboxUploadProgress,
+                                    uploadError = catboxUploadError,
+                                    sessionUploadedLinks = sessionCatboxLinks,
+                                    observeCloudLinks = { uid -> viewModel.observeCloudSharedLinks(uid) },
+                                    bottomBarPadding = bottomBarPadding,
+                                    onSelectExpiry = { viewModel.setCatboxExpiry(it) },
+                                    onUploadUris = { uris, expiry, note ->
+                                        viewModel.uploadFilesToCatbox(uris, expiry, note)
+                                    },
+                                    onUpdateCloudLinkNote = { uid, linkId, note ->
+                                        viewModel.updateCloudSharedLinkNote(uid, linkId, note)
+                                    },
+                                    onDeleteCloudLink = { uid, linkId ->
+                                        viewModel.deleteCloudSharedLink(uid, linkId)
+                                    },
+                                    onClearSessionLinks = { viewModel.clearSessionCatboxLinks() },
                                     onOpenSettings = openSettings,
                                 )
                             }
@@ -440,8 +540,8 @@ fun ShareApp(viewModel: ShareViewModel) {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .widthIn(max = 420.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .widthIn(max = 460.dp)
                     .fillMaxWidth()
                     .swipeBackExcluded()
                     .testTag("glasmio_bottom_tabs"),
@@ -498,7 +598,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                             autoSaveToDownloads = autoSaveToDownloads,
                             soundVibrationEnabled = soundVibrationEnabled,
                             bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
-                            isBleSupported = viewModel.isBleFastDiscoverySupported(),
+                            isBleSupported = isBleSupported,
                             isNfcSupported = isNfcSupported,
                             isNfcEnabled = isNfcEnabled,
                             themeMode = themeMode,

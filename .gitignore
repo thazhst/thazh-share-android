@@ -35,10 +35,8 @@ Thumbs.db
 
 # Log files
 *.log
+*-debug.log
 
 # Android profiling
 *.hprof
 
-# Generated Play Store / Firebase config placeholders some templates add —
-# harmless to ignore even though this project doesn't use them.
-google-services.json

@@ -246,8 +246,55 @@
     <!-- Bottom navigation tabs -->
     <string name="tab_send">Gửi</string>
     <string name="tab_receive">Nhận</string>
+    <string name="tab_link_share">Liên kết</string>
     <string name="tab_received_files">Tệp đã nhận</string>
-    <string name="tab_received_files_count">Tệp đã nhận (%1$d)</string>
+    <string name="tab_received_files_count">Tệp (%1$d)</string>
+
+    <!-- Spatial Radar & Quick Send Actions -->
+    <string name="radar_scanning_active_title">Radar đang quét không gian xung quanh…</string>
+    <string name="radar_idle_title">Chạm vào tâm Radar để bắt đầu quét</string>
+    <string name="radar_found_peers_count">Phát hiện %1$d thiết bị trên Radar</string>
+    <string name="radar_tap_peer_hint">Chạm trực tiếp vào biểu tượng thiết bị trên Radar để kết nối và gửi tệp ngay.</string>
+    <string name="radar_pill_wifi_active">Wi-Fi Direct: Đang quét</string>
+    <string name="radar_pill_wifi_idle">Wi-Fi Direct: Chờ</string>
+    <string name="radar_pill_ble_active">BLE: Đang phát</string>
+    <string name="radar_pill_ble_idle">BLE: Tắt</string>
+    <string name="radar_pill_nfc_ready">NFC: Sẵn sàng chạm</string>
+    <string name="radar_pill_nfc_off">NFC: Đang tắt</string>
+    <string name="discover_quick_actions_title">Thao tác gửi nhanh</string>
+    <string name="discover_quick_actions_subtitle">Chọn tệp trước rồi chạm vào thiết bị trên Radar để tự động gửi, hoặc tạo liên kết đám mây.</string>
+    <string name="discover_quick_link_share">Tạo liên kết</string>
+
+    <!-- Share via Link (Catbox.moe + Cloud History) -->
+    <string name="link_share_title">Chia sẻ qua liên kết</string>
+    <string name="link_share_subtitle">Tạo liên kết tải nhanh qua Catbox.moe • Không bắt buộc đăng nhập</string>
+    <string name="link_share_hero_title">Tải tệp lên Catbox.moe</string>
+    <string name="link_share_hero_desc">Tạo liên kết trực tiếp để gửi cho bất kỳ ai qua tin nhắn, mạng xã hội hoặc mã QR.</string>
+    <string name="link_share_expiry_label">Thời hạn lưu trữ liên kết</string>
+    <string name="link_share_expiry_permanent">Vĩnh viễn (Catbox)</string>
+    <string name="link_share_expiry_1h">1 giờ</string>
+    <string name="link_share_expiry_12h">12 giờ</string>
+    <string name="link_share_expiry_24h">24 giờ</string>
+    <string name="link_share_expiry_72h">72 giờ</string>
+    <string name="link_share_uploading_file">Đang tải lên: %1$s</string>
+    <string name="link_share_session_section_title">Liên kết vừa tạo trong phiên này</string>
+    <string name="link_share_copy_button">Sao chép</string>
+    <string name="link_share_copied_toast">Đã sao chép liên kết vào bộ nhớ tạm</string>
+    <string name="link_share_qr_title">Mã QR liên kết</string>
+    <string name="link_share_edit_note_title">Ghi chú cho liên kết</string>
+    <string name="link_share_note_placeholder">Nhập ghi chú cho tệp này…</string>
+    <string name="link_share_auth_title">Lưu lịch sử liên kết đám mây</string>
+    <string name="link_share_auth_optional_badge">Không bắt buộc</string>
+    <string name="link_share_auth_desc">Bạn có thể tạo và chia sẻ liên kết Catbox.moe ngay mà không cần tài khoản. Đăng nhập để tự động lưu và đồng bộ lịch sử liên kết trên mọi thiết bị.</string>
+    <string name="link_share_sign_in_google">Đăng nhập bằng Google</string>
+    <string name="link_share_signed_in_default">Tài khoản đồng bộ</string>
+    <string name="link_share_cloud_sync_active">Đang tự động lưu lịch sử liên kết đám mây</string>
+    <string name="link_share_sign_out">Đăng xuất</string>
+    <string name="link_share_cloud_history_title">Lịch sử liên kết đã lưu (%1$d)</string>
+    <string name="link_share_cloud_empty_title">Chưa có liên kết nào trong lịch sử</string>
+    <string name="link_share_cloud_empty_body">Mọi tệp bạn tải lên Catbox.moe khi đã đăng nhập sẽ tự động được lưu trữ và đồng bộ tại đây.</string>
+    <string name="link_share_auth_info_title">Về đăng nhập &amp; đồng bộ lịch sử</string>
+    <string name="link_share_auth_info_body">• Chia sẻ qua liên kết Catbox.moe hoạt động hoàn toàn miễn phí và không bắt buộc đăng nhập.\n• Đăng nhập bằng Google (Credential Manager) được kích hoạt sẵn để đồng bộ lịch sử liên kết lên Cloud Firestore an toàn.\n• Nếu muốn dùng thêm phương thức Email/Mật khẩu, quản trị viên có thể bật nhà cung cấp Email/Password trong bảng điều khiển Firebase Authentication của dự án.</string>
 
     <!-- NFC Tap-to-Connect -->
     <string name="nfc_service_description">Kết nối nhanh Thazh Share qua NFC</string>

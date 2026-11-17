@@ -2,23 +2,17 @@ package com.thazh.share.ui.screens
 
 import android.content.Context
 import android.net.wifi.WifiManager
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,10 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -48,7 +42,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.DeviceVisibilityMode
@@ -56,7 +49,9 @@ import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.SavedDevice
 import com.thazh.share.ui.ConnectScreenState
 import com.thazh.share.ui.components.DiscoveredPeerRow
+import com.thazh.share.ui.components.InteractiveRadarCard
 import com.thazh.share.ui.components.NfcTapCard
+import com.thazh.share.ui.components.RadarMode
 import com.thazh.share.ui.components.SavedDeviceRow
 import com.thazh.share.ui.components.VisibilitySelectorCard
 import com.thazh.share.ui.theme.ThazhSymbols
@@ -86,12 +81,18 @@ fun DiscoveryScreen(
     savedDevices: List<SavedDevice>,
     isDiscovering: Boolean,
     screenState: ConnectScreenState,
+    isBleSupported: Boolean = true,
+    isBleEnabled: Boolean = true,
     isNfcSupported: Boolean,
     isNfcEnabled: Boolean,
     nfcPairingPeerName: String?,
     pendingWifiDirectFilesCount: Int = 0,
     bottomBarPadding: Dp = 96.dp,
     onCancelPendingFiles: () -> Unit = {},
+    onQuickPickFiles: () -> Unit = {},
+    onQuickPickMedia: () -> Unit = {},
+    onOpenLinkShare: () -> Unit = {},
+    onToggleBleFastDiscovery: (() -> Unit)? = null,
     onSelectVisibilityMode: (DeviceVisibilityMode) -> Unit,
     onStartDiscovery: () -> Unit,
     onStopDiscovery: () -> Unit,
@@ -115,6 +116,7 @@ fun DiscoveryScreen(
         runCatching { wifiManager?.isWifiEnabled }.getOrNull() ?: true
     }
     val isConnecting = screenState is ConnectScreenState.Connecting
+    val connectedPeer = (screenState as? ConnectScreenState.Connected)?.peerName
 
     var deviceToRename by remember { mutableStateOf<SavedDevice?>(null) }
     var lastRenameTarget by remember { mutableStateOf<SavedDevice?>(null) }
@@ -310,12 +312,49 @@ fun DiscoveryScreen(
                 }
             }
 
+            // Interactive 2D Spatial Radar Hero Card
             item(key = "radar_hero") {
                 CenteredDiscoveryContent {
-                    DiscoveryRadarCard(
+                    InteractiveRadarCard(
+                        mode = RadarMode.SEND,
                         displayName = displayName,
+                        visibilityMode = visibilityMode,
+                        visibilityRemainingSeconds = visibilityRemainingSeconds,
                         isDiscovering = isDiscovering,
+                        isConnecting = isConnecting,
+                        isConnected = connectedPeer != null,
+                        connectedPeerName = connectedPeer,
+                        peers = peers,
+                        isBleSupported = isBleSupported,
+                        isBleEnabled = isBleEnabled,
+                        isNfcSupported = isNfcSupported,
+                        isNfcEnabled = isNfcEnabled,
+                        nfcPairingPeerName = nfcPairingPeerName,
                         errorMessage = (screenState as? ConnectScreenState.Error)?.message,
+                        onCenterClick = {
+                            if (connectedPeer != null) {
+                                onOpenActiveSession()
+                            } else if (isDiscovering) {
+                                onStopDiscovery()
+                            } else {
+                                onStartDiscovery()
+                            }
+                        },
+                        onPeerNodeClick = { peer -> onConnectPeer(peer) },
+                        onToggleBleClick = onToggleBleFastDiscovery,
+                        onNfcPillClick = onOpenNfcSettings,
+                    )
+                }
+            }
+
+            // Streamlined Quick Actions Card (Pick Files / Media before connecting + Share via Link)
+            item(key = "quick_send_actions") {
+                CenteredDiscoveryContent {
+                    QuickSendActionCard(
+                        pendingCount = pendingWifiDirectFilesCount,
+                        onPickFiles = onQuickPickFiles,
+                        onPickMedia = onQuickPickMedia,
+                        onOpenLinkShare = onOpenLinkShare,
                     )
                 }
             }
@@ -525,6 +564,120 @@ fun DiscoveryScreen(
 }
 
 @Composable
+private fun QuickSendActionCard(
+    pendingCount: Int,
+    onPickFiles: () -> Unit,
+    onPickMedia: () -> Unit,
+    onOpenLinkShare: () -> Unit,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+
+    GlasmioCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.discover_quick_actions_title),
+                        style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
+                        color = colors.content,
+                    )
+                    Text(
+                        text = if (pendingCount > 0) {
+                            stringResource(R.string.discover_pending_files_title, pendingCount)
+                        } else {
+                            stringResource(R.string.discover_quick_actions_subtitle)
+                        },
+                        style = GlasmioTheme.textStyles.caption1,
+                        color = if (pendingCount > 0) semantic.accentBlue else colors.secondaryContent,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QuickActionTile(
+                    icon = ThazhSymbols.AttachFile,
+                    label = stringResource(R.string.transfer_pick_files),
+                    accentColor = semantic.accentBlue,
+                    onClick = onPickFiles,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("discover_quick_pick_files"),
+                )
+                QuickActionTile(
+                    icon = ThazhSymbols.PhotoLibrary,
+                    label = stringResource(R.string.transfer_pick_media),
+                    accentColor = semantic.accentCyan,
+                    onClick = onPickMedia,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("discover_quick_pick_media"),
+                )
+                QuickActionTile(
+                    icon = ThazhSymbols.Link,
+                    label = stringResource(R.string.discover_quick_link_share),
+                    accentColor = semantic.accentGreen,
+                    onClick = onOpenLinkShare,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("discover_quick_link_share"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionTile(
+    icon: String,
+    label: String,
+    accentColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = GlasmioTheme.colors
+    val tileShape = ContinuousRoundedRectangle(14.dp)
+    Column(
+        modifier = modifier
+            .defaultMinSize(minHeight = 76.dp)
+            .clip(tileShape)
+            .background(accentColor.copy(alpha = if (colors.isDark) 0.16f else 0.09f))
+            .border(1.dp, accentColor.copy(alpha = 0.28f), tileShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+    ) {
+        SfIcon(
+            systemName = icon,
+            contentDescription = null,
+            tint = accentColor,
+            size = 22.dp,
+        )
+        Text(
+            text = label,
+            style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.content,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun CenteredDiscoveryContent(content: @Composable () -> Unit) {
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -536,99 +689,6 @@ private fun CenteredDiscoveryContent(content: @Composable () -> Unit) {
                 .fillMaxWidth(),
         ) {
             content()
-        }
-    }
-}
-
-@Composable
-private fun DiscoveryRadarCard(
-    displayName: String,
-    isDiscovering: Boolean,
-    errorMessage: String?,
-) {
-    val colors = GlasmioTheme.colors
-    val semantic = ThazhTheme.semantic
-    val transition = rememberInfiniteTransition(label = "radar_wave")
-    val wave by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "wave",
-    )
-
-    GlasmioCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier = Modifier.size(104.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val maxR = size.minDimension / 2f
-                    if (isDiscovering) {
-                        for (ring in 0..2) {
-                            val phase = (wave + ring / 3f) % 1f
-                            val radius = maxR * (0.36f + 0.64f * phase)
-                            val alpha = (1f - phase) * 0.42f
-                            drawCircle(
-                                color = semantic.accentBlue.copy(alpha = alpha),
-                                radius = radius,
-                                style = Stroke(width = 2.dp.toPx()),
-                            )
-                        }
-                    } else {
-                        drawCircle(
-                            color = semantic.accentBlue.copy(alpha = 0.16f),
-                            radius = maxR * 0.72f,
-                            style = Stroke(width = 1.5.dp.toPx()),
-                        )
-                    }
-                    drawCircle(
-                        color = semantic.accentBlue.copy(alpha = 0.16f),
-                        radius = maxR * 0.38f,
-                    )
-                }
-                SfIcon(
-                    systemName = ThazhSymbols.WifiTethering,
-                    contentDescription = null,
-                    tint = semantic.accentBlue,
-                    size = 30.dp,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (displayName.isNotBlank()) {
-                Box(
-                    modifier = Modifier
-                        .clip(ContinuousCapsule)
-                        .background(semantic.accentBlue.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = displayName,
-                        style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
-                        color = semantic.accentBlue,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            Text(
-                text = errorMessage ?: stringResource(R.string.discover_intro),
-                style = GlasmioTheme.textStyles.subheadline,
-                color = if (errorMessage != null) colors.destructive else colors.secondaryContent,
-                textAlign = TextAlign.Center,
-            )
         }
     }
 }

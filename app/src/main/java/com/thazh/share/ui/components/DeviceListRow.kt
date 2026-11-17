@@ -29,9 +29,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.DiscoveredPeer
+import com.thazh.share.data.PeerDiscoveryTransport
 import com.thazh.share.data.PeerStatus
 import com.thazh.share.data.SavedDevice
 import com.thazh.share.ui.theme.ThazhSymbols
@@ -60,13 +62,24 @@ fun DiscoveredPeerRow(
     val badgeColor = when (peer.status) {
         PeerStatus.CONNECTED -> semantic.accentGreen
         PeerStatus.INVITED -> semantic.warningOrange
-        else -> semantic.accentBlue
+        else -> when (peer.discoveryTransport) {
+            PeerDiscoveryTransport.BLE -> semantic.accentCyan
+            PeerDiscoveryTransport.WIFI_AND_BLE -> semantic.accentGreen
+            else -> semantic.accentBlue
+        }
+    }
+
+    val transportLabel = when (peer.discoveryTransport) {
+        PeerDiscoveryTransport.WIFI_DIRECT -> "Wi-Fi Direct"
+        PeerDiscoveryTransport.BLE -> "BLE Nhanh"
+        PeerDiscoveryTransport.WIFI_AND_BLE -> "Wi-Fi + BLE"
+        PeerDiscoveryTransport.NFC -> "NFC"
     }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 68.dp)
+            .defaultMinSize(minHeight = 72.dp)
             .glasmioGroupedListSeparator(colors.separator, visible = showTopSeparator, horizontalInset = 16.dp)
             .clickable(
                 enabled = !isConnecting && peer.status != PeerStatus.INVITED,
@@ -78,13 +91,17 @@ fun DiscoveredPeerRow(
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(ContinuousRoundedRectangle(12.dp))
+                .size(46.dp)
+                .clip(ContinuousRoundedRectangle(13.dp))
                 .background(badgeColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
             SfIcon(
-                systemName = ThazhSymbols.WifiTethering,
+                systemName = when (peer.discoveryTransport) {
+                    PeerDiscoveryTransport.BLE -> ThazhSymbols.Bluetooth
+                    PeerDiscoveryTransport.NFC -> ThazhSymbols.Nfc
+                    else -> ThazhSymbols.WifiTethering
+                },
                 contentDescription = null,
                 tint = badgeColor,
                 size = 22.dp,
@@ -93,19 +110,50 @@ fun DiscoveredPeerRow(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = peer.deviceName.ifBlank { peer.deviceAddress },
-                style = GlasmioTheme.textStyles.headline,
-                color = colors.content,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = peer.deviceName.ifBlank { peer.deviceAddress },
+                    style = GlasmioTheme.textStyles.headline,
+                    color = colors.content,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(ContinuousCapsule)
+                        .background(badgeColor.copy(alpha = if (colors.isDark) 0.24f else 0.14f))
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = transportLabel,
+                        style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
+                        color = badgeColor,
+                    )
+                }
+            }
+
             val statusSubtitle = when (peer.status) {
                 PeerStatus.CONNECTED -> stringResource(R.string.notif_connected, peer.deviceName)
                 PeerStatus.INVITED -> stringResource(R.string.discover_connecting)
-                PeerStatus.AVAILABLE -> peer.deviceAddress
-                PeerStatus.FAILED, PeerStatus.UNAVAILABLE -> peer.deviceAddress
+                PeerStatus.AVAILABLE, PeerStatus.FAILED, PeerStatus.UNAVAILABLE -> {
+                    buildList {
+                        if (peer.estimatedDistanceMeters != null) {
+                            add(FormatUtils.formatDistance(peer.estimatedDistanceMeters))
+                        }
+                        if (peer.rssiDbm != null) {
+                            add("${peer.rssiDbm} dBm")
+                        }
+                        add(peer.deviceAddress)
+                    }.joinToString(" • ")
+                }
             }
             Text(
                 text = statusSubtitle,

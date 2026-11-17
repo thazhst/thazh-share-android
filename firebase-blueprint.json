@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "SharedLink": {
+      "title": "SharedLink",
+      "description": "A file uploaded to Catbox.moe / Litterbox and saved to the user's cloud link-sharing history.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the authenticated user who owns this shared link."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Original name of the uploaded file."
+        },
+        "fileSizeBytes": {
+          "type": "integer",
+          "description": "Size of the uploaded file in bytes."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the uploaded file."
+        },
+        "url": {
+          "type": "string",
+          "description": "The public shareable HTTPS link returned by Catbox.moe or Litterbox."
+        },
+        "expiryLabel": {
+          "type": "string",
+          "description": "Retention policy label (e.g. PERMANENT, 1H, 12H, 24H, 72H)."
+        },
+        "expiresAtEpochMs": {
+          "type": "integer",
+          "description": "Epoch milliseconds when temporary Litterbox link expires, or 0 for permanent Catbox links."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional user note or label for this shared link."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the link record was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the link record was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "fileName",
+        "fileSizeBytes",
+        "mimeType",
+        "url",
+        "expiryLabel",
+        "expiresAtEpochMs",
+        "note",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/shared_links/{linkId}": {
+      "schema": {
+        "$ref": "#/entities/SharedLink"
+      },
+      "description": "Per-user history of files shared via Catbox.moe / Litterbox links."
+    }
+  }
+}

@@ -17,52 +17,77 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
 import java.util.UUID
 
-// A fixed, app-private UUID identifying "this is a Direct Chat BLE beacon"
-// so scanning can filter to just our own traffic. Doesn't need SIG
-// registration — any well-formed random UUID is fine for a private service
-// like this.
+// Fixed app-private UUID identifying a Thazh Share BLE fast-discovery beacon.
 private val SERVICE_UUID: UUID = UUID.fromString("6ac2c2c0-2f1a-4a3f-9c7f-9e2b6a2d9b41")
 
+data class BleDiscoveredBeacon(
+    val deviceAddress: String,
+    val displayName: String?,
+    val rssiDbm: Int,
+    val estimatedDistanceMeters: Int,
+    val lastSeenElapsedMs: Long,
+)
+
 /**
- * Speeds up finding a nearby peer by advertising/scanning this device's own
- * WiFi Direct MAC address over BLE, *alongside* WiFi Direct's own peer
- * discovery rather than replacing it. BLE advertise/scan cycles are much
- * faster and lower-power than WiFi Direct's native discovery, so a peer
- * running this too typically appears in the list noticeably sooner — see
- * [com.thazh.share.service.WifiDirectService] for where the two
- * results get merged. Connecting still goes through the normal WiFi Direct
- * connect() flow either way; BLE only helps the two devices learn each
- * other's address faster.
- *
- * A pure enhancement: [isSupported] gates every entry point so this stays
- * entirely inert — and never touches a Bluetooth permission — on hardware
- * without BLE, or when the person has turned it off in Settings.
+ * Real Bluetooth Low Energy (BLE) fast discovery manager:
+ * - Advertises a compact service data payload containing the 6-byte Wi-Fi Direct MAC
+ *   (or a session-stable synthetic 6-byte beacon ID when Android anonymizes local MACs)
+ *   plus a UTF-8 snippet of the device's display name (up to 12 bytes) so nearby
+ *   Thazh Share devices see both the peer's name and real-time RSSI/distance on the Radar!
+ * - Scans in low-latency mode for nearby Thazh Share BLE beacons and exposes both
+ *   [discoveredBeacons] (with RSSI dBm & estimated distance) and [discoveredAddresses].
  */
 class BleDiscoveryManager(private val context: Context) {
+
+    private val _discoveredBeacons = MutableStateFlow<Map<String, BleDiscoveredBeacon>>(emptyMap())
+    val discoveredBeacons: StateFlow<Map<String, BleDiscoveredBeacon>> = _discoveredBeacons.asStateFlow()
 
     private val _discoveredAddresses = MutableStateFlow<Set<String>>(emptySet())
     val discoveredAddresses: StateFlow<Set<String>> = _discoveredAddresses.asStateFlow()
 
+    private val _isAdvertisingState = MutableStateFlow(false)
+    val isAdvertisingState: StateFlow<Boolean> = _isAdvertisingState.asStateFlow()
+
+    private val _isScanningState = MutableStateFlow(false)
+    val isScanningState: StateFlow<Boolean> = _isScanningState.asStateFlow()
+
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+    }
+
+    private val fallbackSessionMacBytes: ByteArray by lazy {
+        ByteArray(6).also { bytes ->
+            SecureRandom().nextBytes(bytes)
+            // Locally administered unicast MAC bit pattern
+            bytes[0] = ((bytes[0].toInt() and 0xFE) or 0x02).toByte()
+        }
     }
 
     private var advertiser: BluetoothLeAdvertiser? = null
     private var scanner: BluetoothLeScanner? = null
     private var isAdvertising = false
     private var isScanning = false
+    private var lastAdvertisedMac: String? = null
+    private var lastAdvertisedName: String? = null
 
     fun isSupported(): Boolean {
         return runCatching {
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) && bluetoothAdapter != null
         }.getOrDefault(false)
+    }
+
+    fun isBluetoothEnabled(): Boolean {
+        return runCatching { bluetoothAdapter?.isEnabled == true }.getOrDefault(false)
     }
 
     private fun hasPermissions(): Boolean {
@@ -74,12 +99,16 @@ class BleDiscoveryManager(private val context: Context) {
         return true
     }
 
-    fun start(localMacAddress: String?) {
+    fun start(localMacAddress: String?, localDisplayName: String? = null) {
         runCatching {
             if (!isSupported() || !hasPermissions()) return
             val adapter = bluetoothAdapter ?: return
             if (!adapter.isEnabled) return
-            if (localMacAddress != null) startAdvertising(adapter, localMacAddress)
+            val safeName = localDisplayName?.trim()?.takeIf { it.isNotEmpty() }
+            if (isAdvertising && (localMacAddress != lastAdvertisedMac || safeName != lastAdvertisedName)) {
+                stopAdvertising()
+            }
+            startAdvertising(adapter, localMacAddress, safeName)
             startScanning(adapter)
         }.onFailure {
             Log.w(TAG, "BLE start skipped: ${it.message}")
@@ -90,32 +119,47 @@ class BleDiscoveryManager(private val context: Context) {
         runCatching {
             stopAdvertising()
             stopScanning()
+            _discoveredBeacons.value = emptyMap()
             _discoveredAddresses.value = emptySet()
         }
     }
 
-    @SuppressLint("MissingPermission") // checked in hasPermissions(), called from start() before this
-    private fun startAdvertising(adapter: BluetoothAdapter, localMacAddress: String) {
+    @SuppressLint("MissingPermission")
+    private fun startAdvertising(
+        adapter: BluetoothAdapter,
+        localMacAddress: String?,
+        localDisplayName: String?,
+    ) {
         if (isAdvertising) return
-        val macBytes = macStringToBytes(localMacAddress) ?: return
+        val macBytes = macStringToBytes(localMacAddress) ?: fallbackSessionMacBytes
+        val nameBytes = (localDisplayName ?: Build.MODEL ?: "Thazh")
+            .toByteArray(StandardCharsets.UTF_8)
+            .let { if (it.size > 11) it.copyOf(11) else it }
+        val payload = ByteArray(macBytes.size + nameBytes.size)
+        System.arraycopy(macBytes, 0, payload, 0, macBytes.size)
+        System.arraycopy(nameBytes, 0, payload, macBytes.size, nameBytes.size)
+
         val adv = adapter.bluetoothLeAdvertiser ?: return
 
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(false)
             .build()
 
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
-            .addServiceData(ParcelUuid(SERVICE_UUID), macBytes)
+            .addServiceData(ParcelUuid(SERVICE_UUID), payload)
             .build()
 
         try {
             adv.startAdvertising(settings, data, advertiseCallback)
             advertiser = adv
             isAdvertising = true
+            lastAdvertisedMac = localMacAddress
+            lastAdvertisedName = localDisplayName
+            _isAdvertisingState.value = true
         } catch (e: Exception) {
             Log.w(TAG, "startAdvertising failed: ${e.message}")
         }
@@ -126,6 +170,7 @@ class BleDiscoveryManager(private val context: Context) {
         if (!isAdvertising) return
         runCatching { advertiser?.stopAdvertising(advertiseCallback) }
         isAdvertising = false
+        _isAdvertisingState.value = false
         advertiser = null
     }
 
@@ -145,6 +190,7 @@ class BleDiscoveryManager(private val context: Context) {
             sc.startScan(listOf(filter), settings, scanCallback)
             scanner = sc
             isScanning = true
+            _isScanningState.value = true
         } catch (e: Exception) {
             Log.w(TAG, "startScan failed: ${e.message}")
         }
@@ -155,6 +201,7 @@ class BleDiscoveryManager(private val context: Context) {
         if (!isScanning) return
         runCatching { scanner?.stopScan(scanCallback) }
         isScanning = false
+        _isScanningState.value = false
         scanner = null
     }
 
@@ -162,27 +209,57 @@ class BleDiscoveryManager(private val context: Context) {
         override fun onStartFailure(errorCode: Int) {
             Log.w(TAG, "BLE advertise start failed: $errorCode")
             isAdvertising = false
+            _isAdvertisingState.value = false
         }
     }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val data = result.scanRecord?.getServiceData(ParcelUuid(SERVICE_UUID)) ?: return
-            val mac = macBytesToString(data) ?: return
-            val current = _discoveredAddresses.value
-            if (mac !in current) {
-                _discoveredAddresses.value = current + mac
+            if (data.size < 6) return
+            val macBytes = data.copyOfRange(0, 6)
+            if (macBytes.contentEquals(fallbackSessionMacBytes)) return
+            val mac = macBytesToString(macBytes) ?: return
+            if (mac.equals(lastAdvertisedMac, ignoreCase = true)) return
+
+            val parsedName = if (data.size > 6) {
+                runCatching {
+                    String(data, 6, data.size - 6, StandardCharsets.UTF_8).trim()
+                }.getOrNull()?.takeIf { it.isNotBlank() }
+            } else {
+                null
             }
+
+            val rssi = result.rssi
+            val distance = DistanceEstimator.estimateMeters(rssi) ?: 2
+            val now = SystemClock.elapsedRealtime()
+
+            val beacon = BleDiscoveredBeacon(
+                deviceAddress = mac,
+                displayName = parsedName,
+                rssiDbm = rssi,
+                estimatedDistanceMeters = distance,
+                lastSeenElapsedMs = now,
+            )
+
+            val updatedMap = _discoveredBeacons.value.toMutableMap()
+            updatedMap[mac] = beacon
+            _discoveredBeacons.value = updatedMap
+            _discoveredAddresses.value = updatedMap.keys
         }
 
         override fun onScanFailed(errorCode: Int) {
             Log.w(TAG, "BLE scan failed: $errorCode")
             isScanning = false
+            _isScanningState.value = false
         }
     }
 
-    private fun macStringToBytes(mac: String): ByteArray? {
-        val parts = mac.split(":")
+    private fun macStringToBytes(mac: String?): ByteArray? {
+        if (mac.isNullOrBlank()) return null
+        val normalized = mac.trim().uppercase()
+        if (normalized == "02:00:00:00:00:00" || normalized == "00:00:00:00:00:00") return null
+        val parts = normalized.split(":")
         if (parts.size != 6) return null
         return try {
             ByteArray(6) { i -> parts[i].toInt(16).toByte() }

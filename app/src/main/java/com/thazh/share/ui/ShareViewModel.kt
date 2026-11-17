@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.thazh.share.ShareApplication
 import com.thazh.share.data.AppThemeMode
 import com.thazh.share.data.ConnectionQuality
@@ -18,12 +19,18 @@ import com.thazh.share.data.PickedFile
 import com.thazh.share.data.ReceivedFile
 import com.thazh.share.data.RenameResult
 import com.thazh.share.data.SavedDevice
+import com.thazh.share.data.SharedLinkItem
 import com.thazh.share.data.TransferItem
+import com.thazh.share.network.CatboxExpiry
+import com.thazh.share.network.CatboxUploadProgress
+import com.thazh.share.network.CatboxUploadResult
+import com.thazh.share.network.CatboxUploader
 import com.thazh.share.network.NfcConnectionManager
 import com.thazh.share.network.P2pConnectionState
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.util.FileActions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -150,6 +157,22 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     val pendingWifiDirectFilesCount: StateFlow<Int> = _pendingWifiDirectFiles
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // Catbox.moe Link Share state
+    private val _selectedCatboxExpiry = MutableStateFlow(CatboxExpiry.PERMANENT)
+    val selectedCatboxExpiry: StateFlow<CatboxExpiry> = _selectedCatboxExpiry.asStateFlow()
+
+    private val _isUploadingCatbox = MutableStateFlow(false)
+    val isUploadingCatbox: StateFlow<Boolean> = _isUploadingCatbox.asStateFlow()
+
+    private val _catboxUploadProgress = MutableStateFlow<CatboxUploadProgress?>(null)
+    val catboxUploadProgress: StateFlow<CatboxUploadProgress?> = _catboxUploadProgress.asStateFlow()
+
+    private val _catboxUploadError = MutableStateFlow<String?>(null)
+    val catboxUploadError: StateFlow<String?> = _catboxUploadError.asStateFlow()
+
+    private val _sessionCatboxLinks = MutableStateFlow<List<CatboxUploadResult>>(emptyList())
+    val sessionCatboxLinks: StateFlow<List<CatboxUploadResult>> = _sessionCatboxLinks.asStateFlow()
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -320,6 +343,28 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun sendOrQueueFilesForWifiDirect(
+        uris: List<Uri>,
+        onResult: (sentImmediately: Boolean, count: Int) -> Unit = { _, _ -> },
+    ) {
+        if (uris.isEmpty()) return
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            val picked = withContext(Dispatchers.IO) {
+                uris.map { FileActions.queryPickedFile(context, it) }
+            }
+            val currentService = service
+            if (_isSocketConnected.value && currentService != null) {
+                currentService.sendTransferFiles(picked)
+                onResult(true, picked.size)
+            } else {
+                _pendingWifiDirectFiles.value = _pendingWifiDirectFiles.value + picked
+                startDiscovery()
+                onResult(false, picked.size)
+            }
+        }
+    }
+
     fun shareReceivedFilesViaWifiDirect(
         files: List<ReceivedFile>,
         onResult: (sentImmediately: Boolean, count: Int) -> Unit = { _, _ -> },
@@ -357,6 +402,87 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     fun clearPendingWifiDirectFiles() {
         _pendingWifiDirectFiles.value = emptyList()
     }
+
+    // ---- Catbox.moe Link Share & Cloud History ----
+
+    fun setCatboxExpiry(expiry: CatboxExpiry) {
+        _selectedCatboxExpiry.value = expiry
+    }
+
+    fun clearSessionCatboxLinks() {
+        _sessionCatboxLinks.value = emptyList()
+    }
+
+    fun uploadFilesToCatbox(
+        uris: List<Uri>,
+        expiry: CatboxExpiry,
+        note: String = "",
+    ) {
+        if (uris.isEmpty() || _isUploadingCatbox.value) return
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            _isUploadingCatbox.value = true
+            _catboxUploadError.value = null
+            try {
+                val pickedFiles = withContext(Dispatchers.IO) {
+                    uris.map { FileActions.queryPickedFile(context, it) }
+                }
+                for (picked in pickedFiles) {
+                    val result = CatboxUploader.uploadFile(
+                        context = context,
+                        file = picked,
+                        expiry = expiry,
+                        note = note,
+                        onProgress = { progress ->
+                            _catboxUploadProgress.value = progress
+                        },
+                    )
+                    result.onSuccess { uploaded ->
+                        _sessionCatboxLinks.value = listOf(uploaded) + _sessionCatboxLinks.value
+                        val currentUser = FirebaseAuth.getInstance().currentUser
+                        if (currentUser != null) {
+                            runCatching {
+                                app.sharedLinkRepository.saveUploadedLink(currentUser.uid, uploaded)
+                            }
+                        }
+                    }.onFailure { err ->
+                        _catboxUploadError.value = err.localizedMessage ?: "Không thể tải tệp lên Catbox.moe"
+                    }
+                }
+            } finally {
+                _isUploadingCatbox.value = false
+                _catboxUploadProgress.value = null
+            }
+        }
+    }
+
+    fun observeCloudSharedLinks(userId: String): Flow<List<SharedLinkItem>> {
+        return app.sharedLinkRepository.observeSharedLinks(userId) { err ->
+            _catboxUploadError.value = err.localizedMessage
+        }
+    }
+
+    fun updateCloudSharedLinkNote(userId: String, linkId: String, newNote: String) {
+        viewModelScope.launch {
+            runCatching {
+                app.sharedLinkRepository.updateLinkNote(userId, linkId, newNote)
+            }.onFailure { err ->
+                _catboxUploadError.value = err.localizedMessage
+            }
+        }
+    }
+
+    fun deleteCloudSharedLink(userId: String, linkId: String) {
+        viewModelScope.launch {
+            runCatching {
+                app.sharedLinkRepository.deleteSharedLink(userId, linkId)
+            }.onFailure { err ->
+                _catboxUploadError.value = err.localizedMessage
+            }
+        }
+    }
+
+    // ---- File Transfer Actions ----
 
     fun cancelTransfer(transferId: String) {
         service?.cancelTransfer(transferId)
@@ -473,7 +599,7 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun isBleFastDiscoverySupported(): Boolean = service?.isBleFastDiscoverySupported() ?: false
+    fun isBleFastDiscoverySupported(): Boolean = service?.isBleFastDiscoverySupported() ?: true
 
     fun retryBleDiscovery() {
         service?.retryBleDiscovery()

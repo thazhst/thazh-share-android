@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidCatboxUrl(url) {
+      return url is string
+        && url.size() >= 16
+        && url.size() <= 512
+        && url.matches('^https://(files\\.catbox\\.moe|litter\\.catbox\\.moe)/[A-Za-z0-9._\\-]+$');
+    }
+
+    function isValidSharedLink(data, userId) {
+      let allowedKeys = [
+        'userId',
+        'fileName',
+        'fileSizeBytes',
+        'mimeType',
+        'url',
+        'expiryLabel',
+        'expiresAtEpochMs',
+        'note',
+        'createdAt',
+        'updatedAt'
+      ];
+      return data.keys().hasAll(allowedKeys)
+        && data.keys().hasOnly(allowedKeys)
+        && data.userId is string && data.userId == userId
+        && data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255
+        && data.fileSizeBytes is int && data.fileSizeBytes >= 0 && data.fileSizeBytes <= 10737418240
+        && data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 128
+        && isValidCatboxUrl(data.url)
+        && data.expiryLabel is string && data.expiryLabel in ['PERMANENT', '1H', '12H', '24H', '72H']
+        && data.expiresAtEpochMs is int && data.expiresAtEpochMs >= 0
+        && data.note is string && data.note.size() <= 280
+        && data.createdAt is timestamp && data.createdAt <= request.time
+        && data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/shared_links/{linkId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidId(linkId)
+        && isValidSharedLink(request.resource.data, userId);
+      allow update: if isOwner(userId)
+        && isValidSharedLink(request.resource.data, userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.url == resource.data.url
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
+    }
+  }
+}
