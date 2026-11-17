@@ -9,6 +9,7 @@ import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.thazh.share.ShareApplication
+import com.thazh.share.data.AppThemeMode
 import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
@@ -88,6 +89,9 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
 
     val soundVibrationEnabled: StateFlow<Boolean> = app.preferencesRepository.soundVibrationEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val themeMode: StateFlow<AppThemeMode> = app.preferencesRepository.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppThemeMode.SYSTEM)
 
     private val _visibilityMode = MutableStateFlow(DeviceVisibilityMode.TEMPORARY_10_MIN)
     val visibilityMode: StateFlow<DeviceVisibilityMode> = _visibilityMode.asStateFlow()
@@ -460,6 +464,12 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     fun setLiquidGlassEnabled(enabled: Boolean) {
         viewModelScope.launch {
             app.preferencesRepository.setLiquidGlassEnabled(enabled)
+        }
+    }
+
+    fun setThemeMode(mode: AppThemeMode) {
+        viewModelScope.launch {
+            app.preferencesRepository.setThemeMode(mode)
         }
     }
 

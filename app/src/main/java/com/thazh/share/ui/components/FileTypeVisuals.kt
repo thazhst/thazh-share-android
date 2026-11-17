@@ -3,37 +3,29 @@ package com.thazh.share.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Android
-import androidx.compose.material.icons.rounded.AudioFile
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.FolderZip
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.InsertDriveFile
-import androidx.compose.material.icons.rounded.VideoFile
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.FileCategory
+import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.icons.SfIcon
 
-fun FileCategory.icon(): ImageVector = when (this) {
-    FileCategory.IMAGE -> Icons.Rounded.Image
-    FileCategory.VIDEO -> Icons.Rounded.VideoFile
-    FileCategory.AUDIO -> Icons.Rounded.AudioFile
-    FileCategory.DOCUMENT -> Icons.Rounded.Description
-    FileCategory.ARCHIVE -> Icons.Rounded.FolderZip
-    FileCategory.APK -> Icons.Rounded.Android
-    FileCategory.OTHER -> Icons.Rounded.InsertDriveFile
+fun FileCategory.symbolName(): String = when (this) {
+    FileCategory.IMAGE -> ThazhSymbols.FileImage
+    FileCategory.VIDEO -> ThazhSymbols.FileVideo
+    FileCategory.AUDIO -> ThazhSymbols.FileAudio
+    FileCategory.DOCUMENT -> ThazhSymbols.FileDocument
+    FileCategory.ARCHIVE -> ThazhSymbols.FileArchive
+    FileCategory.APK -> ThazhSymbols.FileApk
+    FileCategory.OTHER -> ThazhSymbols.FileOther
 }
 
 @Composable
@@ -66,19 +58,20 @@ fun FileTypeBadge(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
 ) {
+    val colors = GlasmioTheme.colors
     val tint = category.accentColor()
     Box(
         modifier = modifier
             .size(size)
             .clip(ContinuousRoundedRectangle(12.dp))
-            .background(tint.copy(alpha = 0.14f)),
+            .background(tint.copy(alpha = if (colors.isDark) 0.22f else 0.14f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = category.icon(),
+        SfIcon(
+            systemName = category.symbolName(),
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(size * 0.52f),
+            size = size * 0.52f,
         )
     }
 }

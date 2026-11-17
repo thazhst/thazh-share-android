@@ -9,15 +9,18 @@ import androidx.compose.ui.graphics.Color
 enum class ConnectionQuality(
     val label: String,
     val colorValue: Long,
+    val darkColorValue: Long,
     val barsFilled: Int
 ) {
-    STRONG(label = "Mạnh", colorValue = 0xFF34C759, barsFilled = 4),
-    MEDIUM(label = "Trung bình", colorValue = 0xFFFF9F0A, barsFilled = 3),
-    WEAK(label = "Yếu", colorValue = 0xFFFF7A00, barsFilled = 2),
-    POOR(label = "Kém", colorValue = 0xFFFF3B30, barsFilled = 1),
-    DISCONNECTED(label = "Mất kết nối", colorValue = 0xFF8E8E93, barsFilled = 0);
+    STRONG(label = "Mạnh", colorValue = 0xFF34C759, darkColorValue = 0xFF30D158, barsFilled = 4),
+    MEDIUM(label = "Trung bình", colorValue = 0xFFFF9500, darkColorValue = 0xFFFF9F0A, barsFilled = 3),
+    WEAK(label = "Yếu", colorValue = 0xFFFF6B00, darkColorValue = 0xFFFF7A00, barsFilled = 2),
+    POOR(label = "Kém", colorValue = 0xFFFF3B30, darkColorValue = 0xFFFF453A, barsFilled = 1),
+    DISCONNECTED(label = "Mất kết nối", colorValue = 0xFF8E8E93, darkColorValue = 0xFF98989D, barsFilled = 0);
 
     val color: Color get() = Color(colorValue)
+
+    fun color(isDark: Boolean): Color = Color(if (isDark) darkColorValue else colorValue)
 
     companion object {
         fun fromMetrics(avgLatencyMs: Long?, successRatio: Float, isConnected: Boolean): ConnectionQuality {

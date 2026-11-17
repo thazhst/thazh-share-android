@@ -14,6 +14,7 @@ import androidx.core.view.WindowCompat
 import io.github.neoruaa.glasmio.core.GlassAppearance
 import io.github.neoruaa.glasmio.core.GlasmioTheme
 import io.github.neoruaa.glasmio.core.defaultGlassColors
+import io.github.neoruaa.glasmio.core.glasmioColorScheme
 
 @Immutable
 data class ThazhSemanticColors(
@@ -67,6 +68,10 @@ fun ThazhShareTheme(
         isDark = darkTheme,
         accent = semantic.accentBlue,
     )
+    val colorScheme = glasmioColorScheme(
+        isDark = darkTheme,
+        accent = semantic.accentBlue,
+    )
     val appearance = GlassAppearance(
         liquidGlassEnabled = liquidGlassEnabled,
         reduceTransparency = reduceTransparency,
@@ -77,6 +82,7 @@ fun ThazhShareTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
+            window.isNavigationBarContrastEnforced = false
             val controller = WindowCompat.getInsetsController(window, view)
             controller.isAppearanceLightStatusBars = !darkTheme
             controller.isAppearanceLightNavigationBars = !darkTheme
@@ -85,6 +91,8 @@ fun ThazhShareTheme(
 
     CompositionLocalProvider(LocalThazhSemanticColors provides semantic) {
         GlasmioTheme(
+            isDark = darkTheme,
+            colorScheme = colorScheme,
             colors = glassColors,
             appearance = appearance,
             content = content,

@@ -95,6 +95,13 @@
     <string name="settings_sound_vibration">Âm thanh &amp; rung thông báo</string>
     <string name="settings_sound_vibration_desc">Phát âm báo và rung nhẹ khi có yêu cầu kết nối hoặc nhận xong tệp</string>
     <string name="settings_section_appearance">Giao diện &amp; Hiệu ứng</string>
+    <string name="settings_theme_mode">Chế độ giao diện</string>
+    <string name="settings_theme_mode_system">Hệ thống</string>
+    <string name="settings_theme_mode_light">Sáng</string>
+    <string name="settings_theme_mode_dark">Tối</string>
+    <string name="settings_theme_mode_desc_system">Tự động chuyển đổi Sáng / Tối theo cài đặt hệ thống</string>
+    <string name="settings_theme_mode_desc_light">Luôn sử dụng giao diện sáng với nền thủy tinh trong trẻo</string>
+    <string name="settings_theme_mode_desc_dark">Luôn sử dụng giao diện tối dịu mắt với chiều sâu OLED</string>
     <string name="settings_reduce_transparency">Giảm độ trong suốt</string>
     <string name="settings_reduce_transparency_desc">Tắt hiệu ứng trong suốt và Liquid Glass, dùng nền đặc dễ đọc hơn</string>
     <string name="settings_liquid_glass">Hiệu ứng Liquid Glass</string>

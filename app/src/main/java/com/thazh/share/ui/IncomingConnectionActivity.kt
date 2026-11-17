@@ -12,6 +12,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.ShareApplication
+import com.thazh.share.data.AppThemeMode
 import com.thazh.share.data.IncomingConnectionRequest
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.theme.ThazhIconResolver
@@ -86,10 +88,17 @@ class IncomingConnectionActivity : ComponentActivity() {
         isBound = true
 
         setContent {
+            val themeMode by app.preferencesRepository.themeMode
+                .collectAsStateWithLifecycle(initialValue = AppThemeMode.SYSTEM)
             val reduceTransparency by app.preferencesRepository.reduceTransparency
                 .collectAsStateWithLifecycle(initialValue = false)
             val liquidGlassEnabled by app.preferencesRepository.liquidGlassEnabled
                 .collectAsStateWithLifecycle(initialValue = true)
+            val darkTheme = when (themeMode) {
+                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
             val boundService by serviceState
             val request = boundService?.incomingConnectionRequest
                 ?.collectAsStateWithLifecycle(initialValue = null)?.value
@@ -105,6 +114,7 @@ class IncomingConnectionActivity : ComponentActivity() {
 
             GlasmioIconProvider(resolver = ThazhIconResolver) {
                 ThazhShareTheme(
+                    darkTheme = darkTheme,
                     reduceTransparency = reduceTransparency,
                     liquidGlassEnabled = liquidGlassEnabled,
                 ) {
@@ -196,7 +206,9 @@ private fun IncomingConnectionOverlayDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(badgeShape)
-                            .background(colors.secondaryContent.copy(alpha = 0.08f))
+                            .background(
+                                colors.secondaryContent.copy(alpha = if (colors.isDark) 0.14f else 0.08f),
+                            )
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

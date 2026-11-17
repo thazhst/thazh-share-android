@@ -28,6 +28,7 @@ class AppPreferencesRepository(private val context: Context) {
         val BACKGROUND_CONNECTION_DIALOG = booleanPreferencesKey("background_connection_dialog")
         val AUTO_SAVE_TO_DOWNLOADS = booleanPreferencesKey("auto_save_to_downloads")
         val SOUND_VIBRATION_ENABLED = booleanPreferencesKey("sound_vibration_enabled")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
@@ -185,6 +186,16 @@ class AppPreferencesRepository(private val context: Context) {
     suspend fun setSoundVibrationEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[Keys.SOUND_VIBRATION_ENABLED] = enabled
+        }
+    }
+
+    val themeMode: Flow<AppThemeMode> = context.dataStore.data.map { prefs ->
+        AppThemeMode.fromStorageKey(prefs[Keys.THEME_MODE])
+    }
+
+    suspend fun setThemeMode(mode: AppThemeMode) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.THEME_MODE] = mode.storageKey
         }
     }
 

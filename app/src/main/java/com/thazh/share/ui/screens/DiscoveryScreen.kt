@@ -160,7 +160,10 @@ fun DiscoveryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(semantic.accentGreen.copy(alpha = 0.14f), cardShape)
+                                    .background(
+                                        semantic.accentGreen.copy(alpha = if (colors.isDark) 0.20f else 0.14f),
+                                        cardShape,
+                                    )
                                     .border(1.dp, semantic.accentGreen.copy(alpha = 0.35f), cardShape)
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -169,7 +172,7 @@ fun DiscoveryScreen(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(badgeShape)
-                                        .background(semantic.accentGreen.copy(alpha = 0.22f)),
+                                        .background(semantic.accentGreen.copy(alpha = if (colors.isDark) 0.26f else 0.22f)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     SfIcon(
@@ -217,7 +220,10 @@ fun DiscoveryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(semantic.accentBlue.copy(alpha = 0.14f), cardShape)
+                                    .background(
+                                        semantic.accentBlue.copy(alpha = if (colors.isDark) 0.20f else 0.14f),
+                                        cardShape,
+                                    )
                                     .border(1.dp, semantic.accentBlue.copy(alpha = 0.35f), cardShape)
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -227,7 +233,7 @@ fun DiscoveryScreen(
                                     modifier = Modifier
                                         .size(44.dp)
                                         .clip(badgeShape)
-                                        .background(semantic.accentBlue.copy(alpha = 0.20f)),
+                                        .background(semantic.accentBlue.copy(alpha = if (colors.isDark) 0.26f else 0.20f)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     SfIcon(
@@ -277,7 +283,10 @@ fun DiscoveryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(semantic.warningOrange.copy(alpha = 0.14f), cardShape)
+                                    .background(
+                                        semantic.warningOrange.copy(alpha = if (colors.isDark) 0.20f else 0.14f),
+                                        cardShape,
+                                    )
                                     .border(1.dp, semantic.warningOrange.copy(alpha = 0.35f), cardShape)
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -600,7 +609,7 @@ private fun DiscoveryRadarCard(
                 Box(
                     modifier = Modifier
                         .clip(ContinuousCapsule)
-                        .background(semantic.accentBlue.copy(alpha = 0.12f))
+                        .background(semantic.accentBlue.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                 ) {
                     Text(

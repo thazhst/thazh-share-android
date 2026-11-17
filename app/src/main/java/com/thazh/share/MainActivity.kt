@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.thazh.share.data.AppThemeMode
 import com.thazh.share.network.NfcConnectionManager
 import com.thazh.share.ui.ShareApp
 import com.thazh.share.ui.ShareViewModel
@@ -45,11 +47,18 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
 
         setContent {
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val reduceTransparency by viewModel.reduceTransparency.collectAsStateWithLifecycle()
             val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
+            val darkTheme = when (themeMode) {
+                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
 
             GlasmioIconProvider(resolver = ThazhIconResolver) {
                 ThazhShareTheme(
+                    darkTheme = darkTheme,
                     reduceTransparency = reduceTransparency,
                     liquidGlassEnabled = liquidGlassEnabled,
                 ) {

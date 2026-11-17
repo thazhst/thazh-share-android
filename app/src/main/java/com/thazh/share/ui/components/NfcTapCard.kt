@@ -60,7 +60,7 @@ fun NfcTapCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(tintColor.copy(alpha = if (colors.isDark) 0.14f else 0.08f), cardShape)
+                .background(tintColor.copy(alpha = if (colors.isDark) 0.16f else 0.08f), cardShape)
                 .border(1.dp, tintColor.copy(alpha = 0.28f), cardShape)
                 .padding(16.dp),
         ) {
@@ -73,7 +73,7 @@ fun NfcTapCard(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(ContinuousRoundedRectangle(12.dp))
-                        .background(tintColor.copy(alpha = 0.20f)),
+                        .background(tintColor.copy(alpha = if (colors.isDark) 0.24f else 0.18f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (isPairing) {
@@ -106,7 +106,7 @@ fun NfcTapCard(
                             Box(
                                 modifier = Modifier
                                     .clip(ContinuousCapsule)
-                                    .background(semantic.accentGreen.copy(alpha = 0.18f))
+                                    .background(semantic.accentGreen.copy(alpha = if (colors.isDark) 0.24f else 0.18f))
                                     .padding(horizontal = 8.dp, vertical = 2.dp),
                             ) {
                                 Text(

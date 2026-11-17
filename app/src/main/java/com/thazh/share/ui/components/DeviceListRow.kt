@@ -80,7 +80,7 @@ fun DiscoveredPeerRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(ContinuousRoundedRectangle(12.dp))
-                .background(badgeColor.copy(alpha = 0.14f)),
+                .background(badgeColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
             SfIcon(
@@ -182,7 +182,7 @@ fun SavedDeviceRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(ContinuousRoundedRectangle(12.dp))
-                .background(semantic.accentCyan.copy(alpha = 0.16f)),
+                .background(semantic.accentCyan.copy(alpha = if (colors.isDark) 0.22f else 0.16f)),
             contentAlignment = Alignment.Center,
         ) {
             SfIcon(

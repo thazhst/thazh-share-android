@@ -8,11 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,16 +25,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousCapsule
-import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import io.github.neoruaa.glasmio.core.GlasmioTheme
-import io.github.neoruaa.glasmio.core.segmentedControlBackground
 import io.github.neoruaa.glasmio.icons.SfIcon
 import io.github.neoruaa.glasmio.ui.GlasmioCard
+import io.github.neoruaa.glasmio.ui.GlasmioSegmentedControl
 
 @Composable
 fun VisibilitySelectorCard(
@@ -49,6 +45,7 @@ fun VisibilitySelectorCard(
     val colors = GlasmioTheme.colors
     val semantic = ThazhTheme.semantic
     val formattedTimer = remainingSeconds?.let { WifiDirectService.formatCountdown(it) } ?: "10:00"
+    val badgeBgAlpha = if (colors.isDark) 0.22f else 0.14f
 
     val accentColor = when (mode) {
         DeviceVisibilityMode.HIDDEN -> colors.secondaryContent
@@ -56,12 +53,22 @@ fun VisibilitySelectorCard(
         DeviceVisibilityMode.ALWAYS_VISIBLE -> semantic.accentGreen
     }
 
+    val segmentItems = listOf(
+        DeviceVisibilityMode.HIDDEN to stringResource(R.string.visibility_mode_hidden),
+        DeviceVisibilityMode.TEMPORARY_10_MIN to if (mode == DeviceVisibilityMode.TEMPORARY_10_MIN) {
+            formattedTimer
+        } else {
+            stringResource(R.string.visibility_mode_10min)
+        },
+        DeviceVisibilityMode.ALWAYS_VISIBLE to stringResource(R.string.visibility_mode_always),
+    )
+
     GlasmioCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -96,8 +103,8 @@ fun VisibilitySelectorCard(
                     Box(
                         modifier = Modifier
                             .clip(ContinuousCapsule)
-                            .background(semantic.accentBlue.copy(alpha = 0.14f))
-                            .border(1.dp, semantic.accentBlue.copy(alpha = 0.3f), ContinuousCapsule)
+                            .background(semantic.accentBlue.copy(alpha = badgeBgAlpha))
+                            .border(1.dp, semantic.accentBlue.copy(alpha = 0.34f), ContinuousCapsule)
                             .clickable(role = Role.Button) {
                                 onSelectMode(DeviceVisibilityMode.TEMPORARY_10_MIN)
                             }
@@ -115,7 +122,7 @@ fun VisibilitySelectorCard(
                     Box(
                         modifier = Modifier
                             .clip(ContinuousCapsule)
-                            .background(semantic.accentGreen.copy(alpha = 0.14f))
+                            .background(semantic.accentGreen.copy(alpha = badgeBgAlpha))
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
                         Text(
@@ -128,48 +135,61 @@ fun VisibilitySelectorCard(
                 }
             }
 
-            Row(
+            GlasmioSegmentedControl(
+                items = segmentItems,
+                selected = mode,
+                onSelected = onSelectMode,
+                height = 44.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(ContinuousRoundedRectangle(14.dp))
-                    .background(colors.segmentedControlBackground)
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                VisibilityOptionChip(
-                    label = stringResource(R.string.visibility_mode_hidden),
-                    symbol = ThazhSymbols.VisibilityOff,
-                    selected = mode == DeviceVisibilityMode.HIDDEN,
-                    selectedColor = colors.secondaryContent,
-                    onClick = { onSelectMode(DeviceVisibilityMode.HIDDEN) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("visibility_option_hidden"),
-                )
-                VisibilityOptionChip(
-                    label = if (mode == DeviceVisibilityMode.TEMPORARY_10_MIN) {
+                    .testTag("visibility_segmented_control"),
+            ) { value, isSelected ->
+                val symbol = when (value) {
+                    DeviceVisibilityMode.HIDDEN -> ThazhSymbols.VisibilityOff
+                    DeviceVisibilityMode.TEMPORARY_10_MIN -> ThazhSymbols.Timer
+                    DeviceVisibilityMode.ALWAYS_VISIBLE -> ThazhSymbols.AllInclusive
+                }
+                val label = when (value) {
+                    DeviceVisibilityMode.HIDDEN -> stringResource(R.string.visibility_mode_hidden)
+                    DeviceVisibilityMode.TEMPORARY_10_MIN -> if (mode == DeviceVisibilityMode.TEMPORARY_10_MIN) {
                         formattedTimer
                     } else {
                         stringResource(R.string.visibility_mode_10min)
-                    },
-                    symbol = ThazhSymbols.Timer,
-                    selected = mode == DeviceVisibilityMode.TEMPORARY_10_MIN,
-                    selectedColor = semantic.accentBlue,
-                    onClick = { onSelectMode(DeviceVisibilityMode.TEMPORARY_10_MIN) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("visibility_option_10min"),
-                )
-                VisibilityOptionChip(
-                    label = stringResource(R.string.visibility_mode_always),
-                    symbol = ThazhSymbols.AllInclusive,
-                    selected = mode == DeviceVisibilityMode.ALWAYS_VISIBLE,
-                    selectedColor = semantic.accentGreen,
-                    onClick = { onSelectMode(DeviceVisibilityMode.ALWAYS_VISIBLE) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("visibility_option_always"),
-                )
+                    }
+                    DeviceVisibilityMode.ALWAYS_VISIBLE -> stringResource(R.string.visibility_mode_always)
+                }
+                val itemTint = when {
+                    isSelected && value == DeviceVisibilityMode.TEMPORARY_10_MIN ->
+                        if (colors.isDark) Color.White else semantic.accentBlue
+                    isSelected && value == DeviceVisibilityMode.ALWAYS_VISIBLE ->
+                        if (colors.isDark) Color.White else semantic.accentGreen
+                    isSelected -> colors.content
+                    else -> colors.secondaryContent
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 6.dp),
+                ) {
+                    SfIcon(
+                        systemName = symbol,
+                        contentDescription = null,
+                        tint = itemTint,
+                        size = 15.dp,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = label,
+                        style = GlasmioTheme.textStyles.caption1.copy(
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        ),
+                        color = if (isSelected) colors.content else colors.secondaryContent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
 
             Text(
@@ -182,47 +202,5 @@ fun VisibilitySelectorCard(
                 color = colors.secondaryContent,
             )
         }
-    }
-}
-
-@Composable
-private fun VisibilityOptionChip(
-    label: String,
-    symbol: String,
-    selected: Boolean,
-    selectedColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = GlasmioTheme.colors
-    val shape = ContinuousRoundedRectangle(11.dp)
-
-    Row(
-        modifier = modifier
-            .defaultMinSize(minHeight = 48.dp)
-            .clip(shape)
-            .background(if (selected) selectedColor else Color.Transparent)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SfIcon(
-            systemName = symbol,
-            contentDescription = null,
-            tint = if (selected) Color.White else colors.secondaryContent,
-            size = 15.dp,
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = label,
-            style = GlasmioTheme.textStyles.caption1.copy(
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            ),
-            color = if (selected) Color.White else colors.content,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
     }
 }

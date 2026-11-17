@@ -48,6 +48,7 @@ import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.FileActions
 import com.thazh.share.util.FormatUtils
 import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.core.systemGray5
 import io.github.neoruaa.glasmio.glass.GlassEmphasis
 import io.github.neoruaa.glasmio.icons.SfIcon
 import io.github.neoruaa.glasmio.scaffold.GlasmioPinnedListPage
@@ -153,7 +154,7 @@ fun FileTransferScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(ContinuousRoundedRectangle(12.dp))
-                                    .background(semantic.accentBlue.copy(alpha = 0.15f)),
+                                    .background(semantic.accentBlue.copy(alpha = if (colors.isDark) 0.22f else 0.15f)),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 SfIcon(
@@ -495,7 +496,7 @@ internal fun TransferActivityCard(
                         } else {
                             semantic.accentGreen
                         },
-                        trackColor = colors.separator,
+                        trackColor = colors.systemGray5,
                     )
                 }
             }

@@ -30,6 +30,8 @@ fun ConnectionQualityIndicator(
     modifier: Modifier = Modifier,
     showLabel: Boolean = true,
 ) {
+    val colors = GlasmioTheme.colors
+    val indicatorColor = quality.color(colors.isDark)
     val labelText = when (quality) {
         ConnectionQuality.STRONG -> stringResource(R.string.quality_strong)
         ConnectionQuality.MEDIUM -> stringResource(R.string.quality_medium)
@@ -37,12 +39,12 @@ fun ConnectionQualityIndicator(
         ConnectionQuality.POOR -> stringResource(R.string.quality_poor)
         ConnectionQuality.DISCONNECTED -> stringResource(R.string.quality_disconnected)
     }
-    val inactiveColor = GlasmioTheme.colors.tertiaryContent
+    val inactiveColor = colors.tertiaryContent
 
     Row(
         modifier = modifier
             .clip(ContinuousCapsule)
-            .background(quality.color.copy(alpha = 0.14f))
+            .background(indicatorColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f))
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .semantics { contentDescription = labelText },
         verticalAlignment = Alignment.CenterVertically,
@@ -58,7 +60,7 @@ fun ConnectionQualityIndicator(
                 val left = i * (barWidth + gap)
                 val top = size.height - barHeight
                 drawRoundRect(
-                    color = if (i < quality.barsFilled) quality.color else inactiveColor,
+                    color = if (i < quality.barsFilled) indicatorColor else inactiveColor,
                     topLeft = Offset(left, top),
                     size = Size(barWidth, barHeight),
                     cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
@@ -69,7 +71,7 @@ fun ConnectionQualityIndicator(
             Text(
                 text = labelText,
                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
-                color = quality.color,
+                color = indicatorColor,
                 maxLines = 1,
             )
         }

@@ -101,6 +101,7 @@ fun ShareApp(viewModel: ShareViewModel) {
     val soundVibrationEnabled by viewModel.soundVibrationEnabled.collectAsStateWithLifecycle()
     val incomingConnectionRequest by viewModel.incomingConnectionRequest.collectAsStateWithLifecycle()
     val bleFastDiscoveryEnabled by viewModel.bleFastDiscoveryEnabled.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val reduceTransparency by viewModel.reduceTransparency.collectAsStateWithLifecycle()
     val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
     val isDiscovering by viewModel.isDiscovering.collectAsStateWithLifecycle()
@@ -419,6 +420,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                         isBleSupported = viewModel.isBleFastDiscoverySupported(),
                         isNfcSupported = isNfcSupported,
                         isNfcEnabled = isNfcEnabled,
+                        themeMode = themeMode,
                         reduceTransparency = reduceTransparency,
                         liquidGlassEnabled = liquidGlassEnabled,
                         receivedFilesCount = receivedFiles.size,
@@ -432,6 +434,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                         onToggleAutoSaveToDownloads = { viewModel.setAutoSaveToDownloads(it) },
                         onToggleSoundVibration = { viewModel.setSoundVibrationEnabled(it) },
                         onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(it) },
+                        onSelectThemeMode = { viewModel.setThemeMode(it) },
                         onToggleReduceTransparency = { viewModel.setReduceTransparency(it) },
                         onToggleLiquidGlass = { viewModel.setLiquidGlassEnabled(it) },
                         onOpenNfcSettings = { viewModel.openNfcSettings() },
@@ -516,7 +519,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(ContinuousRoundedRectangle(12.dp))
-                            .background(colors.secondaryContent.copy(alpha = 0.08f))
+                            .background(colors.secondaryContent.copy(alpha = if (colors.isDark) 0.14f else 0.08f))
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

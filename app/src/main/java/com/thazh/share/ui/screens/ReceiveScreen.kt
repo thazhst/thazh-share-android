@@ -369,7 +369,10 @@ private fun ReceiveHeroCard(
                 .then(
                     if (isConnected) {
                         Modifier
-                            .background(semantic.accentGreen.copy(alpha = 0.14f), cardShape)
+                            .background(
+                                semantic.accentGreen.copy(alpha = if (colors.isDark) 0.20f else 0.14f),
+                                cardShape,
+                            )
                             .border(1.dp, semantic.accentGreen.copy(alpha = 0.35f), cardShape)
                     } else {
                         Modifier
@@ -452,7 +455,7 @@ private fun ReceiveHeroCard(
                     Box(
                         modifier = Modifier
                             .clip(ContinuousCapsule)
-                            .background(ringColor.copy(alpha = 0.12f))
+                            .background(ringColor.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
                             .padding(horizontal = 12.dp, vertical = 4.dp),
                     ) {
                         Text(

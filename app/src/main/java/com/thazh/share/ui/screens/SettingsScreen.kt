@@ -6,9 +6,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,9 +28,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousCapsule
 import com.thazh.share.R
+import com.thazh.share.data.AppThemeMode
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.theme.ThazhSymbols
@@ -49,6 +55,7 @@ import io.github.neoruaa.glasmio.ui.GlasmioButton
 import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
 import io.github.neoruaa.glasmio.ui.GlasmioGroupedList
 import io.github.neoruaa.glasmio.ui.GlasmioGroupedTableFooter
+import io.github.neoruaa.glasmio.ui.GlasmioSegmentedControl
 
 @Composable
 fun SettingsScreen(
@@ -64,6 +71,7 @@ fun SettingsScreen(
     isBleSupported: Boolean,
     isNfcSupported: Boolean,
     isNfcEnabled: Boolean,
+    themeMode: AppThemeMode,
     reduceTransparency: Boolean,
     liquidGlassEnabled: Boolean,
     receivedFilesCount: Int,
@@ -77,6 +85,7 @@ fun SettingsScreen(
     onToggleAutoSaveToDownloads: (Boolean) -> Unit,
     onToggleSoundVibration: (Boolean) -> Unit,
     onToggleBleFastDiscovery: (Boolean) -> Unit,
+    onSelectThemeMode: (AppThemeMode) -> Unit,
     onToggleReduceTransparency: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onOpenNfcSettings: () -> Unit,
@@ -271,8 +280,91 @@ fun SettingsScreen(
 
         item(key = "appearance_group") {
             CenteredSettingWidth {
+                val systemLabel = stringResource(R.string.settings_theme_mode_system)
+                val lightLabel = stringResource(R.string.settings_theme_mode_light)
+                val darkLabel = stringResource(R.string.settings_theme_mode_dark)
+                val themeItems = remember(systemLabel, lightLabel, darkLabel) {
+                    listOf(
+                        AppThemeMode.SYSTEM to systemLabel,
+                        AppThemeMode.LIGHT to lightLabel,
+                        AppThemeMode.DARK to darkLabel,
+                    )
+                }
+
                 Column {
                     GlasmioGroupedList {
+                        GlasmioPreferenceEntry(
+                            title = { Text(stringResource(R.string.settings_theme_mode)) },
+                            description = when (themeMode) {
+                                AppThemeMode.SYSTEM -> stringResource(R.string.settings_theme_mode_desc_system)
+                                AppThemeMode.LIGHT -> stringResource(R.string.settings_theme_mode_desc_light)
+                                AppThemeMode.DARK -> stringResource(R.string.settings_theme_mode_desc_dark)
+                            },
+                            icon = {
+                                SfIcon(
+                                    systemName = when (themeMode) {
+                                        AppThemeMode.SYSTEM -> ThazhSymbols.ThemeSystem
+                                        AppThemeMode.LIGHT -> ThazhSymbols.ThemeLight
+                                        AppThemeMode.DARK -> ThazhSymbols.ThemeDark
+                                    },
+                                    contentDescription = null,
+                                    tint = when (themeMode) {
+                                        AppThemeMode.SYSTEM -> semantic.accentBlue
+                                        AppThemeMode.LIGHT -> semantic.warningOrange
+                                        AppThemeMode.DARK -> semantic.categoryDocument
+                                    },
+                                    size = 22.dp,
+                                )
+                            },
+                            content = {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                GlasmioSegmentedControl(
+                                    items = themeItems,
+                                    selected = themeMode,
+                                    onSelected = onSelectThemeMode,
+                                    height = 38.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("theme_mode_segmented_control"),
+                                ) { value, isSelected ->
+                                    val symbol = when (value) {
+                                        AppThemeMode.SYSTEM -> ThazhSymbols.ThemeSystem
+                                        AppThemeMode.LIGHT -> ThazhSymbols.ThemeLight
+                                        AppThemeMode.DARK -> ThazhSymbols.ThemeDark
+                                    }
+                                    val label = when (value) {
+                                        AppThemeMode.SYSTEM -> systemLabel
+                                        AppThemeMode.LIGHT -> lightLabel
+                                        AppThemeMode.DARK -> darkLabel
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                        modifier = Modifier.padding(horizontal = 4.dp),
+                                    ) {
+                                        SfIcon(
+                                            systemName = symbol,
+                                            contentDescription = null,
+                                            tint = if (isSelected) colors.content else colors.secondaryContent,
+                                            size = 14.dp,
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = label,
+                                            style = GlasmioTheme.textStyles.caption1.copy(
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            ),
+                                            color = if (isSelected) colors.content else colors.secondaryContent,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                            },
+                            showTopSeparator = false,
+                            modifier = Modifier.testTag("theme_mode_preference"),
+                        )
+
                         GlasmioSwitchPreference(
                             title = { Text(stringResource(R.string.settings_reduce_transparency)) },
                             description = stringResource(R.string.settings_reduce_transparency_desc),
@@ -286,7 +378,7 @@ fun SettingsScreen(
                             },
                             checked = reduceTransparency,
                             onCheckedChange = onToggleReduceTransparency,
-                            showTopSeparator = false,
+                            showTopSeparator = true,
                             modifier = Modifier.testTag("reduce_transparency_toggle"),
                         )
 
@@ -437,7 +529,7 @@ fun SettingsScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(ContinuousCapsule)
-                                            .background(semantic.accentGreen.copy(alpha = 0.16f))
+                                            .background(semantic.accentGreen.copy(alpha = if (colors.isDark) 0.24f else 0.16f))
                                             .padding(horizontal = 10.dp, vertical = 4.dp),
                                     ) {
                                         Text(

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#057CFC</color>
+    <color name="glasmio_light_bg">#F2F2F7</color>
+    <color name="glasmio_dark_bg">#000000</color>
 </resources>
