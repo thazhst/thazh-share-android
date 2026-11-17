@@ -5,6 +5,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +51,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
+import com.thazh.share.ui.components.IosSwipeBackContainer
 import com.thazh.share.ui.screens.DiscoveryScreen
 import com.thazh.share.ui.screens.FileTransferScreen
 import com.thazh.share.ui.screens.ReceiveScreen
@@ -55,6 +60,7 @@ import com.thazh.share.ui.screens.SettingsScreen
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.core.swipeBackExcluded
 import io.github.neoruaa.glasmio.glass.LocalBlurBackdrop
 import io.github.neoruaa.glasmio.glass.LocalGlassBackdrop
 import io.github.neoruaa.glasmio.glass.glassBackdropSource
@@ -119,6 +125,15 @@ fun ShareApp(viewModel: ShareViewModel) {
     val isNfcSupported = remember { viewModel.isNfcSupported }
 
     var selectedTab by rememberSaveable { mutableStateOf(ShareTab.SEND) }
+    var showTransferSessionOnSendTab by rememberSaveable { mutableStateOf(true) }
+    val isConnectedSession = screenState is ConnectScreenState.Connected
+
+    LaunchedEffect(isConnectedSession) {
+        if (isConnectedSession) {
+            showTransferSessionOnSendTab = true
+        }
+    }
+
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
@@ -172,6 +187,271 @@ fun ShareApp(viewModel: ShareViewModel) {
     val hostBackdrop = LocalGlassBackdrop.current
     val screenBackdrop = rememberLayerBackdrop()
     val screenModalBackdrop = rememberCombinedBackdrop(hostBackdrop, screenBackdrop)
+    val bottomBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+        NavigationBarSurfaceHeight + 24.dp
+
+    val openSettings = {
+        navController.navigate(ShareRoutes.SETTINGS) { launchSingleTop = true }
+    }
+
+    @Composable
+    fun RenderDiscoveryContent() {
+        DiscoveryScreen(
+            displayName = displayName,
+            visibilityMode = visibilityMode,
+            visibilityRemainingSeconds = visibilityRemainingSeconds,
+            peers = peers,
+            savedDevices = savedDevices,
+            isDiscovering = isDiscovering,
+            screenState = screenState,
+            isNfcSupported = isNfcSupported,
+            isNfcEnabled = isNfcEnabled,
+            nfcPairingPeerName = nfcPairingPeerName,
+            pendingWifiDirectFilesCount = pendingWifiDirectFilesCount,
+            bottomBarPadding = bottomBarPadding,
+            onCancelPendingFiles = { viewModel.clearPendingWifiDirectFiles() },
+            onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
+            onStartDiscovery = { viewModel.startDiscovery() },
+            onStopDiscovery = { viewModel.stopDiscovery() },
+            onConnectPeer = { viewModel.connectToPeer(it) },
+            onConnectSavedDevice = { viewModel.connectToSavedDevice(it) },
+            onRenameSavedDevice = { address, name -> viewModel.renameSavedDevice(address, name) },
+            onRemoveSavedDevice = { viewModel.removeSavedDevice(it) },
+            onOpenActiveSession = {
+                selectedTab = ShareTab.SEND
+                showTransferSessionOnSendTab = true
+            },
+            onOpenNfcSettings = { viewModel.openNfcSettings() },
+            onOpenSettings = openSettings,
+        )
+    }
+
+    @Composable
+    fun RenderSendTabContent() {
+        val connectedState = screenState as? ConnectScreenState.Connected
+        if (connectedState != null && showTransferSessionOnSendTab) {
+            val peerName = connectedPeerName ?: connectedState.peerName
+            BackHandler {
+                showTransferSessionOnSendTab = false
+            }
+            IosSwipeBackContainer(
+                enabled = true,
+                onBack = { showTransferSessionOnSendTab = false },
+                previousContent = { RenderDiscoveryContent() },
+            ) {
+                FileTransferScreen(
+                    peerName = peerName,
+                    isSocketConnected = isSocketConnected,
+                    connectionQuality = connectionQuality,
+                    estimatedDistanceMeters = estimatedDistanceMeters,
+                    transfers = transfers,
+                    bottomBarPadding = bottomBarPadding,
+                    onPickFiles = { filesPickerLauncher.launch("*/*") },
+                    onPickMedia = {
+                        mediaPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                        )
+                    },
+                    onCancelTransfer = { viewModel.cancelTransfer(it) },
+                    onRetryTransfer = { viewModel.retryTransfer(it) },
+                    onDismissTransfer = { viewModel.dismissTransfer(it) },
+                    onClearFinished = { viewModel.clearFinishedTransfers() },
+                    onDisconnect = { viewModel.disconnect() },
+                    onOpenSettings = openSettings,
+                    onBack = { showTransferSessionOnSendTab = false },
+                )
+            }
+        } else {
+            IosSwipeBackContainer(
+                enabled = false,
+                onBack = {},
+            ) {
+                RenderDiscoveryContent()
+            }
+        }
+    }
+
+    @Composable
+    fun RenderMainTabsBody(interactiveBackHandler: Boolean) {
+        if (interactiveBackHandler) {
+            BackHandler(enabled = selectedTab != ShareTab.SEND) {
+                selectedTab = ShareTab.SEND
+            }
+        }
+
+        val tabsContentBackdrop = rememberLayerBackdrop()
+        val tabsOverlayBackdrop = rememberCombinedBackdrop(hostBackdrop, tabsContentBackdrop)
+        val compactProgress = remember { mutableFloatStateOf(0f) }
+
+        val sendLabel = stringResource(R.string.tab_send)
+        val receiveLabel = stringResource(R.string.tab_receive)
+        val receivedFilesLabel = if (unseenReceivedCount > 0) {
+            stringResource(R.string.tab_received_files_count, unseenReceivedCount)
+        } else {
+            stringResource(R.string.tab_received_files)
+        }
+
+        val tabItems = remember(sendLabel, receiveLabel, receivedFilesLabel) {
+            listOf(
+                GlasmioTabItem(
+                    key = ShareTab.SEND,
+                    label = sendLabel,
+                    symbol = ThazhSymbols.TabSend,
+                    contentDescription = sendLabel,
+                ),
+                GlasmioTabItem(
+                    key = ShareTab.RECEIVE,
+                    label = receiveLabel,
+                    symbol = ThazhSymbols.TabReceive,
+                    contentDescription = receiveLabel,
+                ),
+                GlasmioTabItem(
+                    key = ShareTab.RECEIVED_FILES,
+                    label = receivedFilesLabel,
+                    symbol = ThazhSymbols.TabReceivedFiles,
+                    contentDescription = receivedFilesLabel,
+                ),
+            )
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalBlurBackdrop provides tabsOverlayBackdrop) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .glassBackdropSource(tabsContentBackdrop)
+                        .trackBackdropPosition(tabsContentBackdrop),
+                ) {
+                    when (selectedTab) {
+                        ShareTab.SEND -> {
+                            RenderSendTabContent()
+                        }
+
+                        ShareTab.RECEIVE -> {
+                            IosSwipeBackContainer(
+                                enabled = interactiveBackHandler,
+                                onBack = { selectedTab = ShareTab.SEND },
+                                previousContent = { RenderSendTabContent() },
+                            ) {
+                                ReceiveScreen(
+                                    displayName = displayName,
+                                    visibilityMode = visibilityMode,
+                                    visibilityRemainingSeconds = visibilityRemainingSeconds,
+                                    isDiscovering = isDiscovering,
+                                    screenState = screenState,
+                                    connectedPeerName = connectedPeerName,
+                                    isSocketConnected = isSocketConnected,
+                                    connectionQuality = connectionQuality,
+                                    estimatedDistanceMeters = estimatedDistanceMeters,
+                                    transfers = transfers,
+                                    isNfcSupported = isNfcSupported,
+                                    isNfcEnabled = isNfcEnabled,
+                                    nfcPairingPeerName = nfcPairingPeerName,
+                                    bottomBarPadding = bottomBarPadding,
+                                    onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
+                                    onStartDiscovery = { viewModel.startDiscovery() },
+                                    onOpenNfcSettings = { viewModel.openNfcSettings() },
+                                    onCancelTransfer = { viewModel.cancelTransfer(it) },
+                                    onRetryTransfer = { viewModel.retryTransfer(it) },
+                                    onDismissTransfer = { viewModel.dismissTransfer(it) },
+                                    onClearFinished = { viewModel.clearFinishedTransfers() },
+                                    onDisconnect = { viewModel.disconnect() },
+                                    onOpenSettings = openSettings,
+                                )
+                            }
+                        }
+
+                        ShareTab.RECEIVED_FILES -> {
+                            IosSwipeBackContainer(
+                                enabled = interactiveBackHandler,
+                                onBack = { selectedTab = ShareTab.SEND },
+                                previousContent = { RenderSendTabContent() },
+                            ) {
+                                ReceivedFilesScreen(
+                                    files = receivedFiles,
+                                    isSocketConnected = isSocketConnected,
+                                    peers = peers,
+                                    savedDevices = savedDevices,
+                                    bottomBarPadding = bottomBarPadding,
+                                    onBack = null,
+                                    onOpenSettings = openSettings,
+                                    onMarkAllSeen = { viewModel.markReceivedFilesSeen() },
+                                    onShareViaWifiDirect = { targets ->
+                                        viewModel.shareReceivedFilesViaWifiDirect(targets) { sentImmediately, count ->
+                                            if (count > 0) {
+                                                val msgRes = if (sentImmediately) {
+                                                    R.string.received_files_share_wifi_direct_sending
+                                                } else {
+                                                    R.string.received_files_share_wifi_direct_queued
+                                                }
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(msgRes, count),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                                selectedTab = ShareTab.SEND
+                                            }
+                                        }
+                                    },
+                                    onConnectPeerAndShareViaWifiDirect = { peer, targets ->
+                                        viewModel.shareReceivedFilesViaWifiDirect(targets) { _, count ->
+                                            if (count > 0) {
+                                                viewModel.connectToPeer(peer)
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.received_files_share_wifi_direct_sending, count),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                                selectedTab = ShareTab.SEND
+                                            }
+                                        }
+                                    },
+                                    onConnectSavedDeviceAndShareViaWifiDirect = { saved, targets ->
+                                        viewModel.shareReceivedFilesViaWifiDirect(targets) { _, count ->
+                                            if (count > 0) {
+                                                viewModel.connectToSavedDevice(saved)
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.received_files_share_wifi_direct_sending, count),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                                selectedTab = ShareTab.SEND
+                                            }
+                                        }
+                                    },
+                                    onDeleteFiles = { targets, onDone -> viewModel.deleteReceivedFiles(targets, onDone) },
+                                    onRenameFile = { file, name, onDone -> viewModel.renameReceivedFile(file, name, onDone) },
+                                    onSaveToDownloads = { targets, onDone -> viewModel.saveReceivedFilesToDownloads(targets, onDone) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            GlasmioNavigationBar(
+                items = tabItems,
+                selectedKey = selectedTab,
+                onSelected = { selectedTab = it },
+                onExpand = {},
+                compactProgress = compactProgress,
+                compactSize = CompactBottomControlSize,
+                backdrop = tabsOverlayBackdrop,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .widthIn(max = 420.dp)
+                    .fillMaxWidth()
+                    .swipeBackExcluded()
+                    .testTag("glasmio_bottom_tabs"),
+            )
+        }
+    }
+
+    val iosSlideSpec = remember {
+        spring<IntOffset>(dampingRatio = 0.88f, stiffness = 420f)
+    }
 
     CompositionLocalProvider(LocalBlurBackdrop provides screenModalBackdrop) {
         Box(
@@ -183,285 +463,87 @@ fun ShareApp(viewModel: ShareViewModel) {
             NavHost(
                 navController = navController,
                 startDestination = ShareRoutes.MAIN_TABS,
+                enterTransition = {
+                    slideInHorizontally(iosSlideSpec) { it }
+                },
+                exitTransition = {
+                    slideOutHorizontally(iosSlideSpec) { -(it * 0.30f).toInt() }
+                },
+                popEnterTransition = {
+                    slideInHorizontally(iosSlideSpec) { -(it * 0.30f).toInt() }
+                },
+                popExitTransition = {
+                    slideOutHorizontally(iosSlideSpec) { it }
+                },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 composable(ShareRoutes.MAIN_TABS) {
-                    BackHandler(enabled = selectedTab != ShareTab.SEND) {
-                        selectedTab = ShareTab.SEND
-                    }
-
-                    val tabsContentBackdrop = rememberLayerBackdrop()
-                    val tabsOverlayBackdrop = rememberCombinedBackdrop(hostBackdrop, tabsContentBackdrop)
-                    val bottomBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                        NavigationBarSurfaceHeight + 24.dp
-                    val compactProgress = remember { mutableFloatStateOf(0f) }
-
-                    val openSettings = {
-                        navController.navigate(ShareRoutes.SETTINGS) { launchSingleTop = true }
-                    }
-
-                    val sendLabel = stringResource(R.string.tab_send)
-                    val receiveLabel = stringResource(R.string.tab_receive)
-                    val receivedFilesLabel = if (unseenReceivedCount > 0) {
-                        stringResource(R.string.tab_received_files_count, unseenReceivedCount)
-                    } else {
-                        stringResource(R.string.tab_received_files)
-                    }
-
-                    val tabItems = remember(sendLabel, receiveLabel, receivedFilesLabel) {
-                        listOf(
-                            GlasmioTabItem(
-                                key = ShareTab.SEND,
-                                label = sendLabel,
-                                symbol = ThazhSymbols.TabSend,
-                                contentDescription = sendLabel,
-                            ),
-                            GlasmioTabItem(
-                                key = ShareTab.RECEIVE,
-                                label = receiveLabel,
-                                symbol = ThazhSymbols.TabReceive,
-                                contentDescription = receiveLabel,
-                            ),
-                            GlasmioTabItem(
-                                key = ShareTab.RECEIVED_FILES,
-                                label = receivedFilesLabel,
-                                symbol = ThazhSymbols.TabReceivedFiles,
-                                contentDescription = receivedFilesLabel,
-                            ),
-                        )
-                    }
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // Modal overlays/menus inside MAIN_TABS read tabsOverlayBackdrop;
-                        // in-page glass controls use LocalGlassBackdrop (= hostBackdrop) to avoid cyclic sampling.
-                        CompositionLocalProvider(LocalBlurBackdrop provides tabsOverlayBackdrop) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .glassBackdropSource(tabsContentBackdrop)
-                                    .trackBackdropPosition(tabsContentBackdrop),
-                            ) {
-                                when (selectedTab) {
-                                    ShareTab.SEND -> {
-                                        val connectedState = screenState as? ConnectScreenState.Connected
-                                        if (connectedState != null) {
-                                            val peerName = connectedPeerName ?: connectedState.peerName
-                                            FileTransferScreen(
-                                                peerName = peerName,
-                                                isSocketConnected = isSocketConnected,
-                                                connectionQuality = connectionQuality,
-                                                estimatedDistanceMeters = estimatedDistanceMeters,
-                                                transfers = transfers,
-                                                bottomBarPadding = bottomBarPadding,
-                                                onPickFiles = { filesPickerLauncher.launch("*/*") },
-                                                onPickMedia = {
-                                                    mediaPickerLauncher.launch(
-                                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                                                    )
-                                                },
-                                                onCancelTransfer = { viewModel.cancelTransfer(it) },
-                                                onRetryTransfer = { viewModel.retryTransfer(it) },
-                                                onDismissTransfer = { viewModel.dismissTransfer(it) },
-                                                onClearFinished = { viewModel.clearFinishedTransfers() },
-                                                onDisconnect = { viewModel.disconnect() },
-                                                onOpenSettings = openSettings,
-                                                onBack = null,
-                                            )
-                                        } else {
-                                            DiscoveryScreen(
-                                                displayName = displayName,
-                                                visibilityMode = visibilityMode,
-                                                visibilityRemainingSeconds = visibilityRemainingSeconds,
-                                                peers = peers,
-                                                savedDevices = savedDevices,
-                                                isDiscovering = isDiscovering,
-                                                screenState = screenState,
-                                                isNfcSupported = isNfcSupported,
-                                                isNfcEnabled = isNfcEnabled,
-                                                nfcPairingPeerName = nfcPairingPeerName,
-                                                pendingWifiDirectFilesCount = pendingWifiDirectFilesCount,
-                                                bottomBarPadding = bottomBarPadding,
-                                                onCancelPendingFiles = { viewModel.clearPendingWifiDirectFiles() },
-                                                onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
-                                                onStartDiscovery = { viewModel.startDiscovery() },
-                                                onStopDiscovery = { viewModel.stopDiscovery() },
-                                                onConnectPeer = { viewModel.connectToPeer(it) },
-                                                onConnectSavedDevice = { viewModel.connectToSavedDevice(it) },
-                                                onRenameSavedDevice = { address, name -> viewModel.renameSavedDevice(address, name) },
-                                                onRemoveSavedDevice = { viewModel.removeSavedDevice(it) },
-                                                onOpenActiveSession = { selectedTab = ShareTab.SEND },
-                                                onOpenNfcSettings = { viewModel.openNfcSettings() },
-                                                onOpenSettings = openSettings,
-                                            )
-                                        }
-                                    }
-
-                                    ShareTab.RECEIVE -> {
-                                        ReceiveScreen(
-                                            displayName = displayName,
-                                            visibilityMode = visibilityMode,
-                                            visibilityRemainingSeconds = visibilityRemainingSeconds,
-                                            isDiscovering = isDiscovering,
-                                            screenState = screenState,
-                                            connectedPeerName = connectedPeerName,
-                                            isSocketConnected = isSocketConnected,
-                                            connectionQuality = connectionQuality,
-                                            estimatedDistanceMeters = estimatedDistanceMeters,
-                                            transfers = transfers,
-                                            isNfcSupported = isNfcSupported,
-                                            isNfcEnabled = isNfcEnabled,
-                                            nfcPairingPeerName = nfcPairingPeerName,
-                                            bottomBarPadding = bottomBarPadding,
-                                            onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
-                                            onStartDiscovery = { viewModel.startDiscovery() },
-                                            onOpenNfcSettings = { viewModel.openNfcSettings() },
-                                            onCancelTransfer = { viewModel.cancelTransfer(it) },
-                                            onRetryTransfer = { viewModel.retryTransfer(it) },
-                                            onDismissTransfer = { viewModel.dismissTransfer(it) },
-                                            onClearFinished = { viewModel.clearFinishedTransfers() },
-                                            onDisconnect = { viewModel.disconnect() },
-                                            onOpenSettings = openSettings,
-                                        )
-                                    }
-
-                                    ShareTab.RECEIVED_FILES -> {
-                                        ReceivedFilesScreen(
-                                            files = receivedFiles,
-                                            isSocketConnected = isSocketConnected,
-                                            peers = peers,
-                                            savedDevices = savedDevices,
-                                            bottomBarPadding = bottomBarPadding,
-                                            onBack = null,
-                                            onOpenSettings = openSettings,
-                                            onMarkAllSeen = { viewModel.markReceivedFilesSeen() },
-                                            onShareViaWifiDirect = { targets ->
-                                                viewModel.shareReceivedFilesViaWifiDirect(targets) { sentImmediately, count ->
-                                                    if (count > 0) {
-                                                        val msgRes = if (sentImmediately) {
-                                                            R.string.received_files_share_wifi_direct_sending
-                                                        } else {
-                                                            R.string.received_files_share_wifi_direct_queued
-                                                        }
-                                                        Toast.makeText(
-                                                            context,
-                                                            context.getString(msgRes, count),
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        selectedTab = ShareTab.SEND
-                                                    }
-                                                }
-                                            },
-                                            onConnectPeerAndShareViaWifiDirect = { peer, targets ->
-                                                viewModel.shareReceivedFilesViaWifiDirect(targets) { _, count ->
-                                                    if (count > 0) {
-                                                        viewModel.connectToPeer(peer)
-                                                        Toast.makeText(
-                                                            context,
-                                                            context.getString(R.string.received_files_share_wifi_direct_sending, count),
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        selectedTab = ShareTab.SEND
-                                                    }
-                                                }
-                                            },
-                                            onConnectSavedDeviceAndShareViaWifiDirect = { saved, targets ->
-                                                viewModel.shareReceivedFilesViaWifiDirect(targets) { _, count ->
-                                                    if (count > 0) {
-                                                        viewModel.connectToSavedDevice(saved)
-                                                        Toast.makeText(
-                                                            context,
-                                                            context.getString(R.string.received_files_share_wifi_direct_sending, count),
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        selectedTab = ShareTab.SEND
-                                                    }
-                                                }
-                                            },
-                                            onDeleteFiles = { targets, onDone -> viewModel.deleteReceivedFiles(targets, onDone) },
-                                            onRenameFile = { file, name, onDone -> viewModel.renameReceivedFile(file, name, onDone) },
-                                            onSaveToDownloads = { targets, onDone -> viewModel.saveReceivedFilesToDownloads(targets, onDone) },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        GlasmioNavigationBar(
-                            items = tabItems,
-                            selectedKey = selectedTab,
-                            onSelected = { selectedTab = it },
-                            onExpand = {},
-                            compactProgress = compactProgress,
-                            compactSize = CompactBottomControlSize,
-                            backdrop = tabsOverlayBackdrop,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(horizontal = 20.dp, vertical = 12.dp)
-                                .widthIn(max = 420.dp)
-                                .fillMaxWidth()
-                                .testTag("glasmio_bottom_tabs"),
-                        )
-                    }
+                    RenderMainTabsBody(interactiveBackHandler = true)
                 }
 
                 composable(ShareRoutes.SETTINGS) {
                     val totalReceivedBytes = remember(receivedFiles) { receivedFiles.sumOf { it.sizeBytes } }
-                    SettingsScreen(
-                        currentDisplayName = displayName,
-                        visibilityMode = visibilityMode,
-                        visibilityRemainingSeconds = visibilityRemainingSeconds,
-                        defaultVisibilityMode = defaultVisibilityMode,
-                        confirmIncomingConnection = confirmIncomingConnection,
-                        backgroundConnectionDialog = backgroundConnectionDialog,
-                        autoSaveToDownloads = autoSaveToDownloads,
-                        soundVibrationEnabled = soundVibrationEnabled,
-                        bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
-                        isBleSupported = viewModel.isBleFastDiscoverySupported(),
-                        isNfcSupported = isNfcSupported,
-                        isNfcEnabled = isNfcEnabled,
-                        themeMode = themeMode,
-                        reduceTransparency = reduceTransparency,
-                        liquidGlassEnabled = liquidGlassEnabled,
-                        receivedFilesCount = receivedFiles.size,
-                        receivedFilesTotalBytes = totalReceivedBytes,
-                        savedDevicesCount = savedDevices.size,
-                        onUpdateDisplayName = { viewModel.updateDisplayName(it) },
-                        onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
-                        onSelectDefaultVisibilityMode = { viewModel.setDefaultVisibilityMode(it) },
-                        onToggleConfirmIncomingConnection = { viewModel.setConfirmIncomingConnection(it) },
-                        onToggleBackgroundConnectionDialog = { viewModel.setBackgroundConnectionDialog(it) },
-                        onToggleAutoSaveToDownloads = { viewModel.setAutoSaveToDownloads(it) },
-                        onToggleSoundVibration = { viewModel.setSoundVibrationEnabled(it) },
-                        onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(it) },
-                        onSelectThemeMode = { viewModel.setThemeMode(it) },
-                        onToggleReduceTransparency = { viewModel.setReduceTransparency(it) },
-                        onToggleLiquidGlass = { viewModel.setLiquidGlassEnabled(it) },
-                        onOpenNfcSettings = { viewModel.openNfcSettings() },
-                        onOpenReceivedFiles = {
-                            selectedTab = ShareTab.RECEIVED_FILES
-                            navController.popBackStack(ShareRoutes.MAIN_TABS, inclusive = false)
-                        },
-                        onClearTempStagingCache = {
-                            viewModel.clearTempStagingCache {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.settings_clear_temp_cache_done),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        },
-                        onClearSavedDevices = {
-                            viewModel.clearSavedDevices {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.settings_clear_saved_devices_done),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        },
+                    IosSwipeBackContainer(
+                        enabled = true,
                         onBack = { navController.popBackStack() },
-                    )
+                        previousContent = { RenderMainTabsBody(interactiveBackHandler = false) },
+                    ) {
+                        SettingsScreen(
+                            currentDisplayName = displayName,
+                            visibilityMode = visibilityMode,
+                            visibilityRemainingSeconds = visibilityRemainingSeconds,
+                            defaultVisibilityMode = defaultVisibilityMode,
+                            confirmIncomingConnection = confirmIncomingConnection,
+                            backgroundConnectionDialog = backgroundConnectionDialog,
+                            autoSaveToDownloads = autoSaveToDownloads,
+                            soundVibrationEnabled = soundVibrationEnabled,
+                            bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
+                            isBleSupported = viewModel.isBleFastDiscoverySupported(),
+                            isNfcSupported = isNfcSupported,
+                            isNfcEnabled = isNfcEnabled,
+                            themeMode = themeMode,
+                            reduceTransparency = reduceTransparency,
+                            liquidGlassEnabled = liquidGlassEnabled,
+                            receivedFilesCount = receivedFiles.size,
+                            receivedFilesTotalBytes = totalReceivedBytes,
+                            savedDevicesCount = savedDevices.size,
+                            onUpdateDisplayName = { viewModel.updateDisplayName(it) },
+                            onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
+                            onSelectDefaultVisibilityMode = { viewModel.setDefaultVisibilityMode(it) },
+                            onToggleConfirmIncomingConnection = { viewModel.setConfirmIncomingConnection(it) },
+                            onToggleBackgroundConnectionDialog = { viewModel.setBackgroundConnectionDialog(it) },
+                            onToggleAutoSaveToDownloads = { viewModel.setAutoSaveToDownloads(it) },
+                            onToggleSoundVibration = { viewModel.setSoundVibrationEnabled(it) },
+                            onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(it) },
+                            onSelectThemeMode = { viewModel.setThemeMode(it) },
+                            onToggleReduceTransparency = { viewModel.setReduceTransparency(it) },
+                            onToggleLiquidGlass = { viewModel.setLiquidGlassEnabled(it) },
+                            onOpenNfcSettings = { viewModel.openNfcSettings() },
+                            onOpenReceivedFiles = {
+                                selectedTab = ShareTab.RECEIVED_FILES
+                                navController.popBackStack(ShareRoutes.MAIN_TABS, inclusive = false)
+                            },
+                            onClearTempStagingCache = {
+                                viewModel.clearTempStagingCache {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.settings_clear_temp_cache_done),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                            onClearSavedDevices = {
+                                viewModel.clearSavedDevices {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.settings_clear_saved_devices_done),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                 }
             }
         }

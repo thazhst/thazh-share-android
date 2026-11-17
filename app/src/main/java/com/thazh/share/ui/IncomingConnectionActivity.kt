@@ -1,7 +1,7 @@
 package com.thazh.share.ui
 
 import android.content.ComponentName
-import android.content.Context
+import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,17 +32,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
+import com.thazh.share.MainActivity
 import com.thazh.share.R
 import com.thazh.share.ShareApplication
 import com.thazh.share.data.AppThemeMode
+import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.IncomingConnectionRequest
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.theme.ThazhIconResolver
@@ -59,8 +62,9 @@ import io.github.neoruaa.glasmio.ui.GlasmioAlertButtonRole
 import io.github.neoruaa.glasmio.ui.GlasmioAlertSurface
 
 /**
- * Translucent dialog-styled Activity presented when the user is in another app
- * and interacts with an incoming connection prompt while device visibility is active.
+ * Translucent dialog-styled Activity presented over other apps when the user
+ * receives an incoming file-transfer connection request while device visibility
+ * (10 minutes or Unlimited) is active in Thazh Share.
  */
 class IncomingConnectionActivity : ComponentActivity() {
 
@@ -102,6 +106,11 @@ class IncomingConnectionActivity : ComponentActivity() {
             val boundService by serviceState
             val request = boundService?.incomingConnectionRequest
                 ?.collectAsStateWithLifecycle(initialValue = null)?.value
+            val visibilityMode = boundService?.visibilityMode
+                ?.collectAsStateWithLifecycle(initialValue = DeviceVisibilityMode.TEMPORARY_10_MIN)?.value
+                ?: DeviceVisibilityMode.TEMPORARY_10_MIN
+            val remainingSeconds = boundService?.visibilityRemainingSeconds
+                ?.collectAsStateWithLifecycle(initialValue = 600)?.value
 
             var hadRequest by remember { mutableStateOf(false) }
             LaunchedEffect(boundService, request) {
@@ -120,6 +129,8 @@ class IncomingConnectionActivity : ComponentActivity() {
                 ) {
                     IncomingConnectionOverlayDialog(
                         request = request,
+                        visibilityMode = visibilityMode,
+                        remainingSeconds = remainingSeconds,
                         onAccept = {
                             val peer = request?.peerName.orEmpty()
                             boundService?.acceptIncomingConnection()
@@ -132,8 +143,26 @@ class IncomingConnectionActivity : ComponentActivity() {
                             }
                             finish()
                         },
+                        onAcceptAndOpenApp = {
+                            boundService?.acceptIncomingConnection()
+                            runCatching {
+                                startActivity(
+                                    Intent(this@IncomingConnectionActivity, MainActivity::class.java).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                    },
+                                )
+                            }
+                            finish()
+                        },
                         onDecline = {
                             boundService?.declineIncomingConnection()
+                            Toast.makeText(
+                                this@IncomingConnectionActivity,
+                                getString(R.string.incoming_conn_declined_toast),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                             finish()
                         },
                         onDismiss = {
@@ -157,7 +186,10 @@ class IncomingConnectionActivity : ComponentActivity() {
 @Composable
 private fun IncomingConnectionOverlayDialog(
     request: IncomingConnectionRequest?,
+    visibilityMode: DeviceVisibilityMode,
+    remainingSeconds: Int?,
     onAccept: () -> Unit,
+    onAcceptAndOpenApp: () -> Unit,
     onDecline: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -168,6 +200,7 @@ private fun IncomingConnectionOverlayDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(colors.content.copy(alpha = if (colors.isDark) 0.36f else 0.24f))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -181,6 +214,18 @@ private fun IncomingConnectionOverlayDialog(
             stringResource(R.string.incoming_conn_message_files, request.peerName, request.pendingFileCount)
         } else {
             stringResource(R.string.incoming_conn_message, request.peerName)
+        }
+
+        val visibilityBadgeColor = when (visibilityMode) {
+            DeviceVisibilityMode.ALWAYS_VISIBLE -> semantic.accentGreen
+            else -> semantic.accentBlue
+        }
+        val visibilityBadgeText = when (visibilityMode) {
+            DeviceVisibilityMode.ALWAYS_VISIBLE -> stringResource(R.string.incoming_conn_visibility_always)
+            else -> stringResource(
+                R.string.incoming_conn_visibility_10min,
+                WifiDirectService.formatCountdown(remainingSeconds ?: 600),
+            )
         }
 
         GlasmioAlertSurface(
@@ -198,9 +243,38 @@ private fun IncomingConnectionOverlayDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 18.dp),
+                    .padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Row(
+                    modifier = Modifier
+                        .clip(ContinuousCapsule)
+                        .background(
+                            visibilityBadgeColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SfIcon(
+                        systemName = if (visibilityMode == DeviceVisibilityMode.ALWAYS_VISIBLE) {
+                            ThazhSymbols.AllInclusive
+                        } else {
+                            ThazhSymbols.Timer
+                        },
+                        contentDescription = null,
+                        tint = visibilityBadgeColor,
+                        size = 14.dp,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = visibilityBadgeText,
+                        style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                        color = visibilityBadgeColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
                 if (request.peerAddress.isNotBlank()) {
                     Row(
                         modifier = Modifier
@@ -241,6 +315,23 @@ private fun IncomingConnectionOverlayDialog(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(badgeShape)
+                        .clickable(role = Role.Button, onClick = onAcceptAndOpenApp)
+                        .padding(vertical = 6.dp)
+                        .testTag("background_incoming_accept_open_button"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.incoming_conn_accept_open),
+                        style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
+                        color = semantic.accentBlue,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }

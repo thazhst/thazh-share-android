@@ -36,6 +36,7 @@
     <string name="visibility_timer_badge">Còn %1$s</string>
     <string name="visibility_timer_reset">Làm mới 10p</string>
     <string name="visibility_enable_prompt">Bật 10 phút</string>
+    <string name="visibility_active_always_badge">Luôn hiển thị</string>
 
     <!-- Incoming connection request dialog & prompt -->
     <string name="incoming_conn_title">Yêu cầu kết nối nhận tệp</string>
@@ -43,11 +44,15 @@
     <string name="incoming_conn_message_files">%1$s muốn kết nối và gửi %2$d tệp cho bạn.</string>
     <string name="incoming_conn_device_address">Địa chỉ: %1$s</string>
     <string name="incoming_conn_pending_files">Tệp đang chờ (%1$d): %2$s</string>
+    <string name="incoming_conn_visibility_10min">Đang hiển thị 10 phút (%1$s)</string>
+    <string name="incoming_conn_visibility_always">Đang bật hiển thị không giới hạn</string>
     <string name="incoming_conn_accept">Chấp nhận</string>
+    <string name="incoming_conn_accept_open">Nhận &amp; mở ứng dụng</string>
     <string name="incoming_conn_decline">Từ chối</string>
     <string name="incoming_conn_notif_title">Yêu cầu nhận tệp từ %1$s</string>
     <string name="incoming_conn_notif_body">Chạm để mở hộp thoại xác nhận hoặc chọn Chấp nhận / Từ chối bên dưới.</string>
     <string name="incoming_conn_accepted_toast">Đã chấp nhận kết nối từ %1$s</string>
+    <string name="incoming_conn_declined_toast">Đã từ chối yêu cầu kết nối</string>
 
     <!-- Discovery / Home screen -->
     <string name="discover_title">Thazh Share</string>

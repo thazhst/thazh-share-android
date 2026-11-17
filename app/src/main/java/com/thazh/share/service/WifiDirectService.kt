@@ -246,6 +246,16 @@ class WifiDirectService : Service() {
         isUiInForeground = inForeground
         if (inForeground) {
             cancelIncomingConnectionNotification()
+        } else {
+            val pending = _incomingConnectionRequest.value
+            if (pending != null &&
+                incomingGateState == IncomingGateState.WAITING_DECISION &&
+                _visibilityMode.value.isVisible &&
+                backgroundConnectionDialogEnabled
+            ) {
+                showIncomingConnectionNotification(pending, isInitialPrompt = true)
+                launchIncomingConnectionActivity()
+            }
         }
     }
 
@@ -553,10 +563,14 @@ class WifiDirectService : Service() {
             return
         }
 
-        incomingGateState = if (hasInitiatedOutgoingConnect || !confirmIncomingConnectionEnabled) {
-            IncomingGateState.APPROVED
-        } else {
+        val shouldGateIncoming = !hasInitiatedOutgoingConnect && (
+            confirmIncomingConnectionEnabled ||
+                (!isUiInForeground && _visibilityMode.value.isVisible && backgroundConnectionDialogEnabled)
+            )
+        incomingGateState = if (shouldGateIncoming) {
             IncomingGateState.WAITING_DECISION
+        } else {
+            IncomingGateState.APPROVED
         }
         queuedIncomingOffers.clear()
 
@@ -579,6 +593,26 @@ class WifiDirectService : Service() {
                 connection.startAsServer(WILDCARD_BIND_ADDRESS)
             } else {
                 connection.connectAsClient(groupOwnerAddr ?: DEFAULT_GROUP_OWNER_IP)
+            }
+        }
+
+        if (incomingGateState == IncomingGateState.WAITING_DECISION) {
+            serviceScope.launch {
+                delay(1_200L)
+                if (peerConnection === connection &&
+                    incomingGateState == IncomingGateState.WAITING_DECISION &&
+                    _incomingConnectionRequest.value == null
+                ) {
+                    val fallbackName = _connectedPeerName.value?.takeIf { it.isNotBlank() }
+                        ?: _peers.value.firstOrNull { it.deviceAddress == currentDeviceAddress }?.deviceName
+                        ?: getString(R.string.transfer_unknown_peer)
+                    val fallbackAddress = _connectedPeerAddress.value?.takeIf { it.isNotBlank() }
+                        ?: currentDeviceAddress.orEmpty()
+                    triggerIncomingConnectionPrompt(
+                        peerName = fallbackName,
+                        peerAddress = fallbackAddress,
+                    )
+                }
             }
         }
     }
@@ -699,7 +733,20 @@ class WifiDirectService : Service() {
     }
 
     private fun triggerIncomingConnectionPrompt(peerName: String, peerAddress: String) {
-        if (_incomingConnectionRequest.value != null) return
+        val existing = _incomingConnectionRequest.value
+        if (existing != null) {
+            val updated = existing.copy(
+                peerName = peerName.ifBlank { existing.peerName },
+                peerAddress = peerAddress.ifBlank { existing.peerAddress },
+                pendingFileCount = queuedIncomingOffers.size,
+                pendingFileNames = queuedIncomingOffers.map { it.fileName },
+            )
+            _incomingConnectionRequest.value = updated
+            if (!isUiInForeground && _visibilityMode.value.isVisible && backgroundConnectionDialogEnabled) {
+                showIncomingConnectionNotification(updated, isInitialPrompt = false)
+            }
+            return
+        }
         val request = IncomingConnectionRequest(
             requestId = UUID.randomUUID().toString(),
             peerName = peerName,
@@ -724,7 +771,21 @@ class WifiDirectService : Service() {
         }
 
         if (!isUiInForeground && _visibilityMode.value.isVisible && backgroundConnectionDialogEnabled) {
-            showIncomingConnectionNotification(request)
+            showIncomingConnectionNotification(request, isInitialPrompt = true)
+            launchIncomingConnectionActivity()
+        }
+    }
+
+    private fun launchIncomingConnectionActivity() {
+        runCatching {
+            val dialogIntent = Intent(this, IncomingConnectionActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(dialogIntent)
+        }.onFailure {
+            Log.w(TAG, "launchIncomingConnectionActivity fallback to notification: ${it.message}")
         }
     }
 
@@ -1192,7 +1253,10 @@ class WifiDirectService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-    private fun showIncomingConnectionNotification(request: IncomingConnectionRequest) {
+    private fun showIncomingConnectionNotification(
+        request: IncomingConnectionRequest,
+        isInitialPrompt: Boolean = false,
+    ) {
         runCatching {
             val openDialogIntent = PendingIntent.getActivity(
                 this,
@@ -1227,17 +1291,19 @@ class WifiDirectService : Service() {
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(openDialogIntent)
+                .setFullScreenIntent(openDialogIntent, true)
                 .addAction(0, getString(R.string.incoming_conn_accept), acceptIntent)
                 .addAction(0, getString(R.string.incoming_conn_decline), declineIntent)
                 .setOngoing(true)
+                .setOnlyAlertOnce(!isInitialPrompt)
                 .setAutoCancel(false)
 
             if (!soundVibrationEnabled) {
                 builder.setSilent(true)
-            } else {
+            } else if (isInitialPrompt) {
                 builder.setDefaults(NotificationCompat.DEFAULT_ALL)
             }
 

@@ -53,14 +53,14 @@ fun VisibilitySelectorCard(
         DeviceVisibilityMode.ALWAYS_VISIBLE -> semantic.accentGreen
     }
 
+    val hiddenLabel = stringResource(R.string.visibility_mode_hidden)
+    val tenMinLabel = stringResource(R.string.visibility_mode_10min)
+    val alwaysLabel = stringResource(R.string.visibility_mode_always)
+
     val segmentItems = listOf(
-        DeviceVisibilityMode.HIDDEN to stringResource(R.string.visibility_mode_hidden),
-        DeviceVisibilityMode.TEMPORARY_10_MIN to if (mode == DeviceVisibilityMode.TEMPORARY_10_MIN) {
-            formattedTimer
-        } else {
-            stringResource(R.string.visibility_mode_10min)
-        },
-        DeviceVisibilityMode.ALWAYS_VISIBLE to stringResource(R.string.visibility_mode_always),
+        DeviceVisibilityMode.HIDDEN to hiddenLabel,
+        DeviceVisibilityMode.TEMPORARY_10_MIN to tenMinLabel,
+        DeviceVisibilityMode.ALWAYS_VISIBLE to alwaysLabel,
     )
 
     GlasmioCard(modifier = modifier.fillMaxWidth()) {
@@ -99,38 +99,68 @@ fun VisibilitySelectorCard(
                     )
                 }
 
-                if (mode == DeviceVisibilityMode.TEMPORARY_10_MIN) {
-                    Box(
-                        modifier = Modifier
-                            .clip(ContinuousCapsule)
-                            .background(semantic.accentBlue.copy(alpha = badgeBgAlpha))
-                            .border(1.dp, semantic.accentBlue.copy(alpha = 0.34f), ContinuousCapsule)
-                            .clickable(role = Role.Button) {
-                                onSelectMode(DeviceVisibilityMode.TEMPORARY_10_MIN)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                            .testTag("visibility_timer_badge"),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.visibility_timer_badge, formattedTimer),
-                            style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
-                            color = semantic.accentBlue,
-                            maxLines = 1,
-                        )
+                when (mode) {
+                    DeviceVisibilityMode.TEMPORARY_10_MIN -> {
+                        Row(
+                            modifier = Modifier
+                                .clip(ContinuousCapsule)
+                                .background(semantic.accentBlue.copy(alpha = badgeBgAlpha))
+                                .border(1.dp, semantic.accentBlue.copy(alpha = 0.34f), ContinuousCapsule)
+                                .clickable(role = Role.Button) {
+                                    onSelectMode(DeviceVisibilityMode.TEMPORARY_10_MIN)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .testTag("visibility_timer_badge"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.visibility_timer_badge, formattedTimer),
+                                style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                                color = semantic.accentBlue,
+                                maxLines = 1,
+                            )
+                            SfIcon(
+                                systemName = ThazhSymbols.Refresh,
+                                contentDescription = stringResource(R.string.visibility_timer_reset),
+                                tint = semantic.accentBlue,
+                                size = 12.dp,
+                            )
+                        }
                     }
-                } else if (mode == DeviceVisibilityMode.ALWAYS_VISIBLE) {
-                    Box(
-                        modifier = Modifier
-                            .clip(ContinuousCapsule)
-                            .background(semantic.accentGreen.copy(alpha = badgeBgAlpha))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.visibility_mode_always),
-                            style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
-                            color = semantic.accentGreen,
-                            maxLines = 1,
-                        )
+
+                    DeviceVisibilityMode.ALWAYS_VISIBLE -> {
+                        Box(
+                            modifier = Modifier
+                                .clip(ContinuousCapsule)
+                                .background(semantic.accentGreen.copy(alpha = badgeBgAlpha))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .testTag("visibility_always_badge"),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.visibility_active_always_badge),
+                                style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                                color = semantic.accentGreen,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+
+                    DeviceVisibilityMode.HIDDEN -> {
+                        Box(
+                            modifier = Modifier
+                                .clip(ContinuousCapsule)
+                                .background(colors.secondaryContent.copy(alpha = if (colors.isDark) 0.16f else 0.10f))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .testTag("visibility_hidden_badge"),
+                        ) {
+                            Text(
+                                text = hiddenLabel,
+                                style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Medium),
+                                color = colors.secondaryContent,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -150,13 +180,9 @@ fun VisibilitySelectorCard(
                     DeviceVisibilityMode.ALWAYS_VISIBLE -> ThazhSymbols.AllInclusive
                 }
                 val label = when (value) {
-                    DeviceVisibilityMode.HIDDEN -> stringResource(R.string.visibility_mode_hidden)
-                    DeviceVisibilityMode.TEMPORARY_10_MIN -> if (mode == DeviceVisibilityMode.TEMPORARY_10_MIN) {
-                        formattedTimer
-                    } else {
-                        stringResource(R.string.visibility_mode_10min)
-                    }
-                    DeviceVisibilityMode.ALWAYS_VISIBLE -> stringResource(R.string.visibility_mode_always)
+                    DeviceVisibilityMode.HIDDEN -> hiddenLabel
+                    DeviceVisibilityMode.TEMPORARY_10_MIN -> tenMinLabel
+                    DeviceVisibilityMode.ALWAYS_VISIBLE -> alwaysLabel
                 }
                 val itemTint = when {
                     isSelected && value == DeviceVisibilityMode.TEMPORARY_10_MIN ->

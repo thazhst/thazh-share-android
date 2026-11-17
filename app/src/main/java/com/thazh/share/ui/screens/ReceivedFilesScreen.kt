@@ -72,6 +72,7 @@ import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.FileActions
 import com.thazh.share.util.FormatUtils
 import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.core.swipeBackExcluded
 import io.github.neoruaa.glasmio.glass.GlassEmphasis
 import io.github.neoruaa.glasmio.icons.SfIcon
 import io.github.neoruaa.glasmio.scaffold.GlasmioPinnedListPage
@@ -475,7 +476,9 @@ fun ReceivedFilesScreen(
                                 items = categoryTabs,
                                 selected = selectedCategory,
                                 onSelected = { selectedCategory = it },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .swipeBackExcluded(),
                             )
                         }
                     }
