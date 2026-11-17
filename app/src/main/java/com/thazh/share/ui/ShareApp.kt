@@ -5,9 +5,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +58,7 @@ import androidx.navigation.compose.rememberNavController
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.ui.components.IosSwipeBackContainer
+import com.thazh.share.ui.screens.AboutAppScreen
 import com.thazh.share.ui.screens.DiscoveryScreen
 import com.thazh.share.ui.screens.FileTransferScreen
 import com.thazh.share.ui.screens.LinkShareScreen
@@ -80,6 +87,7 @@ import io.github.neoruaa.glasmio.ui.NavigationBarSurfaceHeight
 object ShareRoutes {
     const val MAIN_TABS = "main_tabs"
     const val SETTINGS = "settings"
+    const val ABOUT_APP = "about_app"
 }
 
 enum class ShareTab(val index: Int) {
@@ -100,6 +108,7 @@ fun ShareApp(viewModel: ShareViewModel) {
     val peers by viewModel.peers.collectAsStateWithLifecycle()
     val savedDevices by viewModel.savedDevices.collectAsStateWithLifecycle()
     val displayName by viewModel.displayName.collectAsStateWithLifecycle()
+    val syncDeviceNameWithAccount by viewModel.syncDeviceNameWithAccount.collectAsStateWithLifecycle()
     val visibilityMode by viewModel.visibilityMode.collectAsStateWithLifecycle()
     val visibilityRemainingSeconds by viewModel.visibilityRemainingSeconds.collectAsStateWithLifecycle()
     val defaultVisibilityMode by viewModel.defaultVisibilityMode.collectAsStateWithLifecycle()
@@ -212,7 +221,7 @@ fun ShareApp(viewModel: ShareViewModel) {
         if (openReceivedFilesRequested) {
             viewModel.consumeOpenReceivedFilesRequest()
             selectedTab = ShareTab.RECEIVED_FILES
-            if (currentRoute == ShareRoutes.SETTINGS) {
+            if (currentRoute == ShareRoutes.SETTINGS || currentRoute == ShareRoutes.ABOUT_APP) {
                 navController.popBackStack(ShareRoutes.MAIN_TABS, inclusive = false)
             }
         }
@@ -387,12 +396,20 @@ fun ShareApp(viewModel: ShareViewModel) {
                         .glassBackdropSource(tabsContentBackdrop)
                         .trackBackdropPosition(tabsContentBackdrop),
                 ) {
-                    when (selectedTab) {
-                        ShareTab.SEND -> {
-                            RenderSendTabContent()
-                        }
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            (fadeIn(tween(200)) + scaleIn(initialScale = 0.985f, animationSpec = tween(220))) togetherWith
+                                fadeOut(tween(150))
+                        },
+                        label = "main_tab_transition",
+                    ) { tab ->
+                        when (tab) {
+                            ShareTab.SEND -> {
+                                RenderSendTabContent()
+                            }
 
-                        ShareTab.RECEIVE -> {
+                            ShareTab.RECEIVE -> {
                             IosSwipeBackContainer(
                                 enabled = interactiveBackHandler,
                                 onBack = { selectedTab = ShareTab.SEND },
@@ -526,6 +543,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                             }
                         }
                     }
+                    }
                 }
             }
 
@@ -590,6 +608,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                     ) {
                         SettingsScreen(
                             currentDisplayName = displayName,
+                            syncDeviceNameWithAccount = syncDeviceNameWithAccount,
                             visibilityMode = visibilityMode,
                             visibilityRemainingSeconds = visibilityRemainingSeconds,
                             defaultVisibilityMode = defaultVisibilityMode,
@@ -608,6 +627,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                             receivedFilesTotalBytes = totalReceivedBytes,
                             savedDevicesCount = savedDevices.size,
                             onUpdateDisplayName = { viewModel.updateDisplayName(it) },
+                            onToggleSyncDeviceNameWithAccount = { viewModel.setSyncDeviceNameWithAccount(it) },
                             onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
                             onSelectDefaultVisibilityMode = { viewModel.setDefaultVisibilityMode(it) },
                             onToggleConfirmIncomingConnection = { viewModel.setConfirmIncomingConnection(it) },
@@ -641,6 +661,62 @@ fun ShareApp(viewModel: ShareViewModel) {
                                     ).show()
                                 }
                             },
+                            onOpenAboutApp = {
+                                navController.navigate(ShareRoutes.ABOUT_APP) { launchSingleTop = true }
+                            },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                }
+
+                composable(ShareRoutes.ABOUT_APP) {
+                    val totalReceivedBytes = remember(receivedFiles) { receivedFiles.sumOf { it.sizeBytes } }
+                    IosSwipeBackContainer(
+                        enabled = true,
+                        onBack = { navController.popBackStack() },
+                        previousContent = {
+                            SettingsScreen(
+                                currentDisplayName = displayName,
+                                syncDeviceNameWithAccount = syncDeviceNameWithAccount,
+                                visibilityMode = visibilityMode,
+                                visibilityRemainingSeconds = visibilityRemainingSeconds,
+                                defaultVisibilityMode = defaultVisibilityMode,
+                                confirmIncomingConnection = confirmIncomingConnection,
+                                backgroundConnectionDialog = backgroundConnectionDialog,
+                                autoSaveToDownloads = autoSaveToDownloads,
+                                soundVibrationEnabled = soundVibrationEnabled,
+                                bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
+                                isBleSupported = isBleSupported,
+                                isNfcSupported = isNfcSupported,
+                                isNfcEnabled = isNfcEnabled,
+                                themeMode = themeMode,
+                                reduceTransparency = reduceTransparency,
+                                liquidGlassEnabled = liquidGlassEnabled,
+                                receivedFilesCount = receivedFiles.size,
+                                receivedFilesTotalBytes = totalReceivedBytes,
+                                savedDevicesCount = savedDevices.size,
+                                onUpdateDisplayName = {},
+                                onToggleSyncDeviceNameWithAccount = {},
+                                onSelectVisibilityMode = {},
+                                onSelectDefaultVisibilityMode = {},
+                                onToggleConfirmIncomingConnection = {},
+                                onToggleBackgroundConnectionDialog = {},
+                                onToggleAutoSaveToDownloads = {},
+                                onToggleSoundVibration = {},
+                                onToggleBleFastDiscovery = {},
+                                onSelectThemeMode = {},
+                                onToggleReduceTransparency = {},
+                                onToggleLiquidGlass = {},
+                                onOpenNfcSettings = {},
+                                onOpenReceivedFiles = {},
+                                onClearTempStagingCache = {},
+                                onClearSavedDevices = {},
+                                onOpenAboutApp = {},
+                                onBack = {},
+                            )
+                        },
+                    ) {
+                        AboutAppScreen(
                             onBack = { navController.popBackStack() },
                         )
                     }

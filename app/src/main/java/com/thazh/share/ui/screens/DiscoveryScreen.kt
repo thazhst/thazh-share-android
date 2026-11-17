@@ -585,20 +585,16 @@ private fun QuickSendActionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.discover_quick_actions_title),
+                    style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
+                    color = colors.content,
+                )
+                if (pendingCount > 0) {
                     Text(
-                        text = stringResource(R.string.discover_quick_actions_title),
-                        style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
-                        color = colors.content,
-                    )
-                    Text(
-                        text = if (pendingCount > 0) {
-                            stringResource(R.string.discover_pending_files_title, pendingCount)
-                        } else {
-                            stringResource(R.string.discover_quick_actions_subtitle)
-                        },
-                        style = GlasmioTheme.textStyles.caption1,
-                        color = if (pendingCount > 0) semantic.accentBlue else colors.secondaryContent,
+                        text = stringResource(R.string.discover_pending_files_title, pendingCount),
+                        style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                        color = semantic.accentBlue,
                     )
                 }
             }

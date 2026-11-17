@@ -1,107 +1,138 @@
-# P2P Chat WiFi Direct
+# Thazh Share (`com.thazh.share`)
 
-Ứng dụng nhắn tin thời gian thực ngang hàng (peer-to-peer) qua WiFi Direct, không cần internet hay máy chủ trung gian. Viết bằng Kotlin + Jetpack Compose.
+Ứng dụng chia sẻ tệp ngang hàng (Peer-to-Peer) tốc độ cao qua **Wi-Fi Direct**, **Bluetooth BLE**, **NFC HCE** và **Chia sẻ qua liên kết đám mây (Catbox.moe)** dành cho Android, được thiết kế với hệ thống giao diện thủy tinh lỏng **Glasmio (Liquid Glass)** hỗ trợ đầy đủ chế độ Sáng / Tối.
 
-## Tính năng
+## Tính năng nổi bật
 
-- **Kết nối trực tiếp qua WiFi Direct** — tìm và kết nối với thiết bị Android khác gần đó, không cần mạng WiFi chung hay dữ liệu di động.
-- **Đổi tên hiển thị** — đặt tên bạn muốn đối phương nhìn thấy.
-- **Trạng thái kết nối theo thời gian thực** — 5 mức: Mạnh, Trung bình, Yếu, Kém, Mất kết nối — đo bằng ping/pong định kỳ qua socket đang hoạt động.
-- **Truyền tệp** — ảnh, video, ghi âm giọng nói, và tệp bất kỳ, truyền theo từng đoạn (chunk) trực tiếp qua socket, có thanh tiến trình và nút thử lại khi gửi thất bại.
-- **Lưu thiết bị đã trò chuyện** — tự động lưu lại thiết bị sau khi kết nối thành công để kết nối lại nhanh, có thể đổi tên gợi nhớ hoặc xóa khỏi danh sách.
-- **Tab Truyền tệp (P2P qua WiFi Direct)** — thanh điều hướng dưới có hai tab: *Nhắn tin* và *Truyền tệp*. Tab Truyền tệp dùng cùng danh sách thiết bị và cùng kết nối với tab Nhắn tin, nhưng sau khi kết nối sẽ mở màn hình gửi/nhận tệp thay vì khung chat: chọn nhiều tệp (hoặc ảnh/video) để gửi, các tệp được xếp hàng và gửi lần lượt, hiển thị tiến trình, tốc độ, thời gian còn lại, hủy hoặc gửi lại từng tệp.
-- **Quản lý tệp đã nhận** — màn hình riêng (mở từ biểu tượng thư mục trên tab Truyền tệp, hoặc bằng cách chạm vào thông báo "Đã nhận tệp mới") liệt kê mọi tệp nhận qua tab Truyền tệp: tìm kiếm, lọc theo loại (ảnh, video, âm thanh, tài liệu, tệp nén, ứng dụng), sắp xếp, chọn nhiều tệp (nhấn giữ), mở, chia sẻ, lưu vào thư mục *Tải xuống/DirectChat*, đổi tên, xem chi tiết và xóa.
+- **Radar không gian 2D không viền (Send & Receive)** — Quét trực quan các thiết bị xung quanh theo khoảng cách thời gian thực, chạm trực tiếp vào nút thiết bị trên Radar để kết nối và gửi tệp ngay.
+- **3 chế độ hiển thị thiết bị & Phím tắt Control Center (Quick Settings Tile)**:
+  - **Ẩn (`HIDDEN`)**, **Tìm thấy trong 10 phút (`TEMPORARY_10_MIN`)** (kèm đồng hồ đếm ngược tự động ẩn), và **Luôn cho phép tìm thấy (`ALWAYS_VISIBLE`)**.
+  - Hỗ trợ thêm phím tắt **Thazh Share** trực tiếp vào **Control Center (Quick Settings)** của Android chỉ với 1 chạm ngay trong ứng dụng để chuyển đổi nhanh trạng thái hiển thị mọi lúc.
+- **Hộp thoại xác nhận kết nối khi đang dùng ứng dụng khác** — Khi vẫn bật trạng thái hiển thị của thiết bị trong Thazh Share và đang mở ứng dụng khác, nếu có người gửi tệp tới, hệ thống hiển thị hộp thoại xác nhận nổi (`IncomingConnectionActivity`) cho phép **Chấp nhận**, **Nhận & mở ứng dụng** hoặc **Từ chối**.
+- **Chạm để kết nối qua NFC HCE & Phát hiện nhanh qua BLE** — Đặt mặt lưng hai máy chạm nhau để tự động trao đổi định danh và bắt tay Wi-Fi Direct tức thì; BLE giúp phát hiện thiết bị gần đó và đo khoảng cách ước tính theo mét.
+- **Chia sẻ qua liên kết (Catbox.moe + Litterbox)** — Tải tệp lên đám mây tạo liên kết trực tiếp kèm mã QR (hỗ trợ lưu vĩnh viễn hoặc tự hủy sau 1h / 12h / 24h / 72h). Không bắt buộc đăng nhập; nếu đăng nhập bằng Google (`CredentialManager`), lịch sử liên kết sẽ tự động đồng bộ qua **Cloud Firestore**.
+- **Màn hình Chào mừng & Chuẩn bị cấp quyền theo từng bước** — Mở đầu bằng trang **Chào mừng** cùng nút **Bắt đầu**, tiếp nối bởi 3 trang **Chuẩn bị** riêng biệt cho từng nhóm quyền (Thiết bị Wi-Fi lân cận, Bluetooth BLE, Thông báo) kèm giải thích ngắn gọn tại sao cần quyền đó.
+- **Vuốt cạnh trái để quay lại kiểu iOS (`IosSwipeBackContainer`)** — Vuốt từ mép trái qua phải để đóng các trang phụ mượt mà.
+- **Quản lý tệp đã nhận** — Tìm kiếm, lọc theo danh mục (Ảnh, Video, Âm thanh, Tài liệu, Tệp nén, APK), sắp xếp, lưu vào `Tải xuống/Thazh Share`, đổi tên hoặc gửi tiếp qua Wi-Fi Direct.
 
-## Kiến trúc
+## Kiến trúc thư mục
 
+```text
+app/src/main/java/com/thazh/share/
+├── auth/            Đăng nhập Google qua Jetpack Credential Manager + Firebase Auth
+├── data/            Mô hình dữ liệu, DataStore Preferences, ReceivedFilesRepository, SharedLinkRepository (Firestore)
+├── network/         WifiDirectManager, BleDiscoveryManager, NfcConnectionManager, SocketFrameCodec, CatboxUploader
+├── service/         WifiDirectService (Foreground Service), ShareNfcHceService (NFC HCE), ShareQuickSettingsTileService (Control Center Tile)
+├── ui/              ShareViewModel + điều hướng Glasmio Compose
+│   ├── components/  InteractiveRadarCard (không viền), VisibilitySelector, NfcTapCard, IosSwipeBackContainer, ...
+│   ├── screens/     PermissionScreen (Chào mừng + Chuẩn bị từng bước), DiscoveryScreen, ReceiveScreen, LinkShareScreen, ReceivedFilesScreen, SettingsScreen
+│   └── theme/       ThazhShareTheme (Light / Dark / System), ThazhIcons (SF Symbols)
+└── util/            PermissionUtils, FileActions, FormatUtils, BackgroundOptimizationHelper
 ```
-app/src/main/java/com/p2pchat/wifidirect/
-├── data/           Mô hình dữ liệu + lưu trữ (DataStore, JSON lịch sử chat)
-├── network/         Lớp WiFi Direct + giao thức socket + truyền tệp
-├── service/         Foreground Service điều phối toàn bộ kết nối
-├── ui/               ViewModel + điều hướng Compose
-│   ├── components/   Các thành phần UI dùng lại được
-│   ├── screens/      Màn hình: khám phá, chat, truyền tệp, tệp đã nhận, cài đặt, quyền
-│   └── theme/        Màu sắc, kiểu chữ, Material 3 theme
-└── util/             Định dạng, xử lý quyền
+
+---
+
+## Hướng dẫn Setup Keystore để Build Release cố định SHA-1 & SHA-256
+
+### 1. Tại sao SHA-1 và SHA-256 bị đổi nếu không cố định Keystore?
+Trên Android, mã băm **SHA-1** và **SHA-256** của bản APK/AAB phụ thuộc hoàn toàn vào tệp **Keystore (`.keystore` / `.jks`)** dùng để ký ứng dụng:
+- Nếu mỗi lần build (trên máy mới, container mới hoặc GitHub Actions) bạn chạy lại lệnh `keytool -genkeypair`, một cặp khóa RSA mới sẽ được sinh ra -> **SHA-1 và SHA-256 sẽ bị thay đổi hoàn toàn**.
+- Khi SHA-1 / SHA-256 bị đổi:
+  1. Thiết bị đã cài bản cũ sẽ báo lỗi `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (không thể cài đè bản cập nhật).
+  2. **Google Sign-In (`CredentialManager`)** và **Firebase Authentication / Firestore** sẽ từ chối xác thực vì chứng chỉ APK không khớp với SHA-1 / SHA-256 đã đăng ký trong `google-services.json`.
+
+Để **mỗi lần build release đều giữ nguyên đúng 1 mã SHA-1 và SHA-256 duy nhất**, bạn chỉ cần **tạo tệp keystore đúng 1 lần duy nhất** và tái sử dụng đúng tệp đó cho mọi lần build cục bộ lẫn CI/CD.
+
+---
+
+### 2. Các bước tạo và cố định Keystore cho dự án `com.thazh.share`
+
+#### Bước 1: Tạo tệp Keystore cố định (Chỉ chạy 1 lần duy nhất)
+Project hiện được cấu hình trong `app/build.gradle.kts` (`signingConfigs.release`) đọc tệp `release-debug.keystore` ở thư mục gốc của project.
+- **Cách A (Giữ nguyên tệp `release-debug.keystore` có sẵn trong repo):**
+  Nếu tệp `release-debug.keystore` đã được commit cố định trong repository và bạn **không chạy lệnh tạo lại**, thì mọi lần build cục bộ hoặc trên GitHub Actions đều sẽ luôn có **cùng một SHA-1 và SHA-256**.
+- **Cách B (Tạo Keystore riêng của bạn và ghi đè một lần duy nhất vào `release-debug.keystore`):**
+  Chạy lệnh sau tại thư mục gốc của project (chỉ chạy **1 lần duy nhất**):
+  ```bash
+  rm -f release-debug.keystore
+  keytool -genkeypair -v \
+    -keystore release-debug.keystore \
+    -alias wifidirectchat \
+    -storepass wifidirectchat \
+    -keypass wifidirectchat \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 10000 \
+    -dname "CN=Thazh Share,O=Thazh,C=VN"
+  ```
+  *(Lưu ý: Giữ nguyên `-alias wifidirectchat`, `-storepass wifidirectchat`, `-keypass wifidirectchat` để tương thích trực tiếp với cấu hình `signingConfigs.release` hiện tại trong `app/build.gradle.kts` mà không cần sửa file Gradle).*
+
+#### Bước 2: Lấy mã SHA-1 và SHA-256 cố định của Keystore
+Chạy lệnh sau để xem mã `SHA-1` và `SHA-256` của tệp `release-debug.keystore`:
+```bash
+keytool -list -v \
+  -keystore release-debug.keystore \
+  -alias wifidirectchat \
+  -storepass wifidirectchat
+```
+Kết quả sẽ hiển thị trong mục **Certificate fingerprints**:
+```text
+Certificate fingerprints:
+     SHA1:   XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX
+     SHA256: YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY
+```
+Ngoài ra, bạn cũng nên lấy thêm `SHA-1` và `SHA-256` của `debug.keystore` nếu muốn test bản Debug:
+```bash
+keytool -list -v \
+  -keystore debug.keystore \
+  -alias androiddebugkey \
+  -storepass android
 ```
 
-**Luồng kết nối:** `WifiDirectManager` bọc quanh `android.net.wifi.p2p.WifiP2pManager` của hệ thống để khám phá và thương lượng nhóm P2P. Khi nhóm hình thành, `WifiDirectService` mở một socket TCP ứng dụng (cổng `8988`) trên subnet mà WiFi Direct gán — chủ nhóm (`group owner`) lắng nghe trên tất cả giao diện cục bộ (`0.0.0.0`), phía còn lại tự dò địa chỉ chủ nhóm bằng cách đọc giao diện mạng `p2p*` của chính thiết bị (dự phòng về `192.168.49.1` nếu không dò được — đây là subnet mặc định phổ biến của WiFi Direct trên Android). Giao thức khung tin (`Frame` trong `Protocol.kt`) là JSON có tiền tố độ dài, gửi qua `SocketFrameCodec`; tệp lớn được chia thành các đoạn 64KB gửi dưới dạng byte thô (không bọc JSON) để tránh phình dung lượng do base64.
+#### Bước 3: Thêm SHA-1 và SHA-256 vào Firebase Console
+Để tính năng đăng nhập Google (`CredentialManager`) hoạt động trên bản Release:
+1. Mở [Firebase Console](https://console.firebase.google.com/) -> chọn dự án của bạn.
+2. Vào **Project Settings (Cài đặt dự án)** -> tab **General (Chung)** -> cuộn xuống phần **Your apps** -> chọn ứng dụng Android **`com.thazh.share`**.
+3. Nhấn **Add fingerprint (Thêm dấu vân tay)** và dán lần lượt cả mã **SHA-1** và **SHA-256** vừa lấy ở Bước 2 vào.
+4. Tải lại tệp **`google-services.json`** mới nhất và đặt đè vào `app/google-services.json`.
 
-### Tab Truyền tệp & tệp đã nhận
+#### Bước 4: Đảm bảo CI/CD (GitHub Actions) luôn dùng đúng Keystore này
+Có 2 cách để GitHub Actions luôn ký APK bằng đúng Keystore cố định của bạn:
+1. **Commit trực tiếp `release-debug.keystore` vào Git (Mặc định):**
+   Chỉ cần commit tệp `release-debug.keystore` vào nhánh `main` và không bao giờ xóa/tạo lại tệp này.
+2. **Lưu trong GitHub Secrets (`RELEASE_KEYSTORE_BASE64`) — Bảo mật cao hơn:**
+   - Mã hóa tệp keystore sang chuỗi Base64:
+     ```bash
+     base64 -w 0 release-debug.keystore
+     # (Trên macOS dùng: base64 -i release-debug.keystore | tr -d '\n')
+     ```
+   - Vào kho GitHub của bạn -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**:
+     - Name: `RELEASE_KEYSTORE_BASE64`
+     - Secret: *(Dán chuỗi Base64 vừa copy)*
+   - Workflow `.github/workflows/build.yml` đã được tích hợp sẵn bước tự động giải mã `RELEASE_KEYSTORE_BASE64` ra `release-debug.keystore` trước khi chạy `./gradlew assembleRelease`. Nhờ đó mọi bản build từ GitHub Actions sẽ luôn giữ cố định 100% mã **SHA-1** và **SHA-256**.
 
-Hai tab dùng **chung một kết nối WiFi Direct** (nhóm P2P và socket do `WifiDirectService` giữ), nên nhắn tin và truyền tệp chạy song song trên cùng một đường truyền. Điểm khác nhau là cách xử lý tệp nhận được:
+#### Bước 5: Tự động tạo lại tệp `app/google-services.json` từ GitHub Secret
+Workflow `.github/workflows/build.yml` hỗ trợ tự động khôi phục tệp `app/google-services.json` từ **GitHub Secrets** trong mỗi lần chạy CI/CD (hỗ trợ cả định dạng JSON thuần và chuỗi Base64):
+1. Vào kho GitHub của bạn -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**.
+2. Tạo một trong hai Secret sau:
+   - **Cách 1 (Dán trực tiếp nội dung JSON):**
+     - Name: `GOOGLE_SERVICES_JSON`
+     - Secret: *(Dán toàn bộ nội dung tệp `app/google-services.json` hoặc chuỗi Base64 của tệp)*
+   - **Cách 2 (Mã hóa Base64):**
+     - Chạy lệnh: `base64 -w 0 app/google-services.json` (hoặc trên macOS: `base64 -i app/google-services.json | tr -d '\n'`)
+     - Name: `GOOGLE_SERVICES_JSON_BASE64`
+     - Secret: *(Dán chuỗi Base64 vừa copy)*
+3. Khi GitHub Actions chạy, bước `Restore google-services.json from GitHub Secret` sẽ tự động tạo lại `app/google-services.json` trước khi biên dịch APK Debug và Release.
 
-- `Frame.FileOffer` có thêm trường `channel` (`CHAT` mặc định, hoặc `TRANSFER`). Tệp thuộc kênh `TRANSFER` được ghi vào thư mục riêng `files/received_files/` thay vì hiện thành bong bóng chat. Bản cũ không biết trường này vẫn tương thích: sẽ coi tệp là đính kèm chat.
-- Dữ liệu đang nhận được ghi tạm vào `received_files/.incoming/` và chỉ được chuyển sang thư mục chính khi nhận đủ đoạn cuối, nên tệp dở dang không bao giờ xuất hiện như một tệp hoàn chỉnh. Khi kết nối bị ngắt giữa chừng, tệp dở bị xóa và các dòng đang chạy được đánh dấu thất bại (có thể gửi lại).
-- Hủy hai chiều qua `Frame.FileAck(success = false, cancelled = true)`: bên gửi hoặc bên nhận bấm hủy đều khiến phía kia dừng ngay (không tiếp tục đẩy dữ liệu, hoặc xóa tệp dở).
-- `ReceivedFilesRepository` giữ chỉ mục JSON (`received_files_index.json`) mô tả từng tệp (ai gửi, khi nào, đã xem chưa). Khi khởi động, chỉ mục được đối chiếu với thư mục: bỏ mục có tệp đã mất và nhận lại các tệp chưa có mục.
-- Tên tệp do thiết bị kia gửi được làm sạch (`FileNameUtils`) trước khi tạo tệp, để một tên như `../../x` không thể ghi ra ngoài thư mục nhận.
+---
 
-## Yêu cầu
-
-- Android Studio Koala trở lên (hoặc chỉ cần JDK 17 + Android SDK nếu build bằng dòng lệnh)
-- Hai thiết bị Android thật chạy Android 8.0 (API 26) trở lên có hỗ trợ WiFi Direct — WiFi Direct **không hoạt động trên trình giả lập** vì cần phần cứng WiFi thật.
-
-## Build
-
-### Bằng GitHub Actions (khuyến nghị)
-
-Mọi lần push hoặc tạo pull request vào nhánh `main`/`master` sẽ tự động kích hoạt workflow tại `.github/workflows/build-apk.yml`, build cả bản debug lẫn bản release đã ký, rồi tải lên dưới dạng artifact của lần chạy đó (vào **Actions → chọn lần chạy → Artifacts**). Cũng có thể kích hoạt thủ công qua tab **Actions → Build APK → Run workflow**.
-
-Muốn đính kèm APK trực tiếp vào một GitHub Release, chỉ cần tạo tag bắt đầu bằng `v` rồi đẩy lên:
+## Lệnh Build
 
 ```bash
-git tag v1.0.0
-git push --tags
+./gradlew assembleDebug      # Build APK Debug
+./gradlew assembleRelease    # Build APK Release (đã ký bằng release-debug.keystore)
 ```
 
-### Build cục bộ
-
-```bash
-./gradlew assembleDebug      # APK debug, cài trực tiếp lên thiết bị test
-./gradlew assembleRelease    # APK release đã ký, dùng cấu hình ký sẵn trong repo
-```
-
-APK xuất ra tại `app/build/outputs/apk/{debug,release}/`.
-
-> **Lưu ý về gradle-wrapper.jar:** repo này chứa `gradlew`/`gradlew.bat` chuẩn, nhưng do môi trường tạo ra dự án không có quyền truy cập mạng để tải file nhị phân `gradle-wrapper.jar` chính chủ từ máy chủ Gradle, workflow CI tự tái tạo file này từ một bản cài Gradle 8.7 đã xác thực trước mỗi lần build (bước "Regenerate Gradle wrapper..."). Nếu bạn build cục bộ lần đầu và gặp lỗi liên quan đến wrapper, hãy chạy (khi máy đã cài Gradle 8.7 trở lên):
-> ```bash
-> gradle wrapper --gradle-version 8.7 --distribution-type bin
-> ```
-> để tái tạo lại các file wrapper trước khi chạy `./gradlew`.
-
-## Ký ứng dụng (signing)
-
-Repo này cố tình đính kèm sẵn `release-debug.keystore` — một keystore tự ký, mật khẩu công khai (`wifidirectchat`/`wifidirectchat`) — để CI có thể build ra bản release **cài đặt được** mà không cần thiết lập secrets. Điều này phù hợp để build thử nghiệm, chia sẻ nội bộ, hoặc học tập.
-
-**Không dùng keystore này để phát hành lên Play Store hoặc phân phối rộng rãi.** Trước khi phát hành thật, hãy tạo keystore riêng và mật khẩu bí mật:
-
-```bash
-keytool -genkeypair -v -keystore your-release.keystore -alias your-alias \
-  -keyalg RSA -keysize 2048 -validity 10000
-```
-
-rồi cập nhật khối `signingConfigs` trong `app/build.gradle.kts` để đọc mật khẩu từ biến môi trường hoặc GitHub Secrets thay vì hard-code.
-
-## Quyền cần thiết
-
-| Quyền | Lý do |
-|---|---|
-| Vị trí (`ACCESS_FINE_LOCATION`) — Android ≤ 12 | Android yêu cầu bắt buộc để quét WiFi Direct, dù ứng dụng không dùng GPS |
-| Thiết bị WiFi lân cận (`NEARBY_WIFI_DEVICES`) — Android 13+ | Thay thế quyền vị trí cho việc quét/kết nối WiFi Direct, khai báo `neverForLocation` vì ứng dụng không suy ra vị trí thực |
-| Máy ảnh, micro | Chỉ dùng khi người dùng chủ động chụp ảnh/quay video/ghi âm để gửi |
-| Thông báo | Hiển thị trạng thái kết nối đang chạy nền (foreground service) |
-
-## Giới hạn đã biết
-
-- WiFi Direct **không hoạt động trên trình giả lập (emulator)** — cần thiết bị thật.
-- Chỉ hỗ trợ kết nối **1-1** (một cặp thiết bị mỗi lần), đúng theo giới hạn nhóm WiFi Direct của Android khi dùng ở chế độ đơn giản này.
-- Lịch sử trò chuyện chỉ lưu **cục bộ trên từng thiết bị**, không đồng bộ qua tài khoản hay nhiều thiết bị.
-- Tệp nhận qua tab Truyền tệp được **tự động nhận** (không hỏi xác nhận từng tệp) và nằm trong bộ nhớ riêng của ứng dụng; dùng *Lưu vào Tải xuống* hoặc *Chia sẻ* trong màn hình Tệp đã nhận để đưa ra ngoài. Tệp nhận qua khung chat vẫn nằm trong cuộc trò chuyện như trước và không hiển thị trong màn hình Tệp đã nhận.
-- Lưu vào *Tải xuống* trên Android 8–9 cần cấp quyền lưu trữ (hỏi khi cần); từ Android 10 không cần quyền.
-- Đây là dự án tham khảo/khởi điểm — trước khi dùng cho mục đích nghiêm túc, nên bổ sung kiểm thử tự động (unit test, instrumentation test) mà bản hiện tại chưa có.
-
-## Giấy phép
-
-Chưa chỉ định — thêm file `LICENSE` phù hợp với mục đích sử dụng của bạn trước khi công khai hoặc phân phối.
+APK sau khi build nằm tại:
+- Debug: `app/build/outputs/apk/debug/app-debug.apk`
+- Release: `app/build/outputs/apk/release/app-release.apk`

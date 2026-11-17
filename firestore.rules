@@ -21,6 +21,21 @@ service cloud.firestore {
         && url.matches('^https://(files\\.catbox\\.moe|litter\\.catbox\\.moe)/[A-Za-z0-9._\\-]+$');
     }
 
+    function isValidUserProfile(data, userId) {
+      let allowedKeys = [
+        'userId',
+        'deviceName',
+        'email',
+        'updatedAt'
+      ];
+      return data.keys().hasAll(allowedKeys)
+        && data.keys().hasOnly(allowedKeys)
+        && data.userId is string && data.userId == userId
+        && data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 100
+        && data.email is string && data.email.size() <= 255
+        && data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
     function isValidSharedLink(data, userId) {
       let allowedKeys = [
         'userId',
@@ -48,17 +63,24 @@ service cloud.firestore {
         && data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
 
-    match /users/{userId}/shared_links/{linkId} {
+    match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId)
-        && isValidId(linkId)
-        && isValidSharedLink(request.resource.data, userId);
-      allow update: if isOwner(userId)
-        && isValidSharedLink(request.resource.data, userId)
-        && request.resource.data.userId == resource.data.userId
-        && request.resource.data.url == resource.data.url
-        && request.resource.data.createdAt == resource.data.createdAt;
+      allow create, update: if isOwner(userId)
+        && isValidUserProfile(request.resource.data, userId);
       allow delete: if isOwner(userId);
+
+      match /shared_links/{linkId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidId(linkId)
+          && isValidSharedLink(request.resource.data, userId);
+        allow update: if isOwner(userId)
+          && isValidSharedLink(request.resource.data, userId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.url == resource.data.url
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
     }
   }
 }

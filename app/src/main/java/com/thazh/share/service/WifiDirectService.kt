@@ -219,6 +219,11 @@ class WifiDirectService : Service() {
                 }
             }
             ACTION_DECLINE_INCOMING -> declineIncomingConnection()
+            ACTION_SET_VISIBILITY_FROM_TILE -> {
+                val modeKey = intent.getStringExtra(EXTRA_VISIBILITY_MODE)
+                val targetMode = DeviceVisibilityMode.fromStorageKey(modeKey)
+                setVisibilityMode(targetMode)
+            }
         }
         return START_NOT_STICKY
     }
@@ -229,6 +234,11 @@ class WifiDirectService : Service() {
     }
 
     override fun onDestroy() {
+        ShareQuickSettingsTileService.notifyVisibilityChanged(
+            context = applicationContext,
+            mode = _visibilityMode.value,
+            running = false,
+        )
         tearDownActiveConnection()
         visibilityTimerJob?.cancel()
         incomingRequestTimeoutJob?.cancel()
@@ -274,6 +284,11 @@ class WifiDirectService : Service() {
     fun setVisibilityMode(mode: DeviceVisibilityMode) {
         visibilityTimerJob?.cancel()
         _visibilityMode.value = mode
+        ShareQuickSettingsTileService.notifyVisibilityChanged(
+            context = applicationContext,
+            mode = mode,
+            running = true,
+        )
 
         when (mode) {
             DeviceVisibilityMode.HIDDEN -> {
@@ -1387,6 +1402,8 @@ class WifiDirectService : Service() {
         private const val INCOMING_REQUEST_TIMEOUT_MS = 60_000L
         const val ACTION_ACCEPT_INCOMING = "com.thazh.share.action.ACCEPT_INCOMING"
         const val ACTION_DECLINE_INCOMING = "com.thazh.share.action.DECLINE_INCOMING"
+        const val ACTION_SET_VISIBILITY_FROM_TILE = "com.thazh.share.action.SET_VISIBILITY_FROM_TILE"
+        const val EXTRA_VISIBILITY_MODE = "com.thazh.share.extra.VISIBILITY_MODE"
         const val WILDCARD_BIND_ADDRESS = "0.0.0.0"
         const val DEFAULT_GROUP_OWNER_IP = "192.168.49.1"
 

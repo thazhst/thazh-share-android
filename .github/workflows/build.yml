@@ -70,8 +70,39 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      - name: Sanity-check release keystore is present
+      - name: Restore google-services.json from GitHub Secret
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
+          mkdir -p app
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            TRIMMED=$(printf '%s' "$GOOGLE_SERVICES_JSON" | sed -e 's/^[[:space:]]*//')
+            if printf '%s' "$TRIMMED" | grep -q '^{'; then
+              printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+              echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON secret (raw JSON)."
+            else
+              printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+              echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON secret (Base64)."
+            fi
+          elif [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+            echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON_BASE64 secret."
+          fi
+          if [ ! -f app/google-services.json ]; then
+            echo "::error::app/google-services.json is missing. Add GOOGLE_SERVICES_JSON (or GOOGLE_SERVICES_JSON_BASE64) in GitHub Secrets."
+            exit 1
+          fi
+          echo "app/google-services.json is present."
+
+      - name: Restore or sanity-check release keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-debug.keystore
+            echo "Restored persistent release keystore from RELEASE_KEYSTORE_BASE64 secret."
+          fi
           if [ ! -f release-debug.keystore ]; then
             echo "::error::release-debug.keystore is missing from the repository root."
             exit 1
@@ -115,7 +146,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: directchat-debug
+          name: thazh-share-debug
           path: ${{ steps.outputs.outputs.debug_apk }}
           if-no-files-found: error
           retention-days: 30
@@ -123,7 +154,7 @@ jobs:
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: directchat-release
+          name: thazh-share-release
           path: ${{ steps.outputs.outputs.release_apk }}
           if-no-files-found: error
           retention-days: 30
@@ -174,6 +205,38 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
+
+      - name: Restore google-services.json from GitHub Secret
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          mkdir -p app
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            TRIMMED=$(printf '%s' "$GOOGLE_SERVICES_JSON" | sed -e 's/^[[:space:]]*//')
+            if printf '%s' "$TRIMMED" | grep -q '^{'; then
+              printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+              echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON secret (raw JSON)."
+            else
+              printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+              echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON secret (Base64)."
+            fi
+          elif [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+            echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON_BASE64 secret."
+          fi
+          if [ ! -f app/google-services.json ]; then
+            echo "::error::app/google-services.json is missing. Add GOOGLE_SERVICES_JSON (or GOOGLE_SERVICES_JSON_BASE64) in GitHub Secrets."
+            exit 1
+          fi
+
+      - name: Restore persistent release keystore (if configured)
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-debug.keystore
+          fi
 
       - name: Build release APK (signed)
         run: ./gradlew assembleRelease --stacktrace

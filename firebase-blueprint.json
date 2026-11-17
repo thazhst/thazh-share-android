@@ -1,5 +1,35 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Per-user profile storing the synced device display name and account metadata.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the authenticated user."
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "The synced device display name for Thazh Share."
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional email address of the authenticated user."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the synced device name was last updated."
+        }
+      },
+      "required": [
+        "userId",
+        "deviceName",
+        "email",
+        "updatedAt"
+      ]
+    },
     "SharedLink": {
       "title": "SharedLink",
       "description": "A file uploaded to Catbox.moe / Litterbox and saved to the user's cloud link-sharing history.",
@@ -63,6 +93,12 @@
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Per-user profile document for syncing device display name with the signed-in account."
+    },
     "/users/{userId}/shared_links/{linkId}": {
       "schema": {
         "$ref": "#/entities/SharedLink"

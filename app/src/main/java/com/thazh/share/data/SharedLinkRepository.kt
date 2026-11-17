@@ -140,6 +140,58 @@ class SharedLinkRepository(private val db: FirebaseFirestore) {
         }
     }
 
+    fun observeSyncedDeviceName(userId: String): Flow<String?> = callbackFlow {
+        val path = "users/$userId"
+        val subscription = db.collection("users")
+            .document(userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.GET, path)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val syncedName = if (snapshot.exists()) {
+                        snapshot.getString("deviceName")?.trim()?.takeIf { it.isNotEmpty() }
+                    } else {
+                        null
+                    }
+                    trySend(syncedName)
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    suspend fun saveSyncedDeviceName(
+        userId: String,
+        deviceName: String,
+        email: String,
+    ): Result<Unit> {
+        val trimmedName = deviceName.trim().take(100)
+        if (userId.isBlank() || trimmedName.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Invalid userId or deviceName"))
+        }
+        val path = "users/$userId"
+        val payload = hashMapOf(
+            "userId" to userId,
+            "deviceName" to trimmedName,
+            "email" to email.trim().take(255),
+            "updatedAt" to FieldValue.serverTimestamp(),
+        )
+        return try {
+            db.collection("users")
+                .document(userId)
+                .set(payload)
+                .await()
+            Result.success(Unit)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, path)
+            Result.failure(e)
+        }
+    }
+
     companion object {
         fun create(context: Context): SharedLinkRepository {
             val databaseId = context.getString(R.string.firestore_database_id)

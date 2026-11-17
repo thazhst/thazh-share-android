@@ -217,16 +217,6 @@ fun VisibilitySelectorCard(
                     )
                 }
             }
-
-            Text(
-                text = when (mode) {
-                    DeviceVisibilityMode.HIDDEN -> stringResource(R.string.visibility_desc_hidden)
-                    DeviceVisibilityMode.TEMPORARY_10_MIN -> stringResource(R.string.visibility_desc_10min, formattedTimer)
-                    DeviceVisibilityMode.ALWAYS_VISIBLE -> stringResource(R.string.visibility_desc_always)
-                },
-                style = GlasmioTheme.textStyles.footnote,
-                color = colors.secondaryContent,
-            )
         }
     }
 }

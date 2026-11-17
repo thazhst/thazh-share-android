@@ -3,44 +3,79 @@ package com.thazh.share.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kyant.capsule.ContinuousCapsule
 import com.thazh.share.R
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
+import com.thazh.share.util.OnboardingPermissionStep
 import com.thazh.share.util.PermissionUtils
 import io.github.neoruaa.glasmio.core.GlasmioTheme
 import io.github.neoruaa.glasmio.glass.GlassEmphasis
@@ -48,6 +83,7 @@ import io.github.neoruaa.glasmio.icons.SfIcon
 import io.github.neoruaa.glasmio.ui.GlasmioButton
 import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
 import io.github.neoruaa.glasmio.ui.GlasmioCard
+import io.github.neoruaa.glasmio.ui.GlasmioIconButton
 
 @Composable
 fun PermissionRationaleScreen(
@@ -55,139 +91,520 @@ fun PermissionRationaleScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val colors = GlasmioTheme.colors
-    val semantic = ThazhTheme.semantic
-    var deniedOnce by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val steps = remember { PermissionUtils.allSteps() }
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-    ) {
-        if (PermissionUtils.hasAllRequiredPermissions(context)) {
-            onPermissionsGranted()
-        } else {
-            deniedOnce = true
+    // Page -1 = Welcome Screen ("Trang Chào mừng")
+    // Pages 0..steps.lastIndex = Individual Permission Preparation Pages ("Màn hình Chuẩn bị")
+    var currentPageIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var deniedOnCurrentStep by rememberSaveable { mutableStateOf(false) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(lifecycleOwner, currentPageIndex) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++
+                if (PermissionUtils.hasAllRequiredPermissions(context) && currentPageIndex >= 0) {
+                    onPermissionsGranted()
+                } else if (currentPageIndex in steps.indices) {
+                    val step = steps[currentPageIndex]
+                    if (PermissionUtils.isStepGranted(context, step)) {
+                        deniedOnCurrentStep = false
+                        if (currentPageIndex < steps.lastIndex) {
+                            currentPageIndex++
+                        } else if (PermissionUtils.hasAllRequiredPermissions(context)) {
+                            onPermissionsGranted()
+                        }
+                    }
+                }
+            }
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val pulseTransition = rememberInfiniteTransition(label = "perm_pulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "pulse",
-    )
+    BackHandler(enabled = currentPageIndex >= 0) {
+        deniedOnCurrentStep = false
+        currentPageIndex = (currentPageIndex - 1).coerceAtLeast(-1)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        val stepIndex = currentPageIndex
+        if (stepIndex !in steps.indices) return@rememberLauncherForActivityResult
+        val currentStep = steps[stepIndex]
+        val stepGranted = result.values.all { it } || PermissionUtils.isStepGranted(context, currentStep)
+        if (stepGranted) {
+            deniedOnCurrentStep = false
+            if (stepIndex < steps.lastIndex) {
+                currentPageIndex = stepIndex + 1
+            } else {
+                onPermissionsGranted()
+            }
+        } else {
+            deniedOnCurrentStep = true
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .safeDrawingPadding()
-            .padding(24.dp),
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
-        GlasmioCard(
-            modifier = Modifier
-                .widthIn(max = 460.dp)
-                .fillMaxWidth(),
+        AnimatedContent(
+            targetState = currentPageIndex,
+            transitionSpec = {
+                val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                )
+                if (targetState > initialState) {
+                    (slideInHorizontally(springSpec) { width -> width / 3 } + fadeIn(tween(220)) + scaleIn(initialScale = 0.96f)) togetherWith
+                        (slideOutHorizontally(springSpec) { width -> -width / 3 } + fadeOut(tween(180)))
+                } else {
+                    (slideInHorizontally(springSpec) { width -> -width / 3 } + fadeIn(tween(220)) + scaleIn(initialScale = 0.96f)) togetherWith
+                        (slideOutHorizontally(springSpec) { width -> width / 3 } + fadeOut(tween(180)))
+                }
+            },
+            label = "onboarding_page_transition",
+        ) { pageIndex ->
+            if (pageIndex < 0) {
+                WelcomeOnboardingPage(
+                    onStartClick = {
+                        deniedOnCurrentStep = false
+                        if (PermissionUtils.hasAllRequiredPermissions(context)) {
+                            onPermissionsGranted()
+                        } else {
+                            currentPageIndex = PermissionUtils.firstUngrantedStepIndex(context)
+                        }
+                    },
+                )
+            } else {
+                val step = steps[pageIndex.coerceIn(steps.indices)]
+                val isStepAlreadyGranted = remember(pageIndex, refreshTrigger) {
+                    PermissionUtils.isStepGranted(context, step)
+                }
+                PreparationPermissionPage(
+                    step = step,
+                    stepNumber = pageIndex + 1,
+                    totalSteps = steps.size,
+                    isGranted = isStepAlreadyGranted,
+                    showDeniedHint = deniedOnCurrentStep,
+                    onBackClick = {
+                        deniedOnCurrentStep = false
+                        currentPageIndex = (pageIndex - 1).coerceAtLeast(-1)
+                    },
+                    onGrantClick = {
+                        val permsToRequest = PermissionUtils.permissionsForStep(step)
+                        if (permsToRequest.isEmpty() || PermissionUtils.isStepGranted(context, step)) {
+                            deniedOnCurrentStep = false
+                            if (pageIndex < steps.lastIndex) {
+                                currentPageIndex = pageIndex + 1
+                            } else {
+                                onPermissionsGranted()
+                            }
+                        } else {
+                            permissionLauncher.launch(permsToRequest)
+                        }
+                    },
+                    onOpenSettingsClick = {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(intent)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeOnboardingPage(
+    onStartClick: () -> Unit,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+
+    val entryScale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.88f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow,
+        ),
+        label = "welcome_entry_scale",
+    )
+    val entryAlpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+        label = "welcome_entry_alpha",
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "welcome_breathing")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "welcome_pulse_scale",
+    )
+    val haloAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.16f,
+        targetValue = 0.34f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "welcome_halo_alpha",
+    )
+
+    Column(
+        modifier = Modifier
+            .widthIn(max = 420.dp)
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = entryScale
+                scaleY = entryScale
+                alpha = entryAlpha
+            }
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Animated Breathing Hero Emblem (Clean, feature-card-free Welcome page)
+        Box(
+            modifier = Modifier.size(136.dp),
+            contentAlignment = Alignment.Center,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(132.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                    }
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                semantic.accentBlue.copy(alpha = haloAlpha),
+                                semantic.accentCyan.copy(alpha = haloAlpha * 0.45f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                semantic.accentBlue.copy(alpha = if (colors.isDark) 0.32f else 0.18f),
+                                semantic.accentCyan.copy(alpha = if (colors.isDark) 0.22f else 0.12f),
+                            ),
+                        ),
+                    )
+                    .border(
+                        width = 1.2.dp,
+                        color = semantic.accentBlue.copy(alpha = 0.42f),
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                SfIcon(
+                    systemName = ThazhSymbols.WifiTethering,
+                    contentDescription = null,
+                    tint = semantic.accentBlue,
+                    size = 44.dp,
+                )
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.welcome_title),
+                style = GlasmioTheme.textStyles.largeTitle.copy(fontWeight = FontWeight.Bold),
+                color = colors.content,
+                textAlign = TextAlign.Center,
+            )
+
+            Text(
+                text = stringResource(R.string.welcome_subtitle),
+                style = GlasmioTheme.textStyles.subheadline,
+                color = colors.secondaryContent,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        GlasmioButton(
+            onClick = onStartClick,
+            emphasis = GlassEmphasis.Prominent,
+            navigationSurfaceColor = semantic.accentBlue,
+            size = GlasmioButtonSize.Large,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("welcome_start_button"),
+        ) {
+            Text(
+                text = stringResource(R.string.welcome_start_button),
+                style = GlasmioTheme.textStyles.headline,
+                color = Color.White,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            SfIcon(
+                systemName = ThazhSymbols.ChevronRight,
+                contentDescription = null,
+                tint = Color.White,
+                size = 18.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreparationPermissionPage(
+    step: OnboardingPermissionStep,
+    stepNumber: Int,
+    totalSteps: Int,
+    isGranted: Boolean,
+    showDeniedHint: Boolean,
+    onBackClick: () -> Unit,
+    onGrantClick: () -> Unit,
+    onOpenSettingsClick: () -> Unit,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+
+    val accentColor = when (step) {
+        OnboardingPermissionStep.WIFI_DIRECT -> semantic.accentBlue
+        OnboardingPermissionStep.BLUETOOTH_BLE -> semantic.accentCyan
+        OnboardingPermissionStep.NOTIFICATIONS -> semantic.accentGreen
+    }
+
+    val stepIcon = when (step) {
+        OnboardingPermissionStep.WIFI_DIRECT -> ThazhSymbols.WifiTethering
+        OnboardingPermissionStep.BLUETOOTH_BLE -> ThazhSymbols.Bluetooth
+        OnboardingPermissionStep.NOTIFICATIONS -> ThazhSymbols.NotificationsActive
+    }
+
+    val stepTitle = when (step) {
+        OnboardingPermissionStep.WIFI_DIRECT -> stringResource(R.string.prep_wifi_title)
+        OnboardingPermissionStep.BLUETOOTH_BLE -> stringResource(R.string.prep_ble_title)
+        OnboardingPermissionStep.NOTIFICATIONS -> stringResource(R.string.prep_notif_title)
+    }
+
+    val stepWhyReason = when (step) {
+        OnboardingPermissionStep.WIFI_DIRECT -> stringResource(R.string.prep_wifi_why_body)
+        OnboardingPermissionStep.BLUETOOTH_BLE -> stringResource(R.string.prep_ble_why_body)
+        OnboardingPermissionStep.NOTIFICATIONS -> stringResource(R.string.prep_notif_why_body)
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "prep_icon_pulse")
+    val iconPulse by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "prep_icon_scale",
+    )
+
+    Column(
+        modifier = Modifier
+            .widthIn(max = 420.dp)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        // Top Header with Back Button and Step Indicator Pill
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            GlasmioIconButton(
+                onClick = onBackClick,
+                modifier = Modifier.testTag("prep_back_button"),
+            ) {
+                SfIcon(
+                    systemName = ThazhSymbols.Back,
+                    contentDescription = stringResource(R.string.back),
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(ContinuousCapsule)
+                    .background(accentColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f))
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.prep_step_badge, stepNumber, totalSteps),
+                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                    color = accentColor,
+                )
+            }
+
+            Spacer(modifier = Modifier.size(40.dp))
+        }
+
+        // Animated Step Progress Dots
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            for (index in 1..totalSteps) {
+                val active = index == stepNumber
+                val completed = index < stepNumber
+                val dotWidth by animateDpAsState(
+                    targetValue = if (active) 28.dp else 8.dp,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "step_dot_width_$index",
+                )
+                Box(
+                    modifier = Modifier
+                        .height(8.dp)
+                        .width(dotWidth)
+                        .clip(ContinuousCapsule)
+                        .background(
+                            when {
+                                active -> accentColor
+                                completed -> accentColor.copy(alpha = 0.55f)
+                                else -> colors.separator.copy(alpha = 0.5f)
+                            },
+                        ),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Step Icon Circle with subtle pulse
+        Box(
+            modifier = Modifier
+                .size(84.dp)
+                .graphicsLayer {
+                    scaleX = iconPulse
+                    scaleY = iconPulse
+                }
+                .clip(CircleShape)
+                .background(accentColor.copy(alpha = if (colors.isDark) 0.24f else 0.14f))
+                .border(
+                    width = 1.dp,
+                    color = accentColor.copy(alpha = 0.4f),
+                    shape = CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            SfIcon(
+                systemName = stepIcon,
+                contentDescription = null,
+                tint = accentColor,
+                size = 38.dp,
+            )
+        }
+
+        Text(
+            text = stepTitle,
+            style = GlasmioTheme.textStyles.title1.copy(fontWeight = FontWeight.Bold),
+            color = colors.content,
+            textAlign = TextAlign.Center,
+        )
+
+        // Concise explanation card
+        GlasmioCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier = Modifier.size(116.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val center = this.center
-                        val maxR = size.minDimension / 2f
-                        for (ring in 0..1) {
-                            val phase = (pulse + ring * 0.5f) % 1f
-                            val radius = maxR * (0.42f + 0.58f * phase)
-                            val alpha = (1f - phase) * 0.35f
-                            drawCircle(
-                                color = semantic.accentBlue.copy(alpha = alpha),
-                                radius = radius,
-                                center = center,
-                                style = Stroke(width = 2.dp.toPx()),
-                            )
-                        }
-                        drawCircle(
-                            color = semantic.accentBlue.copy(alpha = 0.14f),
-                            radius = maxR * 0.44f,
-                            center = center,
-                        )
-                    }
-                    SfIcon(
-                        systemName = ThazhSymbols.WifiTethering,
-                        contentDescription = null,
-                        tint = semantic.accentBlue,
-                        size = 36.dp,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
-                    text = stringResource(R.string.permission_required_title),
-                    style = GlasmioTheme.textStyles.title1.copy(fontWeight = FontWeight.Bold),
-                    color = colors.content,
-                    textAlign = TextAlign.Center,
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = stringResource(R.string.permission_required_body),
-                    style = GlasmioTheme.textStyles.subheadline,
+                    text = stepWhyReason,
+                    style = GlasmioTheme.textStyles.body,
                     color = colors.secondaryContent,
                     textAlign = TextAlign.Center,
                 )
+            }
+        }
 
-                Spacer(modifier = Modifier.height(24.dp))
+        AnimatedVisibility(
+            visible = showDeniedHint && !isGranted,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Text(
+                text = stringResource(R.string.prep_denied_hint),
+                style = GlasmioTheme.textStyles.footnote,
+                color = semantic.warningOrange,
+                textAlign = TextAlign.Center,
+            )
+        }
 
-                GlasmioButton(
-                    onClick = {
-                        launcher.launch(PermissionUtils.requiredPermissions())
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            GlasmioButton(
+                onClick = onGrantClick,
+                emphasis = GlassEmphasis.Prominent,
+                navigationSurfaceColor = accentColor,
+                size = GlasmioButtonSize.Large,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("grant_permission_button"),
+            ) {
+                Text(
+                    text = when {
+                        isGranted && stepNumber < totalSteps -> stringResource(R.string.prep_continue_next)
+                        isGranted -> stringResource(R.string.prep_finish_button)
+                        stepNumber < totalSteps -> stringResource(R.string.prep_grant_and_continue)
+                        else -> stringResource(R.string.prep_grant_and_finish)
                     },
-                    emphasis = GlassEmphasis.Prominent,
+                    style = GlasmioTheme.textStyles.headline,
+                    color = Color.White,
+                )
+            }
+
+            AnimatedVisibility(
+                visible = showDeniedHint && !isGranted,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                GlasmioButton(
+                    onClick = onOpenSettingsClick,
+                    emphasis = GlassEmphasis.Regular,
                     size = GlasmioButtonSize.Large,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("grant_permission_button"),
+                        .testTag("open_app_settings_button"),
                 ) {
                     Text(
-                        text = stringResource(R.string.permission_grant),
+                        text = stringResource(R.string.permission_open_settings),
                         style = GlasmioTheme.textStyles.headline,
-                        color = Color.White,
+                        color = colors.accent,
                     )
-                }
-
-                if (deniedOnce) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    GlasmioButton(
-                        onClick = {
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                            context.startActivity(intent)
-                        },
-                        emphasis = GlassEmphasis.Regular,
-                        size = GlasmioButtonSize.Large,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("open_app_settings_button"),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.permission_open_settings),
-                            style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.SemiBold),
-                            color = semantic.accentBlue,
-                        )
-                    }
                 }
             }
         }

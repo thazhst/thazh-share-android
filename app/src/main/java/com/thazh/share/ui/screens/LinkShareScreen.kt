@@ -1136,7 +1136,7 @@ private fun expiryCodeToBadgeText(code: String): String = when (code) {
 
 private fun copyUrlToClipboard(context: Context, url: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-    clipboard?.setPrimaryClip(ClipData.newPlainText("Catbox Link", url))
+    clipboard?.setPrimaryClip(ClipData.newPlainText("Thazh Share Link", url))
     Toast.makeText(
         context,
         context.getString(R.string.link_share_copied_toast),

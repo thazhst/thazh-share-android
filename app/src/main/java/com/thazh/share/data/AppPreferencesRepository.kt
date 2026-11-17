@@ -29,9 +29,31 @@ class AppPreferencesRepository(private val context: Context) {
         val AUTO_SAVE_TO_DOWNLOADS = booleanPreferencesKey("auto_save_to_downloads")
         val SOUND_VIBRATION_ENABLED = booleanPreferencesKey("sound_vibration_enabled")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val SYNC_DEVICE_NAME_WITH_ACCOUNT = booleanPreferencesKey("sync_device_name_with_account")
     }
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
+
+    val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.ONBOARDING_COMPLETED] ?: false
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.ONBOARDING_COMPLETED] = completed
+        }
+    }
+
+    val syncDeviceNameWithAccount: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.SYNC_DEVICE_NAME_WITH_ACCOUNT] ?: true
+    }
+
+    suspend fun setSyncDeviceNameWithAccount(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.SYNC_DEVICE_NAME_WITH_ACCOUNT] = enabled
+        }
+    }
 
     val displayName: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[Keys.DISPLAY_NAME] ?: defaultDisplayName()

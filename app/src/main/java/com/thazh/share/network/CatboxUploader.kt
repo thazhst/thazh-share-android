@@ -128,7 +128,7 @@ object CatboxUploader {
 
             try {
                 val inputStream = context.contentResolver.openInputStream(file.uri)
-                    ?: throw IllegalStateException("Không thể mở tệp nguồn để tải lên Catbox.moe")
+                    ?: throw IllegalStateException("Không thể mở tệp nguồn để tải lên")
 
                 inputStream.use { input ->
                     BufferedOutputStream(connection.outputStream, CHUNK_SIZE).use { output ->
@@ -194,7 +194,7 @@ object CatboxUploader {
 
                 if (statusCode !in 200..299 || !responseBody.startsWith("https://")) {
                     val detail = responseBody.ifBlank { "HTTP $statusCode" }
-                    throw IllegalStateException("Catbox.moe phản hồi lỗi: $detail")
+                    throw IllegalStateException("Máy chủ phản hồi lỗi: $detail")
                 }
 
                 val nowEpoch = System.currentTimeMillis()

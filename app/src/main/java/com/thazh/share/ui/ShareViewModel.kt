@@ -100,6 +100,21 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     val themeMode: StateFlow<AppThemeMode> = app.preferencesRepository.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppThemeMode.SYSTEM)
 
+    val syncDeviceNameWithAccount: StateFlow<Boolean> = app.preferencesRepository.syncDeviceNameWithAccount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    private var accountNameSyncJob: kotlinx.coroutines.Job? = null
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val user = firebaseAuth.currentUser
+        restartAccountDeviceNameSync(user)
+    }
+
+    init {
+        runCatching {
+            FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
+        }
+    }
+
     private val _visibilityMode = MutableStateFlow(DeviceVisibilityMode.TEMPORARY_10_MIN)
     val visibilityMode: StateFlow<DeviceVisibilityMode> = _visibilityMode.asStateFlow()
 
@@ -446,7 +461,7 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }.onFailure { err ->
-                        _catboxUploadError.value = err.localizedMessage ?: "Không thể tải tệp lên Catbox.moe"
+                        _catboxUploadError.value = err.localizedMessage ?: "Không thể tải tệp lên đám mây"
                     }
                 }
             } finally {
@@ -539,9 +554,77 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateDisplayName(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            app.preferencesRepository.setDisplayName(name)
-            service?.setLocalDisplayName(name)
+            app.preferencesRepository.setDisplayName(trimmed)
+            service?.setLocalDisplayName(trimmed)
+            if (app.preferencesRepository.syncDeviceNameWithAccount.first()) {
+                val user = runCatching { FirebaseAuth.getInstance().currentUser }.getOrNull()
+                if (user != null && user.uid.isNotBlank()) {
+                    app.sharedLinkRepository.saveSyncedDeviceName(
+                        userId = user.uid,
+                        deviceName = trimmed,
+                        email = user.email.orEmpty(),
+                    )
+                }
+            }
+        }
+    }
+
+    fun setSyncDeviceNameWithAccount(enabled: Boolean) {
+        viewModelScope.launch {
+            app.preferencesRepository.setSyncDeviceNameWithAccount(enabled)
+            val user = runCatching { FirebaseAuth.getInstance().currentUser }.getOrNull()
+            restartAccountDeviceNameSync(user, forceEnabled = enabled)
+        }
+    }
+
+    fun applyAccountNameAsDeviceName(accountDisplayName: String) {
+        val trimmed = accountDisplayName.trim()
+        if (trimmed.isEmpty()) return
+        updateDisplayName(trimmed)
+    }
+
+    private fun restartAccountDeviceNameSync(
+        user: com.google.firebase.auth.FirebaseUser?,
+        forceEnabled: Boolean? = null,
+    ) {
+        accountNameSyncJob?.cancel()
+        if (user == null || user.uid.isBlank()) return
+        accountNameSyncJob = viewModelScope.launch {
+            val syncEnabled = forceEnabled ?: app.preferencesRepository.syncDeviceNameWithAccount.first()
+            if (!syncEnabled) return@launch
+
+            runCatching {
+                app.sharedLinkRepository.observeSyncedDeviceName(user.uid).collect { cloudName ->
+                    val currentLocal = app.preferencesRepository.displayName.first().trim()
+                    if (!cloudName.isNullOrBlank()) {
+                        if (cloudName != currentLocal) {
+                            app.preferencesRepository.setDisplayName(cloudName)
+                            service?.setLocalDisplayName(cloudName)
+                        }
+                    } else {
+                        val defaultModel = android.os.Build.MODEL?.trim().orEmpty()
+                        val accountName = user.displayName?.trim().orEmpty()
+                        val nameToSync = if (
+                            (currentLocal.isEmpty() || currentLocal.equals(defaultModel, ignoreCase = true) || currentLocal == "Thiết bị") &&
+                            accountName.isNotEmpty()
+                        ) {
+                            app.preferencesRepository.setDisplayName(accountName)
+                            service?.setLocalDisplayName(accountName)
+                            accountName
+                        } else {
+                            currentLocal.ifBlank { accountName.ifBlank { "Thiết bị" } }
+                        }
+                        app.sharedLinkRepository.saveSyncedDeviceName(
+                            userId = user.uid,
+                            deviceName = nameToSync,
+                            email = user.email.orEmpty(),
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -607,6 +690,10 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        accountNameSyncJob?.cancel()
+        runCatching {
+            FirebaseAuth.getInstance().removeAuthStateListener(authStateListener)
+        }
         service?.setUiInForeground(false)
     }
 }

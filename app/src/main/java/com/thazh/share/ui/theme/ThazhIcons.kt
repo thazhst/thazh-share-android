@@ -125,6 +125,7 @@ object ThazhSymbols {
     const val RadioUnchecked = "circle"
     const val ChevronRight = "chevron.right"
     const val Back = "chevron.left"
+    const val Search = "magnifyingglass"
 
     // Visibility, incoming dialog & extended settings symbols
     const val VisibilityOn = "eye"
