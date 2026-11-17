@@ -29,7 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
+import com.thazh.share.ui.components.GlasmioText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -502,13 +502,13 @@ fun ReceivedFilesScreen(
                                     tint = colors.tertiaryContent,
                                     size = 38.dp,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.received_files_empty_title),
                                     style = GlasmioTheme.textStyles.headline,
                                     color = colors.content,
                                     textAlign = TextAlign.Center,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.received_files_empty_body),
                                     style = GlasmioTheme.textStyles.subheadline,
                                     color = colors.secondaryContent,
@@ -522,7 +522,7 @@ fun ReceivedFilesScreen(
                 item(key = "no_match") {
                     CenteredReceivedContent {
                         GlasmioCard(modifier = Modifier.fillMaxWidth()) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.received_files_no_match),
                                 style = GlasmioTheme.textStyles.subheadline,
                                 color = colors.secondaryContent,
@@ -640,7 +640,7 @@ fun ReceivedFilesScreen(
                         size = 20.dp,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
+                    GlasmioText(
                         text = stringResource(
                             R.string.received_files_share_wifi_direct_count,
                             selectedFiles.size,
@@ -762,7 +762,7 @@ fun ReceivedFilesScreen(
                 )
             }
             if (renameError != null) {
-                Text(
+                GlasmioText(
                     text = renameError.orEmpty(),
                     style = GlasmioTheme.textStyles.caption1,
                     color = colors.destructive,
@@ -869,7 +869,7 @@ private fun PeerPickerBottomSheet(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
+            GlasmioText(
                 text = stringResource(R.string.received_files_pick_peer_subtitle),
                 style = GlasmioTheme.textStyles.subheadline,
                 color = colors.secondaryContent,
@@ -918,7 +918,7 @@ private fun PeerPickerBottomSheet(
                     size = 18.dp,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
+                GlasmioText(
                     text = stringResource(R.string.received_files_open_send_tab),
                     style = GlasmioTheme.textStyles.headline,
                     color = Color.White,
@@ -1006,7 +1006,7 @@ private fun FileDetailsBottomSheet(
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
+                    GlasmioText(
                         text = file.fileName,
                         style = GlasmioTheme.textStyles.headline,
                         color = colors.content,
@@ -1014,7 +1014,7 @@ private fun FileDetailsBottomSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
+                    GlasmioText(
                         text = "${FormatUtils.formatFileSize(file.sizeBytes)} • ${stringResource(file.category.labelRes())}",
                         style = GlasmioTheme.textStyles.footnote,
                         color = colors.secondaryContent,
@@ -1077,7 +1077,7 @@ private fun FileDetailsBottomSheet(
                         size = 16.dp,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.received_files_open),
                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                         color = Color.White,
@@ -1100,7 +1100,7 @@ private fun FileDetailsBottomSheet(
                         size = 16.dp,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.received_files_share),
                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                         color = colors.content,
@@ -1209,7 +1209,7 @@ private fun ReceivedFileRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
+                GlasmioText(
                     text = file.fileName,
                     style = GlasmioTheme.textStyles.headline,
                     color = colors.content,
@@ -1224,7 +1224,7 @@ private fun ReceivedFileRow(
                             .background(colors.accent.copy(alpha = if (colors.isDark) 0.24f else 0.16f))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        Text(
+                        GlasmioText(
                             text = stringResource(R.string.received_files_new_badge),
                             style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Bold),
                             color = colors.accent,
@@ -1234,7 +1234,7 @@ private fun ReceivedFileRow(
             }
             Spacer(modifier = Modifier.height(2.dp))
             val sender = file.peerName.ifBlank { stringResource(R.string.transfer_unknown_peer) }
-            Text(
+            GlasmioText(
                 text = "${FormatUtils.formatFileSize(file.sizeBytes)} • $sender • ${FormatUtils.formatRelativeTime(file.receivedAtEpochMs)}",
                 style = GlasmioTheme.textStyles.footnote,
                 color = colors.secondaryContent,

@@ -1,138 +1,178 @@
-# Thazh Share (`com.thazh.share`)
+# Thazh Share
 
-Ứng dụng chia sẻ tệp ngang hàng (Peer-to-Peer) tốc độ cao qua **Wi-Fi Direct**, **Bluetooth BLE**, **NFC HCE** và **Chia sẻ qua liên kết đám mây (Catbox.moe)** dành cho Android, được thiết kế với hệ thống giao diện thủy tinh lỏng **Glasmio (Liquid Glass)** hỗ trợ đầy đủ chế độ Sáng / Tối.
+<p align="center">
+  <strong>Truyền tệp siêu tốc ngang hàng (P2P) & Chia sẻ đám mây đa giao thức với giao diện Glasmio Liquid Glass</strong>
+</p>
 
-## Tính năng nổi bật
+<p align="center">
+  <img src="https://img.shields.io/badge/Package-com.thazh.share-0A84FF?style=for-the-badge" alt="Package Name" />
+  <img src="https://img.shields.io/badge/Version-1.2.0%20(3)-30D158?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-5AC8FA?style=for-the-badge" alt="Min SDK" />
+  <img src="https://img.shields.io/badge/Target%20SDK-36-FF9F0A?style=for-the-badge" alt="Target SDK" />
+  <img src="https://img.shields.io/badge/UI-Glasmio%20Liquid%20Glass-BF5AF2?style=for-the-badge" alt="Glasmio UI" />
+  <img src="https://img.shields.io/badge/Store%20Ready-Uptodown%20%7C%20APK-34C759?style=for-the-badge" alt="Uptodown Ready" />
+</p>
 
-- **Radar không gian 2D không viền (Send & Receive)** — Quét trực quan các thiết bị xung quanh theo khoảng cách thời gian thực, chạm trực tiếp vào nút thiết bị trên Radar để kết nối và gửi tệp ngay.
-- **3 chế độ hiển thị thiết bị & Phím tắt Control Center (Quick Settings Tile)**:
-  - **Ẩn (`HIDDEN`)**, **Tìm thấy trong 10 phút (`TEMPORARY_10_MIN`)** (kèm đồng hồ đếm ngược tự động ẩn), và **Luôn cho phép tìm thấy (`ALWAYS_VISIBLE`)**.
-  - Hỗ trợ thêm phím tắt **Thazh Share** trực tiếp vào **Control Center (Quick Settings)** của Android chỉ với 1 chạm ngay trong ứng dụng để chuyển đổi nhanh trạng thái hiển thị mọi lúc.
-- **Hộp thoại xác nhận kết nối khi đang dùng ứng dụng khác** — Khi vẫn bật trạng thái hiển thị của thiết bị trong Thazh Share và đang mở ứng dụng khác, nếu có người gửi tệp tới, hệ thống hiển thị hộp thoại xác nhận nổi (`IncomingConnectionActivity`) cho phép **Chấp nhận**, **Nhận & mở ứng dụng** hoặc **Từ chối**.
-- **Chạm để kết nối qua NFC HCE & Phát hiện nhanh qua BLE** — Đặt mặt lưng hai máy chạm nhau để tự động trao đổi định danh và bắt tay Wi-Fi Direct tức thì; BLE giúp phát hiện thiết bị gần đó và đo khoảng cách ước tính theo mét.
-- **Chia sẻ qua liên kết (Catbox.moe + Litterbox)** — Tải tệp lên đám mây tạo liên kết trực tiếp kèm mã QR (hỗ trợ lưu vĩnh viễn hoặc tự hủy sau 1h / 12h / 24h / 72h). Không bắt buộc đăng nhập; nếu đăng nhập bằng Google (`CredentialManager`), lịch sử liên kết sẽ tự động đồng bộ qua **Cloud Firestore**.
-- **Màn hình Chào mừng & Chuẩn bị cấp quyền theo từng bước** — Mở đầu bằng trang **Chào mừng** cùng nút **Bắt đầu**, tiếp nối bởi 3 trang **Chuẩn bị** riêng biệt cho từng nhóm quyền (Thiết bị Wi-Fi lân cận, Bluetooth BLE, Thông báo) kèm giải thích ngắn gọn tại sao cần quyền đó.
-- **Vuốt cạnh trái để quay lại kiểu iOS (`IosSwipeBackContainer`)** — Vuốt từ mép trái qua phải để đóng các trang phụ mượt mà.
-- **Quản lý tệp đã nhận** — Tìm kiếm, lọc theo danh mục (Ảnh, Video, Âm thanh, Tài liệu, Tệp nén, APK), sắp xếp, lưu vào `Tải xuống/Thazh Share`, đổi tên hoặc gửi tiếp qua Wi-Fi Direct.
+---
 
-## Kiến trúc thư mục
+## 1. Tổng quan (Overview)
+
+**Thazh Share** (`com.thazh.share`) là ứng dụng chia sẻ tệp thế hệ mới dành cho Android, kết hợp sức mạnh của **Wi-Fi Direct (P2P TCP Socket)**, **Bluetooth Low Energy (BLE Fast Beacon)**, **NFC Host Card Emulation (HCE Tap-to-Pair)** và **Chia sẻ qua liên kết đám mây** trong một trải nghiệm người dùng nguyên bản được xây dựng hoàn toàn trên hệ thống thiết kế **[Glasmio Liquid Glass](https://github.com/NEORUAA/Glasmio)** và bộ biểu tượng **SF Symbols**.
+
+Ứng dụng không phụ thuộc vào các thành phần Material Design 3 truyền thống hay Material Icons, mang lại hiệu ứng kính mờ quang học thời gian thực (`Liquid Glass`), thanh tìm kiếm nổi (`GlasmioFloatingSearchBar`), thanh điều hướng nổi (`GlasmioFloatingNavBar`) và cử chỉ vuốt cạnh trái về trang trước mượt mà theo chuẩn iOS (`IosSwipeBackContainer`).
+
+---
+
+## 2. Tính năng nổi bật (Key Features)
+
+### Truyền tệp đa giao thức (Multi-Protocol P2P Engine)
+- **Wi-Fi Direct tốc độ cao**: Truyền tải ảnh gốc, video 4K, tài liệu và tệp dung lượng lớn trực tiếp giữa hai thiết bị Android thông qua luồng TCP Socket đa luồng mà không tiêu tốn dữ liệu di động (4G/5G).
+- **Radar không gian tương tác (Borderless Spatial Radar)**: Giao diện Radar 2D không viền trên cả hai trang **Gửi** và **Nhận**, hiển thị khoảng cách ước tính (`1m`, `3m`, `10m`) từ cường độ tín hiệu RSSI và trạng thái kết nối trực quan.
+- **BLE Fast Discovery**: Quảng bá và quét gói tin nhận diện thiết bị tức thì qua Bluetooth Low Energy (`0000FE9F-0000-1000-8000-00805F9B34FB`), cho phép phát hiện thiết bị lân cận trong tích tắc trước khi bắt tay qua Wi-Fi Direct.
+- **NFC Tap-to-Pair (HCE)**: Chạm lưng hai điện thoại có bật NFC để trao đổi thông tin định danh APDU và tự động khởi tạo kết nối P2P không cần dò tìm thủ công.
+
+### Kiểm soát quyền riêng tư & Nhận tệp thông minh
+- **3 chế độ hiển thị linh hoạt**:
+  1. **Ẩn thiết bị (`HIDDEN`)**: Hoàn toàn ẩn khỏi mạng quét xung quanh.
+  2. **10 phút (`TEMPORARY_10_MIN`)**: Cho phép tìm thấy trong 10 phút với bộ đếm ngược trực tiếp và tự động ẩn khi hết giờ.
+  3. **Luôn hiển thị (`ALWAYS_VISIBLE`)**: Luôn sẵn sàng nhận tệp không giới hạn thời gian.
+- **Hộp thoại xác nhận kết nối nổi (`IncomingConnectionActivity`)**: Khi bạn đang sử dụng ứng dụng khác và vẫn bật chế độ hiển thị, Thazh Share hiển thị hộp thoại xác nhận kết nối trực quan với chuông báo tuỳ chọn và tự động từ chối sau 30 giây nếu không phản hồi.
+- **Ô phím tắt Cài đặt nhanh (`VisibilityQuickTileService`)**: Bật/tắt chế độ hiển thị của Thazh Share ngay từ thanh Control Center / Quick Settings của Android.
+
+### Chia sẻ qua liên kết & Đồng bộ đám mây
+- **Tạo liên kết tải xuống tức thì**: Tải tệp lên đám mây và nhận ngay liên kết rút gọn kèm **mã QR trực quan** với tuỳ chọn thời hạn lưu trữ (`1 giờ`, `12 giờ`, `24 giờ`, `3 ngày`, hoặc `Vĩnh viễn`).
+- **Đồng bộ đám mây qua Google Sign-In (Tuỳ chọn)**: Đăng nhập bằng tài khoản Google thông qua Jetpack `CredentialManager` để lưu trữ lịch sử liên kết đã tạo, chỉnh sửa ghi chú liên kết và đồng bộ tên hiển thị thiết bị xuyên suốt các thiết bị của bạn.
+
+### Hệ thống thiết kế Glasmio Liquid Glass & SF Symbols
+- **100% Glasmio UI & SF Symbols**: Sử dụng hoàn toàn các thành phần của thư viện [Glasmio](https://github.com/NEORUAA/Glasmio) (`GlasmioScaffold`, `GlasmioPinnedListPage`, `GlasmioCard`, `GlasmioGroupedList`, `GlasmioFloatingSearchBar`, `GlasmioFloatingNavBar`, `GlasmioBottomSheet`, `GlasmioAlertDialog`, `GlasmioSegmentedControl`) và bộ biểu tượng vector chuẩn **SF Symbols** (`SfSymbol`, `SfIcon`, `SfSymbolCatalog`).
+- **Cử chỉ vuốt cạnh trái thông minh (`IosSwipeBackContainer`)**: Vuốt từ mép trái sang phải để quay lại **trang hoặc tab liền trước đó** trong lịch sử điều hướng (bao gồm cả từng trang con trong Cài đặt, các bước cấp quyền và lịch sử chuyển tab), kèm hiệu ứng thị sai (parallax) và bóng đổ thời gian thực.
+- **Cài đặt phân trang khoa học**: Trang Cài đặt được chia thành 6 chuyên mục riêng biệt (*Tài khoản & thiết bị*, *Hiển thị & kết nối*, *Nhận tệp & bảo mật*, *Giao diện*, *Dữ liệu*, *Giới thiệu*) kèm thanh tìm kiếm nổi thông minh ở đáy màn hình.
+
+---
+
+## 3. Kiến trúc hệ thống (Architecture)
 
 ```text
-app/src/main/java/com/thazh/share/
-├── auth/            Đăng nhập Google qua Jetpack Credential Manager + Firebase Auth
-├── data/            Mô hình dữ liệu, DataStore Preferences, ReceivedFilesRepository, SharedLinkRepository (Firestore)
-├── network/         WifiDirectManager, BleDiscoveryManager, NfcConnectionManager, SocketFrameCodec, CatboxUploader
-├── service/         WifiDirectService (Foreground Service), ShareNfcHceService (NFC HCE), ShareQuickSettingsTileService (Control Center Tile)
-├── ui/              ShareViewModel + điều hướng Glasmio Compose
-│   ├── components/  InteractiveRadarCard (không viền), VisibilitySelector, NfcTapCard, IosSwipeBackContainer, ...
-│   ├── screens/     PermissionScreen (Chào mừng + Chuẩn bị từng bước), DiscoveryScreen, ReceiveScreen, LinkShareScreen, ReceivedFilesScreen, SettingsScreen
-│   └── theme/       ThazhShareTheme (Light / Dark / System), ThazhIcons (SF Symbols)
-└── util/            PermissionUtils, FileActions, FormatUtils, BackgroundOptimizationHelper
+Thazh Share
+├── app/                                  # Ứng dụng chính (com.thazh.share)
+│   ├── data/                             # Lưu trữ cục bộ, Preferences, Firestore Repository & Models
+│   ├── network/                          # Giao thức truyền tệp TCP Socket & Cloud Link Uploader
+│   ├── service/                          # WifiDirectService, BleDiscoveryManager, NfcHceService, QuickTile
+│   ├── ui/
+│   │   ├── auth/                         # Xác thực Google qua Jetpack CredentialManager
+│   │   ├── components/                   # GlasmioPrimitives, InteractiveRadarCard, VisibilitySelector, v.v.
+│   │   ├── screens/                      # Discovery, Receive, LinkShare, ReceivedFiles, Settings (6 trang con), About
+│   │   └── theme/                        # ThazhTheme (Sáng/Tối/Hệ thống) & ThazhIcons (SF Symbols)
+│   └── util/                             # Tiện ích định dạng, chia sẻ tệp và tạo dữ liệu
+├── glasmio-core/                         # Hệ thống màu sắc, Typography, Theme & IosSwipeBackContainer
+├── glasmio-glass/                        # Hiệu ứng khúc xạ kính mờ Liquid Glass & Backdrop
+├── glasmio-icons/                        # Bộ giải mã và hiển thị SF Symbols (SfSymbol, SfIcon)
+└── glasmio-ui/                           # Hệ thống thành phần giao diện Glasmio (Cards, Sheets, NavBars, SearchBars)
 ```
 
 ---
 
-## Hướng dẫn Setup Keystore để Build Release cố định SHA-1 & SHA-256
+## 4. Hướng dẫn cài đặt & Build (Getting Started)
 
-### 1. Tại sao SHA-1 và SHA-256 bị đổi nếu không cố định Keystore?
-Trên Android, mã băm **SHA-1** và **SHA-256** của bản APK/AAB phụ thuộc hoàn toàn vào tệp **Keystore (`.keystore` / `.jks`)** dùng để ký ứng dụng:
-- Nếu mỗi lần build (trên máy mới, container mới hoặc GitHub Actions) bạn chạy lại lệnh `keytool -genkeypair`, một cặp khóa RSA mới sẽ được sinh ra -> **SHA-1 và SHA-256 sẽ bị thay đổi hoàn toàn**.
-- Khi SHA-1 / SHA-256 bị đổi:
-  1. Thiết bị đã cài bản cũ sẽ báo lỗi `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (không thể cài đè bản cập nhật).
-  2. **Google Sign-In (`CredentialManager`)** và **Firebase Authentication / Firestore** sẽ từ chối xác thực vì chứng chỉ APK không khớp với SHA-1 / SHA-256 đã đăng ký trong `google-services.json`.
+### Yêu cầu môi trường
+- **Android Studio**: Ladybug (2024.2.1) trở lên hoặc JDK 17.
+- **Android SDK**: `minSdk = 26` (Android 8.0), `targetSdk = 36`, `compileSdk = 36`.
+- **Gradle**: Sử dụng Gradle 8.x (Kotlin DSL).
 
-Để **mỗi lần build release đều giữ nguyên đúng 1 mã SHA-1 và SHA-256 duy nhất**, bạn chỉ cần **tạo tệp keystore đúng 1 lần duy nhất** và tái sử dụng đúng tệp đó cho mọi lần build cục bộ lẫn CI/CD.
+### Các lệnh Build cơ bản
+
+```bash
+# Kiểm tra và biên dịch bản Debug APK
+gradle assembleDebug
+
+# Biên dịch bản Release APK (đã bật R8/ProGuard thu gọn tài nguyên, sẵn sàng phát hành lên Uptodown)
+gradle assembleRelease
+
+# Chạy kiểm thử đơn vị (Unit & Robolectric Tests)
+gradle :app:testDebugUnitTest
+```
+
+Sau khi chạy `gradle assembleRelease`, tệp APK phát hành sẽ nằm tại:
+`app/build/outputs/apk/release/app-release.apk`
 
 ---
 
-### 2. Các bước tạo và cố định Keystore cho dự án `com.thazh.share`
+## 5. Thiết lập Keystore cố định SHA-1 / SHA-256 qua `RELEASE_KEYSTORE_BASE64`
 
-#### Bước 1: Tạo tệp Keystore cố định (Chỉ chạy 1 lần duy nhất)
-Project hiện được cấu hình trong `app/build.gradle.kts` (`signingConfigs.release`) đọc tệp `release-debug.keystore` ở thư mục gốc của project.
-- **Cách A (Giữ nguyên tệp `release-debug.keystore` có sẵn trong repo):**
-  Nếu tệp `release-debug.keystore` đã được commit cố định trong repository và bạn **không chạy lệnh tạo lại**, thì mọi lần build cục bộ hoặc trên GitHub Actions đều sẽ luôn có **cùng một SHA-1 và SHA-256**.
-- **Cách B (Tạo Keystore riêng của bạn và ghi đè một lần duy nhất vào `release-debug.keystore`):**
-  Chạy lệnh sau tại thư mục gốc của project (chỉ chạy **1 lần duy nhất**):
-  ```bash
-  rm -f release-debug.keystore
-  keytool -genkeypair -v \
-    -keystore release-debug.keystore \
-    -alias wifidirectchat \
-    -storepass wifidirectchat \
-    -keypass wifidirectchat \
-    -keyalg RSA \
-    -keysize 2048 \
-    -validity 10000 \
-    -dname "CN=Thazh Share,O=Thazh,C=VN"
-  ```
-  *(Lưu ý: Giữ nguyên `-alias wifidirectchat`, `-storepass wifidirectchat`, `-keypass wifidirectchat` để tương thích trực tiếp với cấu hình `signingConfigs.release` hiện tại trong `app/build.gradle.kts` mà không cần sửa file Gradle).*
+Kho mã nguồn không lưu trữ bất kỳ tệp keystore nào để đảm bảo an toàn bảo mật. Để mỗi lần build trên GitHub Actions **luôn giữ nguyên chứng chỉ ký số SHA-1 và SHA-256** (giúp Google Sign-In, Firebase Authentication và cập nhật ứng dụng trên **Uptodown** hoạt động liền mạch):
 
-#### Bước 2: Lấy mã SHA-1 và SHA-256 cố định của Keystore
-Chạy lệnh sau để xem mã `SHA-1` và `SHA-256` của tệp `release-debug.keystore`:
+### Bước 1: Tạo tệp Keystore cố định (Chỉ thực hiện 1 lần duy nhất)
+Chạy lệnh sau trên máy tính của bạn để tạo tệp `release.keystore`:
+
+```bash
+keytool -genkeypair -v \
+  -keystore release.keystore \
+  -alias wifidirectchat \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 10000 \
+  -storepass wifidirectchat \
+  -keypass wifidirectchat \
+  -dname "CN=Thazh Share, OU=Mobile, O=Thazh, L=Hanoi, S=HN, C=VN"
+```
+
+### Bước 2: Lấy mã băm SHA-1 và SHA-256 cố định
 ```bash
 keytool -list -v \
-  -keystore release-debug.keystore \
+  -keystore release.keystore \
   -alias wifidirectchat \
   -storepass wifidirectchat
 ```
-Kết quả sẽ hiển thị trong mục **Certificate fingerprints**:
-```text
-Certificate fingerprints:
-     SHA1:   XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX
-     SHA256: YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY:YY
-```
-Ngoài ra, bạn cũng nên lấy thêm `SHA-1` và `SHA-256` của `debug.keystore` nếu muốn test bản Debug:
+Sao chép hai giá trị **SHA1** và **SHA256** trong phần `Certificate fingerprints` và thêm vào cấu hình ứng dụng Android (`com.thazh.share`) trong **Firebase Console > Project Settings > Your apps**.
+
+### Bước 3: Mã hoá Keystore sang Base64 và lưu vào GitHub Secret
 ```bash
-keytool -list -v \
-  -keystore debug.keystore \
-  -alias androiddebugkey \
-  -storepass android
+base64 -w 0 release.keystore > release.keystore.base64
 ```
-
-#### Bước 3: Thêm SHA-1 và SHA-256 vào Firebase Console
-Để tính năng đăng nhập Google (`CredentialManager`) hoạt động trên bản Release:
-1. Mở [Firebase Console](https://console.firebase.google.com/) -> chọn dự án của bạn.
-2. Vào **Project Settings (Cài đặt dự án)** -> tab **General (Chung)** -> cuộn xuống phần **Your apps** -> chọn ứng dụng Android **`com.thazh.share`**.
-3. Nhấn **Add fingerprint (Thêm dấu vân tay)** và dán lần lượt cả mã **SHA-1** và **SHA-256** vừa lấy ở Bước 2 vào.
-4. Tải lại tệp **`google-services.json`** mới nhất và đặt đè vào `app/google-services.json`.
-
-#### Bước 4: Đảm bảo CI/CD (GitHub Actions) luôn dùng đúng Keystore này
-Có 2 cách để GitHub Actions luôn ký APK bằng đúng Keystore cố định của bạn:
-1. **Commit trực tiếp `release-debug.keystore` vào Git (Mặc định):**
-   Chỉ cần commit tệp `release-debug.keystore` vào nhánh `main` và không bao giờ xóa/tạo lại tệp này.
-2. **Lưu trong GitHub Secrets (`RELEASE_KEYSTORE_BASE64`) — Bảo mật cao hơn:**
-   - Mã hóa tệp keystore sang chuỗi Base64:
-     ```bash
-     base64 -w 0 release-debug.keystore
-     # (Trên macOS dùng: base64 -i release-debug.keystore | tr -d '\n')
-     ```
-   - Vào kho GitHub của bạn -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**:
-     - Name: `RELEASE_KEYSTORE_BASE64`
-     - Secret: *(Dán chuỗi Base64 vừa copy)*
-   - Workflow `.github/workflows/build.yml` đã được tích hợp sẵn bước tự động giải mã `RELEASE_KEYSTORE_BASE64` ra `release-debug.keystore` trước khi chạy `./gradlew assembleRelease`. Nhờ đó mọi bản build từ GitHub Actions sẽ luôn giữ cố định 100% mã **SHA-1** và **SHA-256**.
-
-#### Bước 5: Tự động tạo lại tệp `app/google-services.json` từ GitHub Secret
-Workflow `.github/workflows/build.yml` hỗ trợ tự động khôi phục tệp `app/google-services.json` từ **GitHub Secrets** trong mỗi lần chạy CI/CD (hỗ trợ cả định dạng JSON thuần và chuỗi Base64):
-1. Vào kho GitHub của bạn -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**.
-2. Tạo một trong hai Secret sau:
-   - **Cách 1 (Dán trực tiếp nội dung JSON):**
-     - Name: `GOOGLE_SERVICES_JSON`
-     - Secret: *(Dán toàn bộ nội dung tệp `app/google-services.json` hoặc chuỗi Base64 của tệp)*
-   - **Cách 2 (Mã hóa Base64):**
-     - Chạy lệnh: `base64 -w 0 app/google-services.json` (hoặc trên macOS: `base64 -i app/google-services.json | tr -d '\n'`)
-     - Name: `GOOGLE_SERVICES_JSON_BASE64`
-     - Secret: *(Dán chuỗi Base64 vừa copy)*
-3. Khi GitHub Actions chạy, bước `Restore google-services.json from GitHub Secret` sẽ tự động tạo lại `app/google-services.json` trước khi biên dịch APK Debug và Release.
+- Mở kho lưu trữ trên GitHub: **Settings > Secrets and variables > Actions > New repository secret**.
+- Tạo biến bí mật **`RELEASE_KEYSTORE_BASE64`** và dán toàn bộ nội dung của `release.keystore.base64`. Workflow `.github/workflows/build.yml` sẽ tự động giải mã `RELEASE_KEYSTORE_BASE64` để ký số cho các bản dựng APK.
 
 ---
 
-## Lệnh Build
+## 6. Tự động khôi phục `google-services.json` từ GitHub Secret
 
+> 📄 **Hướng dẫn chi tiết từng bước bằng tiếng Việt**: Xem tệp [`HUONG_DAN_GITHUB_SECRETS.txt`](./HUONG_DAN_GITHUB_SECRETS.txt) tại thư mục gốc của dự án để thiết lập nhanh các biến `GOOGLE_SERVICES_JSON` và `RELEASE_KEYSTORE_BASE64` trên GitHub.
+
+Vì lý do bảo mật, bạn có thể không muốn đưa tệp `app/google-services.json` công khai lên kho mã nguồn, hoặc muốn tự động tạo lại tệp này khi chạy CI/CD trên GitHub Actions:
+
+1. Mở kho lưu trữ trên GitHub: **Settings > Secrets and variables > Actions > New repository secret**.
+2. Tạo Secret tên là **`GOOGLE_SERVICES_JSON`**:
+   - Bạn có thể dán **toàn bộ nội dung JSON gốc** của tệp `google-services.json`, **hoặc** chuỗi đã mã hoá **Base64** (`base64 -w 0 app/google-services.json`).
+3. Quy trình `.github/workflows/android-release.yml` tích hợp sẵn trong dự án sẽ tự động kiểm tra định dạng (JSON thuần hoặc Base64), khôi phục chính xác tệp `app/google-services.json` và xác thực cấu trúc JSON trước khi thực hiện lệnh `gradle assembleRelease`.
+
+Bạn cũng có thể khôi phục nhanh trên môi trường terminal bằng lệnh:
 ```bash
-./gradlew assembleDebug      # Build APK Debug
-./gradlew assembleRelease    # Build APK Release (đã ký bằng release-debug.keystore)
+# Nếu GOOGLE_SERVICES_JSON chứa nội dung JSON thuần:
+printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+
+# Hoặc nếu GOOGLE_SERVICES_JSON được mã hoá Base64:
+printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
 ```
 
-APK sau khi build nằm tại:
-- Debug: `app/build/outputs/apk/debug/app-debug.apk`
-- Release: `app/build/outputs/apk/release/app-release.apk`
+---
+
+## 7. Danh sách kiểm tra phát hành lên Store (Uptodown Readiness)
+
+Thazh Share đã được tối ưu hoá toàn diện để sẵn sàng phân phối trên **Uptodown** và các kho ứng dụng Android quốc tế:
+
+- **Định danh gói chuẩn (`applicationId`)**: `com.thazh.share`
+- **Phiên bản phát hành**: `versionName = "1.2.0"`, `versionCode = 3`
+- **Biểu tượng thích ứng (Adaptive Launcher Icon)**: Hỗ trợ đầy đủ `mipmap-anydpi-v26` với lớp nền chuyển sắc và biểu tượng sắc nét trên mọi trình khởi chạy Android.
+- **Tối ưu hoá R8 / ProGuard (`proguard-rules.pro`)**: Bật `isMinifyEnabled = true` và `isShrinkResources = true` cho bản Release kèm tập quy tắc bảo toàn đầy đủ cho Firebase Firestore, Credential Manager, Kotlinx Serialization và các dịch vụ phần cứng (Wi-Fi Direct, BLE, NFC HCE).
+- **Tuân thủ quyền truy cập (Least-Privilege Permissions)**:
+  - Màn hình chuẩn bị cấp quyền minh bạch giải thích rõ lý do cho từng quyền (*Thiết bị ở gần*, *Vị trí cho Wi-Fi Direct*, *Thông báo*, *Hiển thị hộp thoại nhận tệp*).
+  - Sử dụng **Android Photo Picker** (`PickMultipleVisualMedia`) không yêu cầu quyền truy cập bộ nhớ rộng khi chọn ảnh/video.
+
+---
+
+## 8. Ghi nhận & Giấy phép nguồn mở (Credits & License)
+
+- **[Glasmio UI Library](https://github.com/NEORUAA/Glasmio)**: Hệ thống thiết kế Liquid Glass, SF Symbols và các thành phần giao diện hiện đại cho Jetpack Compose bởi **NEORUAA**, phát hành theo giấy phép **Apache License 2.0**.
+- **Hạ tầng lưu trữ đám mây**: Hỗ trợ tạo liên kết chia sẻ tệp nhanh chóng với tuỳ chọn thời hạn linh hoạt.
+
+ Toàn bộ văn bản giấy phép **Apache License 2.0** của Glasmio được tích hợp trực tiếp trong ứng dụng tại mục **Cài đặt > Giới thiệu > Giấy phép nguồn mở**.

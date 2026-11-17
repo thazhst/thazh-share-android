@@ -36,11 +36,10 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,7 +73,10 @@ import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.auth.GoogleAuthHelper
 import com.thazh.share.ui.auth.findActivity
+import com.thazh.share.ui.components.GlasmioActivityIndicator
+import com.thazh.share.ui.components.GlasmioText
 import com.thazh.share.ui.components.IosSwipeBackContainer
+import com.thazh.share.ui.components.ThazhSquircleIconBox
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.BackgroundOptimizationHelper
@@ -155,6 +157,7 @@ fun SettingsScreen(
     onClearTempStagingCache: () -> Unit,
     onClearSavedDevices: () -> Unit,
     onOpenAboutApp: () -> Unit = {},
+    onSubPageActiveChange: (Boolean) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,17 +180,22 @@ fun SettingsScreen(
         auth?.addAuthStateListener(listener)
         onDispose {
             auth?.removeAuthStateListener(listener)
+            onSubPageActiveChange(false)
         }
     }
 
     val appVersion = remember(context) {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0)?.versionName
-        }.getOrNull() ?: "1.1.0"
+        }.getOrNull() ?: "1.2.0"
     }
 
     // Sub-page navigation state inside Settings (each of the 6 categories has its own dedicated page)
     var selectedCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
+
+    LaunchedEffect(selectedCategory) {
+        onSubPageActiveChange(selectedCategory != null)
+    }
 
     BackHandler(enabled = selectedCategory != null) {
         selectedCategory = null
@@ -551,7 +559,7 @@ private fun SettingsHubPage(
                                         tint = colors.tertiaryContent,
                                         size = 30.dp,
                                     )
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.settings_search_empty),
                                         style = GlasmioTheme.textStyles.subheadline,
                                         color = colors.secondaryContent,
@@ -851,23 +859,13 @@ private fun CategoryMenuRow(
 ) {
     val colors = GlasmioTheme.colors
     GlasmioPreferenceEntry(
-        title = { Text(title) },
+        title = { GlasmioText(title) },
         description = description,
         icon = {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(ContinuousRoundedRectangle(10.dp))
-                    .background(badgeColor.copy(alpha = if (colors.isDark) 0.24f else 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                SfIcon(
-                    systemName = symbol,
-                    contentDescription = null,
-                    tint = badgeColor,
-                    size = 19.dp,
-                )
-            }
+            ThazhSquircleIconBox(
+                symbol = symbol,
+                accentColor = badgeColor,
+            )
         },
         trailingContent = {
             SfIcon(
@@ -944,14 +942,12 @@ private fun AccountDeviceSettingsCardContent(
     GlasmioGroupedList {
         if (user == null) {
             GlasmioPreferenceEntry(
-                title = { Text(stringResource(R.string.settings_account_title)) },
+                title = { GlasmioText(stringResource(R.string.settings_account_title)) },
                 description = stringResource(R.string.settings_account_signed_out_desc),
                 icon = {
-                    SfIcon(
-                        systemName = ThazhSymbols.AccountCircle,
-                        contentDescription = null,
-                        tint = semantic.accentBlue,
-                        size = 22.dp,
+                    ThazhSquircleIconBox(
+                        symbol = ThazhSymbols.AccountCircle,
+                        accentColor = semantic.accentBlue,
                     )
                 },
                 trailingContent = {
@@ -979,14 +975,14 @@ private fun AccountDeviceSettingsCardContent(
                         modifier = Modifier.testTag("settings_google_sign_in_button"),
                     ) {
                         if (isSigningIn) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
+                            GlasmioActivityIndicator(
+                                size = 14.dp,
                                 color = Color.White,
-                                strokeWidth = 2.dp,
+                                strokeWidth = 1.8.dp,
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                         }
-                        Text(
+                        GlasmioText(
                             text = stringResource(R.string.settings_account_sign_in_short),
                             style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                             color = Color.White,
@@ -1000,7 +996,7 @@ private fun AccountDeviceSettingsCardContent(
         } else {
             GlasmioPreferenceEntry(
                 title = {
-                    Text(
+                    GlasmioText(
                         text = accountDisplayName
                             ?: user.email
                             ?: stringResource(R.string.link_share_signed_in_default),
@@ -1010,20 +1006,10 @@ private fun AccountDeviceSettingsCardContent(
                 },
                 description = user.email ?: stringResource(R.string.link_share_cloud_sync_active),
                 icon = {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(semantic.accentGreen.copy(alpha = 0.20f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        SfIcon(
-                            systemName = ThazhSymbols.CloudDone,
-                            contentDescription = null,
-                            tint = semantic.accentGreen,
-                            size = 16.dp,
-                        )
-                    }
+                    ThazhSquircleIconBox(
+                        symbol = ThazhSymbols.CloudDone,
+                        accentColor = semantic.accentGreen,
+                    )
                 },
                 trailingContent = {
                     GlasmioButton(
@@ -1036,7 +1022,7 @@ private fun AccountDeviceSettingsCardContent(
                         size = GlasmioButtonSize.Small,
                         modifier = Modifier.testTag("settings_google_sign_out_button"),
                     ) {
-                        Text(
+                        GlasmioText(
                             text = stringResource(R.string.link_share_sign_out),
                             style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                             color = colors.destructive,
@@ -1050,7 +1036,7 @@ private fun AccountDeviceSettingsCardContent(
         }
 
         GlasmioEditTextPreference(
-            title = { Text(stringResource(R.string.settings_display_name)) },
+            title = { GlasmioText(stringResource(R.string.settings_display_name)) },
             value = currentDisplayName.ifBlank { stringResource(R.string.settings_display_name_desc) },
             onValueChange = { newName ->
                 val trimmed = newName.trim()
@@ -1059,11 +1045,9 @@ private fun AccountDeviceSettingsCardContent(
                 }
             },
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.Person,
-                    contentDescription = null,
-                    tint = semantic.accentBlue,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.Person,
+                    accentColor = semantic.accentBlue,
                 )
             },
             showTopSeparator = true,
@@ -1071,18 +1055,16 @@ private fun AccountDeviceSettingsCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_sync_device_name)) },
+            title = { GlasmioText(stringResource(R.string.settings_sync_device_name)) },
             description = if (user != null && syncDeviceNameWithAccount) {
                 stringResource(R.string.settings_sync_device_name_active_desc)
             } else {
                 stringResource(R.string.settings_sync_device_name_desc)
             },
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.CloudUpload,
-                    contentDescription = null,
-                    tint = if (syncDeviceNameWithAccount) semantic.accentCyan else colors.tertiaryContent,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.CloudUpload,
+                    accentColor = if (syncDeviceNameWithAccount) semantic.accentCyan else colors.secondaryContent,
                 )
             },
             checked = syncDeviceNameWithAccount,
@@ -1094,17 +1076,15 @@ private fun AccountDeviceSettingsCardContent(
         if (accountDisplayName != null && accountDisplayName != currentDisplayName) {
             GlasmioPreferenceEntry(
                 title = {
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.settings_use_account_name, accountDisplayName),
                         color = semantic.accentBlue,
                     )
                 },
                 icon = {
-                    SfIcon(
-                        systemName = ThazhSymbols.Refresh,
-                        contentDescription = null,
-                        tint = semantic.accentBlue,
-                        size = 20.dp,
+                    ThazhSquircleIconBox(
+                        symbol = ThazhSymbols.Refresh,
+                        accentColor = semantic.accentBlue,
                     )
                 },
                 onClick = {
@@ -1211,7 +1191,7 @@ private fun VisibilityConnectivityCardContent(
         }
 
         GlasmioListPreference(
-            title = { Text(stringResource(R.string.settings_current_visibility)) },
+            title = { GlasmioText(stringResource(R.string.settings_current_visibility)) },
             description = currentVisibilityDesc,
             values = DeviceVisibilityMode.entries,
             selectedValue = visibilityMode,
@@ -1223,11 +1203,9 @@ private fun VisibilityConnectivityCardContent(
                     DeviceVisibilityMode.TEMPORARY_10_MIN -> ThazhSymbols.Timer to semantic.accentBlue
                     DeviceVisibilityMode.ALWAYS_VISIBLE -> ThazhSymbols.VisibilityOn to semantic.accentGreen
                 }
-                SfIcon(
-                    systemName = symbol,
-                    contentDescription = null,
-                    tint = tint,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = symbol,
+                    accentColor = tint,
                 )
             },
             showTopSeparator = false,
@@ -1235,17 +1213,15 @@ private fun VisibilityConnectivityCardContent(
         )
 
         GlasmioListPreference(
-            title = { Text(stringResource(R.string.settings_default_visibility)) },
+            title = { GlasmioText(stringResource(R.string.settings_default_visibility)) },
             values = DeviceVisibilityMode.entries,
             selectedValue = defaultVisibilityMode,
             onValueSelected = onSelectDefaultVisibilityMode,
             valueText = { mode -> visibilityModeLabel(mode) },
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.AllInclusive,
-                    contentDescription = null,
-                    tint = semantic.accentCyan,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.AllInclusive,
+                    accentColor = semantic.accentCyan,
                 )
             },
             showTopSeparator = true,
@@ -1253,18 +1229,16 @@ private fun VisibilityConnectivityCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_ble_fast_discovery)) },
+            title = { GlasmioText(stringResource(R.string.settings_ble_fast_discovery)) },
             description = if (isBleSupported) {
                 stringResource(R.string.settings_ble_fast_discovery_desc)
             } else {
                 stringResource(R.string.settings_ble_not_supported)
             },
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.Bluetooth,
-                    contentDescription = null,
-                    tint = if (isBleSupported) semantic.accentCyan else colors.tertiaryContent,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.Bluetooth,
+                    accentColor = if (isBleSupported) semantic.accentCyan else colors.secondaryContent,
                 )
             },
             checked = bleFastDiscoveryEnabled && isBleSupported,
@@ -1275,22 +1249,20 @@ private fun VisibilityConnectivityCardContent(
         )
 
         GlasmioPreferenceEntry(
-            title = { Text(stringResource(R.string.nfc_settings_title)) },
+            title = { GlasmioText(stringResource(R.string.nfc_settings_title)) },
             description = when {
                 !isNfcSupported -> stringResource(R.string.nfc_settings_unsupported_desc)
                 isNfcEnabled -> stringResource(R.string.nfc_settings_ready_desc)
                 else -> stringResource(R.string.nfc_settings_disabled_desc)
             },
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.Nfc,
-                    contentDescription = null,
-                    tint = when {
-                        !isNfcSupported -> colors.tertiaryContent
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.Nfc,
+                    accentColor = when {
+                        !isNfcSupported -> colors.secondaryContent
                         isNfcEnabled -> semantic.accentGreen
                         else -> semantic.warningOrange
                     },
-                    size = 22.dp,
                 )
             },
             trailingContent = when {
@@ -1303,7 +1275,7 @@ private fun VisibilityConnectivityCardContent(
                             size = GlasmioButtonSize.Small,
                             modifier = Modifier.testTag("settings_open_nfc_button"),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.nfc_open_settings),
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = Color.White,
@@ -1320,7 +1292,7 @@ private fun VisibilityConnectivityCardContent(
                                 .background(semantic.accentGreen.copy(alpha = if (colors.isDark) 0.24f else 0.16f))
                                 .padding(horizontal = 10.dp, vertical = 4.dp),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.nfc_status_ready),
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = semantic.accentGreen,
@@ -1401,14 +1373,12 @@ private fun TransferSecurityCardContent(
 
     GlasmioGroupedList {
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_confirm_incoming)) },
+            title = { GlasmioText(stringResource(R.string.settings_confirm_incoming)) },
             description = stringResource(R.string.settings_confirm_incoming_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.ShieldCheck,
-                    contentDescription = null,
-                    tint = semantic.accentGreen,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.ShieldCheck,
+                    accentColor = semantic.accentGreen,
                 )
             },
             checked = confirmIncomingConnection,
@@ -1418,14 +1388,12 @@ private fun TransferSecurityCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_background_prompt)) },
+            title = { GlasmioText(stringResource(R.string.settings_background_prompt)) },
             description = stringResource(R.string.settings_background_prompt_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.NotificationsActive,
-                    contentDescription = null,
-                    tint = if (confirmIncomingConnection) semantic.accentBlue else colors.tertiaryContent,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.OverlayPrompt,
+                    accentColor = if (confirmIncomingConnection) semantic.accentBlue else colors.secondaryContent,
                 )
             },
             checked = backgroundConnectionDialog && confirmIncomingConnection,
@@ -1436,14 +1404,12 @@ private fun TransferSecurityCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_auto_save_downloads)) },
+            title = { GlasmioText(stringResource(R.string.settings_auto_save_downloads)) },
             description = stringResource(R.string.settings_auto_save_downloads_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.SaveAlt,
-                    contentDescription = null,
-                    tint = semantic.accentCyan,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.SaveAlt,
+                    accentColor = semantic.accentCyan,
                 )
             },
             checked = autoSaveToDownloads,
@@ -1453,14 +1419,12 @@ private fun TransferSecurityCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_sound_vibration)) },
+            title = { GlasmioText(stringResource(R.string.settings_sound_vibration)) },
             description = stringResource(R.string.settings_sound_vibration_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.NotificationsActive,
-                    contentDescription = null,
-                    tint = semantic.warningOrange,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.NotificationsActive,
+                    accentColor = semantic.warningOrange,
                 )
             },
             checked = soundVibrationEnabled,
@@ -1539,21 +1503,19 @@ private fun AppearanceCardContent(
 
     GlasmioGroupedList {
         GlasmioPreferenceEntry(
-            title = { Text(stringResource(R.string.settings_theme_mode)) },
+            title = { GlasmioText(stringResource(R.string.settings_theme_mode)) },
             icon = {
-                SfIcon(
-                    systemName = when (themeMode) {
+                ThazhSquircleIconBox(
+                    symbol = when (themeMode) {
                         AppThemeMode.SYSTEM -> ThazhSymbols.ThemeSystem
                         AppThemeMode.LIGHT -> ThazhSymbols.ThemeLight
                         AppThemeMode.DARK -> ThazhSymbols.ThemeDark
                     },
-                    contentDescription = null,
-                    tint = when (themeMode) {
+                    accentColor = when (themeMode) {
                         AppThemeMode.SYSTEM -> semantic.accentBlue
                         AppThemeMode.LIGHT -> semantic.warningOrange
                         AppThemeMode.DARK -> semantic.categoryDocument
                     },
-                    size = 22.dp,
                 )
             },
             content = {
@@ -1589,7 +1551,7 @@ private fun AppearanceCardContent(
                             size = 14.dp,
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
+                        GlasmioText(
                             text = label,
                             style = GlasmioTheme.textStyles.caption1.copy(
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
@@ -1606,14 +1568,12 @@ private fun AppearanceCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_liquid_glass)) },
+            title = { GlasmioText(stringResource(R.string.settings_liquid_glass)) },
             description = stringResource(R.string.settings_liquid_glass_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.LiquidGlass,
-                    contentDescription = null,
-                    tint = if (!reduceTransparency) semantic.accentCyan else colors.tertiaryContent,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.LiquidGlass,
+                    accentColor = if (!reduceTransparency) semantic.accentCyan else colors.secondaryContent,
                 )
             },
             checked = liquidGlassEnabled && !reduceTransparency,
@@ -1624,14 +1584,12 @@ private fun AppearanceCardContent(
         )
 
         GlasmioSwitchPreference(
-            title = { Text(stringResource(R.string.settings_reduce_transparency)) },
+            title = { GlasmioText(stringResource(R.string.settings_reduce_transparency)) },
             description = stringResource(R.string.settings_reduce_transparency_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.ReduceTransparency,
-                    contentDescription = null,
-                    tint = semantic.accentBlue,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.ReduceTransparency,
+                    accentColor = semantic.accentBlue,
                 )
             },
             checked = reduceTransparency,
@@ -1704,18 +1662,16 @@ private fun DataSettingsCardContent(
 
     GlasmioGroupedList {
         GlasmioPreferenceEntry(
-            title = { Text(stringResource(R.string.settings_received_storage_title)) },
+            title = { GlasmioText(stringResource(R.string.settings_received_storage_title)) },
             description = stringResource(
                 R.string.settings_received_storage_summary,
                 receivedFilesCount,
                 FormatUtils.formatFileSize(receivedFilesTotalBytes),
             ),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.Storage,
-                    contentDescription = null,
-                    tint = semantic.accentBlue,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.Storage,
+                    accentColor = semantic.accentBlue,
                 )
             },
             trailingContent = {
@@ -1732,14 +1688,12 @@ private fun DataSettingsCardContent(
         )
 
         GlasmioPreferenceEntry(
-            title = { Text(stringResource(R.string.settings_clear_temp_cache)) },
+            title = { GlasmioText(stringResource(R.string.settings_clear_temp_cache)) },
             description = stringResource(R.string.settings_clear_temp_cache_desc),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.Cleaning,
-                    contentDescription = null,
-                    tint = semantic.accentCyan,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.Cleaning,
+                    accentColor = semantic.accentCyan,
                 )
             },
             onClick = onClearTempStagingCache,
@@ -1750,18 +1704,16 @@ private fun DataSettingsCardContent(
         if (savedDevicesCount > 0) {
             GlasmioPreferenceEntry(
                 title = {
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.settings_clear_saved_devices),
                         color = colors.destructive,
                     )
                 },
                 description = stringResource(R.string.settings_clear_saved_devices_desc, savedDevicesCount),
                 icon = {
-                    SfIcon(
-                        systemName = ThazhSymbols.DeleteSweep,
-                        contentDescription = null,
-                        tint = colors.destructive,
-                        size = 22.dp,
+                    ThazhSquircleIconBox(
+                        symbol = ThazhSymbols.DeleteSweep,
+                        accentColor = colors.destructive,
                     )
                 },
                 onClick = onRequestClearSavedDevices,
@@ -1771,14 +1723,12 @@ private fun DataSettingsCardContent(
         }
 
         GlasmioPreferenceEntry(
-            title = { Text(stringResource(R.string.settings_background_optimization)) },
+            title = { GlasmioText(stringResource(R.string.settings_background_optimization)) },
             description = stringResource(R.string.settings_background_optimization_desc, manufacturer),
             icon = {
-                SfIcon(
-                    systemName = ThazhSymbols.BatterySaver,
-                    contentDescription = null,
-                    tint = semantic.accentGreen,
-                    size = 22.dp,
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.BatterySaver,
+                    accentColor = semantic.accentGreen,
                 )
             },
             trailingContent = {

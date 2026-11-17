@@ -26,8 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -161,7 +159,7 @@ fun InteractiveRadarCard(
                         .clip(CircleShape)
                         .background(primaryAccent),
                 )
-                Text(
+                GlasmioText(
                     text = displayName.ifBlank { stringResource(R.string.app_name) },
                     style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                     color = primaryAccent,
@@ -185,7 +183,7 @@ fun InteractiveRadarCard(
                     .background(colors.secondaryContent.copy(alpha = if (colors.isDark) 0.18f else 0.10f))
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             ) {
-                Text(
+                GlasmioText(
                     text = visibilityBadgeText,
                     style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.Medium),
                     color = colors.secondaryContent,
@@ -314,7 +312,7 @@ fun InteractiveRadarCard(
             val ringLabels = listOf(0.36f to "1m", 0.66f to "3m", 0.95f to "10m")
             ringLabels.forEach { (fraction, label) ->
                 val yOffsetPx = -(maxRadiusPx * 0.92f * fraction).roundToInt()
-                Text(
+                GlasmioText(
                     text = label,
                     style = GlasmioTheme.textStyles.caption2,
                     color = colors.tertiaryContent.copy(alpha = 0.78f),
@@ -403,15 +401,20 @@ fun InteractiveRadarCard(
             // Center Device Avatar Node (Tap to start/stop scan or toggle visibility)
             Box(
                 modifier = Modifier
-                    .size(64.dp)
+                    .size(66.dp)
                     .clip(CircleShape)
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 primaryAccent,
-                                primaryAccent.copy(alpha = 0.78f),
+                                primaryAccent.copy(alpha = 0.80f),
                             )
                         )
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        color = Color.White.copy(alpha = 0.36f),
+                        shape = CircleShape,
                     )
                     .clickable(
                         role = Role.Button,
@@ -421,15 +424,15 @@ fun InteractiveRadarCard(
                 contentAlignment = Alignment.Center,
             ) {
                 if (isConnecting || !nfcPairingPeerName.isNullOrBlank()) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(26.dp),
+                    GlasmioActivityIndicator(
+                        size = 26.dp,
                         color = Color.White,
                         strokeWidth = 2.5.dp,
                     )
                 } else {
                     SfIcon(
                         systemName = when {
-                            isConnected -> if (mode == RadarMode.RECEIVE) ThazhSymbols.Download else ThazhSymbols.Share
+                            isConnected -> if (mode == RadarMode.RECEIVE) ThazhSymbols.Download else ThazhSymbols.SendPaperPlane
                             isHidden -> ThazhSymbols.VisibilityOff
                             mode == RadarMode.RECEIVE -> ThazhSymbols.Download
                             else -> ThazhSymbols.WifiTethering
@@ -455,7 +458,7 @@ fun InteractiveRadarCard(
             else -> stringResource(R.string.radar_idle_title)
         }
 
-        Text(
+        GlasmioText(
             text = statusHeadline,
             style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
             color = colors.content,
@@ -472,7 +475,7 @@ fun InteractiveRadarCard(
             else -> stringResource(R.string.discover_intro)
         }
 
-        Text(
+        GlasmioText(
             text = statusSubtitle,
             style = GlasmioTheme.textStyles.footnote,
             color = if (errorMessage != null) colors.destructive else colors.secondaryContent,
@@ -570,14 +573,14 @@ private fun RadarPeerChip(
             )
         }
         Column {
-            Text(
+            GlasmioText(
                 text = name,
                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                 color = colors.content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
+            GlasmioText(
                 text = subtitle,
                 style = GlasmioTheme.textStyles.caption2,
                 color = accentColor,
@@ -620,7 +623,7 @@ private fun ProtocolStatusPill(
             tint = tint,
             size = 14.dp,
         )
-        Text(
+        GlasmioText(
             text = label,
             style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
             color = tint,

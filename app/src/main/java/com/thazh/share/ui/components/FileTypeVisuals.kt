@@ -1,12 +1,14 @@
 package com.thazh.share.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -60,18 +62,31 @@ fun FileTypeBadge(
 ) {
     val colors = GlasmioTheme.colors
     val tint = category.accentColor()
+    val shape = ContinuousRoundedRectangle(12.dp)
     Box(
         modifier = modifier
             .size(size)
-            .clip(ContinuousRoundedRectangle(12.dp))
-            .background(tint.copy(alpha = if (colors.isDark) 0.22f else 0.14f)),
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        tint.copy(alpha = if (colors.isDark) 0.28f else 0.17f),
+                        tint.copy(alpha = if (colors.isDark) 0.16f else 0.09f),
+                    ),
+                ),
+            )
+            .border(
+                width = 0.8.dp,
+                color = tint.copy(alpha = if (colors.isDark) 0.34f else 0.22f),
+                shape = shape,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         SfIcon(
             systemName = category.symbolName(),
             contentDescription = null,
             tint = tint,
-            size = size * 0.52f,
+            size = size * 0.50f,
         )
     }
 }

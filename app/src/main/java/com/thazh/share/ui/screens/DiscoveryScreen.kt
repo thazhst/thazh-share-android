@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,10 +47,13 @@ import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.SavedDevice
 import com.thazh.share.ui.ConnectScreenState
 import com.thazh.share.ui.components.DiscoveredPeerRow
+import com.thazh.share.ui.components.GlasmioActivityIndicator
+import com.thazh.share.ui.components.GlasmioText
 import com.thazh.share.ui.components.InteractiveRadarCard
 import com.thazh.share.ui.components.NfcTapCard
 import com.thazh.share.ui.components.RadarMode
 import com.thazh.share.ui.components.SavedDeviceRow
+import com.thazh.share.ui.components.ThazhSquircleIconBox
 import com.thazh.share.ui.components.VisibilitySelectorCard
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
@@ -178,7 +179,7 @@ fun DiscoveryScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     SfIcon(
-                                        systemName = ThazhSymbols.Share,
+                                        systemName = ThazhSymbols.SendPaperPlane,
                                         contentDescription = null,
                                         tint = semantic.accentGreen,
                                         size = 22.dp,
@@ -186,14 +187,14 @@ fun DiscoveryScreen(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.discover_active_session, screenState.peerName),
                                         style = GlasmioTheme.textStyles.headline,
                                         color = colors.content,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.discover_active_session_action),
                                         style = GlasmioTheme.textStyles.footnote,
                                         color = colors.secondaryContent,
@@ -239,14 +240,14 @@ fun DiscoveryScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     SfIcon(
-                                        systemName = ThazhSymbols.Share,
+                                        systemName = ThazhSymbols.SendPaperPlane,
                                         contentDescription = null,
                                         tint = semantic.accentBlue,
                                         size = 22.dp,
                                     )
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(
                                             R.string.discover_pending_files_title,
                                             pendingWifiDirectFilesCount,
@@ -254,7 +255,7 @@ fun DiscoveryScreen(
                                         style = GlasmioTheme.textStyles.headline,
                                         color = colors.content,
                                     )
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.discover_pending_files_subtitle),
                                         style = GlasmioTheme.textStyles.footnote,
                                         color = colors.secondaryContent,
@@ -300,7 +301,7 @@ fun DiscoveryScreen(
                                     tint = semantic.warningOrange,
                                     size = 22.dp,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.discover_wifi_off),
                                     style = GlasmioTheme.textStyles.subheadline,
                                     color = colors.content,
@@ -426,12 +427,12 @@ fun DiscoveryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 modifier = Modifier.padding(end = 6.dp),
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(15.dp),
+                                GlasmioActivityIndicator(
+                                    size = 15.dp,
                                     color = semantic.accentBlue,
                                     strokeWidth = 2.dp,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.discover_scanning),
                                     style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Medium),
                                     color = semantic.accentBlue,
@@ -459,7 +460,7 @@ fun DiscoveryScreen(
                                     tint = colors.tertiaryContent,
                                     size = 34.dp,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = stringResource(
                                         if (visibilityMode == DeviceVisibilityMode.HIDDEN) {
                                             R.string.discover_no_peers_hidden
@@ -513,7 +514,7 @@ fun DiscoveryScreen(
                     size = 20.dp,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
+                GlasmioText(
                     text = stringResource(
                         if (isDiscovering) R.string.discover_stop_scan else R.string.discover_start_scan,
                     ),
@@ -585,13 +586,13 @@ private fun QuickSendActionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
+                GlasmioText(
                     text = stringResource(R.string.discover_quick_actions_title),
                     style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
                     color = colors.content,
                 )
                 if (pendingCount > 0) {
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.discover_pending_files_title, pendingCount),
                         style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         color = semantic.accentBlue,
@@ -647,22 +648,23 @@ private fun QuickActionTile(
     val tileShape = ContinuousRoundedRectangle(14.dp)
     Column(
         modifier = modifier
-            .defaultMinSize(minHeight = 76.dp)
+            .defaultMinSize(minHeight = 82.dp)
             .clip(tileShape)
-            .background(accentColor.copy(alpha = if (colors.isDark) 0.16f else 0.09f))
-            .border(1.dp, accentColor.copy(alpha = 0.28f), tileShape)
+            .background(accentColor.copy(alpha = if (colors.isDark) 0.14f else 0.08f))
+            .border(0.9.dp, accentColor.copy(alpha = 0.28f), tileShape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
     ) {
-        SfIcon(
-            systemName = icon,
-            contentDescription = null,
-            tint = accentColor,
-            size = 22.dp,
+        ThazhSquircleIconBox(
+            symbol = icon,
+            accentColor = accentColor,
+            boxSize = 34.dp,
+            iconSize = 18.dp,
+            cornerRadius = 10.dp,
         )
-        Text(
+        GlasmioText(
             text = label,
             style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
             color = colors.content,

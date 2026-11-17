@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +48,7 @@ import com.thazh.share.data.AppThemeMode
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.IncomingConnectionRequest
 import com.thazh.share.service.WifiDirectService
+import com.thazh.share.ui.components.GlasmioText
 import com.thazh.share.ui.theme.ThazhIconResolver
 import com.thazh.share.ui.theme.ThazhShareTheme
 import com.thazh.share.ui.theme.ThazhSymbols
@@ -266,7 +266,7 @@ private fun IncomingConnectionOverlayDialog(
                         size = 14.dp,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(
+                    GlasmioText(
                         text = visibilityBadgeText,
                         style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         color = visibilityBadgeColor,
@@ -293,7 +293,7 @@ private fun IncomingConnectionOverlayDialog(
                             size = 18.dp,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
+                        GlasmioText(
                             text = stringResource(R.string.incoming_conn_device_address, request.peerAddress),
                             style = GlasmioTheme.textStyles.footnote,
                             color = colors.secondaryContent,
@@ -304,7 +304,7 @@ private fun IncomingConnectionOverlayDialog(
                 }
 
                 if (request.pendingFileNames.isNotEmpty()) {
-                    Text(
+                    GlasmioText(
                         text = stringResource(
                             R.string.incoming_conn_pending_files,
                             request.pendingFileCount,
@@ -327,7 +327,7 @@ private fun IncomingConnectionOverlayDialog(
                         .testTag("background_incoming_accept_open_button"),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.incoming_conn_accept_open),
                         style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
                         color = semantic.accentBlue,

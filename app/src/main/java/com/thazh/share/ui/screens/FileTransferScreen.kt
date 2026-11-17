@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
+import com.thazh.share.ui.components.GlasmioLinearProgressBar
+import com.thazh.share.ui.components.GlasmioText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -165,13 +165,13 @@ fun FileTransferScreen(
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.transfer_send_title),
                                     style = GlasmioTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
                                     color = colors.content,
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
-                                Text(
+                                GlasmioText(
                                     text = if (isSocketConnected) {
                                         stringResource(R.string.transfer_send_subtitle, peerName)
                                     } else {
@@ -206,7 +206,7 @@ fun FileTransferScreen(
                                     size = 18.dp,
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.transfer_pick_files),
                                     style = GlasmioTheme.textStyles.headline,
                                     color = Color.White,
@@ -231,7 +231,7 @@ fun FileTransferScreen(
                                     size = 18.dp,
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.transfer_pick_media),
                                     style = GlasmioTheme.textStyles.headline,
                                     color = semantic.accentBlue,
@@ -263,7 +263,7 @@ fun FileTransferScreen(
                             size = GlasmioButtonSize.Small,
                             modifier = Modifier.testTag("clear_finished_transfers_button"),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.transfer_clear_finished),
                                 style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
                                 color = colors.accent,
@@ -285,13 +285,13 @@ fun FileTransferScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.transfer_empty_title),
                                 style = GlasmioTheme.textStyles.headline,
                                 color = colors.content,
                                 textAlign = TextAlign.Center,
                             )
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.transfer_empty_body),
                                 style = GlasmioTheme.textStyles.subheadline,
                                 color = colors.secondaryContent,
@@ -410,7 +410,7 @@ internal fun TransferActivityCard(
                         },
                         size = 14.dp,
                     )
-                    Text(
+                    GlasmioText(
                         text = item.fileName,
                         style = GlasmioTheme.textStyles.headline,
                         color = colors.content,
@@ -470,7 +470,7 @@ internal fun TransferActivityCard(
                     TransferState.CANCELLED -> stringResource(R.string.transfer_status_cancelled)
                 }
 
-                Text(
+                GlasmioText(
                     text = statusText,
                     style = GlasmioTheme.textStyles.footnote,
                     color = when (item.state) {
@@ -485,12 +485,10 @@ internal fun TransferActivityCard(
 
                 if (item.isActive) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { item.progress.coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(ContinuousCapsule),
+                    GlasmioLinearProgressBar(
+                        progress = item.progress.coerceIn(0f, 1f),
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 5.dp,
                         color = if (item.direction == TransferDirection.SENT) {
                             semantic.accentBlue
                         } else {

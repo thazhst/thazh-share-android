@@ -46,7 +46,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -73,6 +72,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kyant.capsule.ContinuousCapsule
 import com.thazh.share.R
+import com.thazh.share.ui.components.GlasmioText
+import com.thazh.share.ui.components.IosSwipeBackContainer
+import com.thazh.share.ui.components.ThazhAppIconBadge
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.OnboardingPermissionStep
@@ -187,36 +189,59 @@ fun PermissionRationaleScreen(
                 val isStepAlreadyGranted = remember(pageIndex, refreshTrigger) {
                     PermissionUtils.isStepGranted(context, step)
                 }
-                PreparationPermissionPage(
-                    step = step,
-                    stepNumber = pageIndex + 1,
-                    totalSteps = steps.size,
-                    isGranted = isStepAlreadyGranted,
-                    showDeniedHint = deniedOnCurrentStep,
-                    onBackClick = {
-                        deniedOnCurrentStep = false
-                        currentPageIndex = (pageIndex - 1).coerceAtLeast(-1)
-                    },
-                    onGrantClick = {
-                        val permsToRequest = PermissionUtils.permissionsForStep(step)
-                        if (permsToRequest.isEmpty() || PermissionUtils.isStepGranted(context, step)) {
-                            deniedOnCurrentStep = false
-                            if (pageIndex < steps.lastIndex) {
-                                currentPageIndex = pageIndex + 1
-                            } else {
-                                onPermissionsGranted()
-                            }
+                val goBackToPreviousStep = {
+                    deniedOnCurrentStep = false
+                    currentPageIndex = (pageIndex - 1).coerceAtLeast(-1)
+                }
+                IosSwipeBackContainer(
+                    enabled = true,
+                    onBack = goBackToPreviousStep,
+                    previousContent = {
+                        if (pageIndex - 1 < 0) {
+                            WelcomeOnboardingPage(onStartClick = {})
                         } else {
-                            permissionLauncher.launch(permsToRequest)
+                            val prevStep = steps[(pageIndex - 1).coerceIn(steps.indices)]
+                            PreparationPermissionPage(
+                                step = prevStep,
+                                stepNumber = pageIndex,
+                                totalSteps = steps.size,
+                                isGranted = PermissionUtils.isStepGranted(context, prevStep),
+                                showDeniedHint = false,
+                                onBackClick = {},
+                                onGrantClick = {},
+                                onOpenSettingsClick = {},
+                            )
                         }
                     },
-                    onOpenSettingsClick = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        context.startActivity(intent)
-                    },
-                )
+                ) {
+                    PreparationPermissionPage(
+                        step = step,
+                        stepNumber = pageIndex + 1,
+                        totalSteps = steps.size,
+                        isGranted = isStepAlreadyGranted,
+                        showDeniedHint = deniedOnCurrentStep,
+                        onBackClick = goBackToPreviousStep,
+                        onGrantClick = {
+                            val permsToRequest = PermissionUtils.permissionsForStep(step)
+                            if (permsToRequest.isEmpty() || PermissionUtils.isStepGranted(context, step)) {
+                                deniedOnCurrentStep = false
+                                if (pageIndex < steps.lastIndex) {
+                                    currentPageIndex = pageIndex + 1
+                                } else {
+                                    onPermissionsGranted()
+                                }
+                            } else {
+                                permissionLauncher.launch(permsToRequest)
+                            }
+                        },
+                        onOpenSettingsClick = {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        },
+                    )
+                }
             }
         }
     }
@@ -281,14 +306,14 @@ private fun WelcomeOnboardingPage(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Animated Breathing Hero Emblem (Clean, feature-card-free Welcome page)
+        // Animated Breathing Apple HIG App Icon Emblem (Clean, feature-card-free Welcome page)
         Box(
-            modifier = Modifier.size(136.dp),
+            modifier = Modifier.size(140.dp),
             contentAlignment = Alignment.Center,
         ) {
             Box(
                 modifier = Modifier
-                    .size(132.dp)
+                    .size(136.dp)
                     .graphicsLayer {
                         scaleX = pulseScale
                         scaleY = pulseScale
@@ -304,46 +329,25 @@ private fun WelcomeOnboardingPage(
                         ),
                     ),
             )
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                semantic.accentBlue.copy(alpha = if (colors.isDark) 0.32f else 0.18f),
-                                semantic.accentCyan.copy(alpha = if (colors.isDark) 0.22f else 0.12f),
-                            ),
-                        ),
-                    )
-                    .border(
-                        width = 1.2.dp,
-                        color = semantic.accentBlue.copy(alpha = 0.42f),
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                SfIcon(
-                    systemName = ThazhSymbols.WifiTethering,
-                    contentDescription = null,
-                    tint = semantic.accentBlue,
-                    size = 44.dp,
-                )
-            }
+            ThazhAppIconBadge(
+                size = 96.dp,
+                cornerRadius = 22.dp,
+                contentDescription = stringResource(R.string.app_name),
+            )
         }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
+            GlasmioText(
                 text = stringResource(R.string.welcome_title),
                 style = GlasmioTheme.textStyles.largeTitle.copy(fontWeight = FontWeight.Bold),
                 color = colors.content,
                 textAlign = TextAlign.Center,
             )
 
-            Text(
+            GlasmioText(
                 text = stringResource(R.string.welcome_subtitle),
                 style = GlasmioTheme.textStyles.subheadline,
                 color = colors.secondaryContent,
@@ -363,7 +367,7 @@ private fun WelcomeOnboardingPage(
                 .fillMaxWidth()
                 .testTag("welcome_start_button"),
         ) {
-            Text(
+            GlasmioText(
                 text = stringResource(R.string.welcome_start_button),
                 style = GlasmioTheme.textStyles.headline,
                 color = Color.White,
@@ -458,7 +462,7 @@ private fun PreparationPermissionPage(
                     .background(accentColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f))
                     .padding(horizontal = 12.dp, vertical = 5.dp),
             ) {
-                Text(
+                GlasmioText(
                     text = stringResource(R.string.prep_step_badge, stepNumber, totalSteps),
                     style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                     color = accentColor,
@@ -524,7 +528,7 @@ private fun PreparationPermissionPage(
             )
         }
 
-        Text(
+        GlasmioText(
             text = stepTitle,
             style = GlasmioTheme.textStyles.title1.copy(fontWeight = FontWeight.Bold),
             color = colors.content,
@@ -540,7 +544,7 @@ private fun PreparationPermissionPage(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
+                GlasmioText(
                     text = stepWhyReason,
                     style = GlasmioTheme.textStyles.body,
                     color = colors.secondaryContent,
@@ -554,7 +558,7 @@ private fun PreparationPermissionPage(
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically(),
         ) {
-            Text(
+            GlasmioText(
                 text = stringResource(R.string.prep_denied_hint),
                 style = GlasmioTheme.textStyles.footnote,
                 color = semantic.warningOrange,
@@ -575,7 +579,7 @@ private fun PreparationPermissionPage(
                     .fillMaxWidth()
                     .testTag("grant_permission_button"),
             ) {
-                Text(
+                GlasmioText(
                     text = when {
                         isGranted && stepNumber < totalSteps -> stringResource(R.string.prep_continue_next)
                         isGranted -> stringResource(R.string.prep_finish_button)
@@ -600,7 +604,7 @@ private fun PreparationPermissionPage(
                         .fillMaxWidth()
                         .testTag("open_app_settings_button"),
                 ) {
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.permission_open_settings),
                         style = GlasmioTheme.textStyles.headline,
                         color = colors.accent,

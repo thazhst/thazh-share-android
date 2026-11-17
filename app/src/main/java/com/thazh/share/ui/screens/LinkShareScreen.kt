@@ -32,9 +32,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
+import com.thazh.share.ui.components.GlasmioActivityIndicator
+import com.thazh.share.ui.components.GlasmioLinearProgressBar
+import com.thazh.share.ui.components.GlasmioText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -231,12 +231,12 @@ fun LinkShareScreen(
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.link_share_hero_title),
                                     style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
                                     color = colors.content,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.link_share_hero_desc),
                                     style = GlasmioTheme.textStyles.footnote,
                                     color = colors.secondaryContent,
@@ -246,7 +246,7 @@ fun LinkShareScreen(
 
                         // Retention / Expiry selector chips
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.link_share_expiry_label),
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = colors.secondaryContent,
@@ -282,7 +282,7 @@ fun LinkShareScreen(
                                             .testTag("expiry_chip_${expiry.code}"),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Text(
+                                        GlasmioText(
                                             text = expiryDisplayLabel(expiry),
                                             style = GlasmioTheme.textStyles.caption1.copy(
                                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
@@ -309,7 +309,7 @@ fun LinkShareScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.link_share_uploading_file, uploadProgress.fileName),
                                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                                         color = colors.content,
@@ -318,20 +318,18 @@ fun LinkShareScreen(
                                         modifier = Modifier.weight(1f),
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
+                                    GlasmioText(
                                         text = "${(uploadProgress.fraction * 100).toInt()}%",
                                         style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Bold),
                                         color = semantic.accentBlue,
                                     )
                                 }
-                                LinearProgressIndicator(
-                                    progress = { uploadProgress.fraction },
+                                GlasmioLinearProgressBar(
+                                    progress = uploadProgress.fraction,
                                     color = semantic.accentBlue,
                                     trackColor = semantic.accentBlue.copy(alpha = 0.18f),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(ContinuousCapsule),
+                                    height = 6.dp,
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                                 val statsText = buildList {
                                     add("${FormatUtils.formatFileSize(uploadProgress.bytesUploaded)} / ${FormatUtils.formatFileSize(uploadProgress.totalBytes)}")
@@ -339,7 +337,7 @@ fun LinkShareScreen(
                                         add(FormatUtils.formatSpeed(uploadProgress.speedBytesPerSec))
                                     }
                                 }.joinToString(" • ")
-                                Text(
+                                GlasmioText(
                                     text = statsText,
                                     style = GlasmioTheme.textStyles.caption2,
                                     color = colors.secondaryContent,
@@ -366,7 +364,7 @@ fun LinkShareScreen(
                                         size = 18.dp,
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.transfer_pick_files),
                                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                                         color = Color.White,
@@ -392,7 +390,7 @@ fun LinkShareScreen(
                                         size = 18.dp,
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.transfer_pick_media),
                                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                                         color = colors.accent,
@@ -402,7 +400,7 @@ fun LinkShareScreen(
                         }
 
                         if (!uploadError.isNullOrBlank()) {
-                            Text(
+                            GlasmioText(
                                 text = uploadError,
                                 style = GlasmioTheme.textStyles.footnote,
                                 color = colors.destructive,
@@ -431,7 +429,7 @@ fun LinkShareScreen(
                             emphasis = GlassEmphasis.Regular,
                             size = GlasmioButtonSize.Small,
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.transfer_clear_finished),
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = colors.accent,
@@ -497,7 +495,7 @@ fun LinkShareScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     ) {
-                                        Text(
+                                        GlasmioText(
                                             text = stringResource(R.string.link_share_auth_title),
                                             style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
                                             color = colors.content,
@@ -508,14 +506,14 @@ fun LinkShareScreen(
                                                 .background(colors.secondaryContent.copy(alpha = 0.14f))
                                                 .padding(horizontal = 7.dp, vertical = 2.dp),
                                         ) {
-                                            Text(
+                                            GlasmioText(
                                                 text = stringResource(R.string.link_share_auth_optional_badge),
                                                 style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
                                                 color = colors.secondaryContent,
                                             )
                                         }
                                     }
-                                    Text(
+                                    GlasmioText(
                                         text = stringResource(R.string.link_share_auth_desc),
                                         style = GlasmioTheme.textStyles.footnote,
                                         color = colors.secondaryContent,
@@ -536,7 +534,7 @@ fun LinkShareScreen(
                             }
 
                             if (!authErrorMessage.isNullOrBlank()) {
-                                Text(
+                                GlasmioText(
                                     text = authErrorMessage!!,
                                     style = GlasmioTheme.textStyles.footnote,
                                     color = colors.destructive,
@@ -568,8 +566,8 @@ fun LinkShareScreen(
                                     .testTag("google_sign_in_button"),
                             ) {
                                 if (isSigningIn) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
+                                    GlasmioActivityIndicator(
+                                        size = 18.dp,
                                         color = Color.White,
                                         strokeWidth = 2.dp,
                                     )
@@ -583,7 +581,7 @@ fun LinkShareScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.link_share_sign_in_google),
                                     style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                                     color = Color.White,
@@ -621,7 +619,7 @@ fun LinkShareScreen(
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
+                                GlasmioText(
                                     text = user.displayName?.takeIf { it.isNotBlank() }
                                         ?: user.email
                                         ?: stringResource(R.string.link_share_signed_in_default),
@@ -630,7 +628,7 @@ fun LinkShareScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                Text(
+                                GlasmioText(
                                     text = user.email ?: stringResource(R.string.link_share_cloud_sync_active),
                                     style = GlasmioTheme.textStyles.footnote,
                                     color = colors.secondaryContent,
@@ -691,13 +689,13 @@ fun LinkShareScreen(
                                             tint = colors.tertiaryContent,
                                             size = 32.dp,
                                         )
-                                        Text(
+                                        GlasmioText(
                                             text = stringResource(R.string.link_share_cloud_empty_title),
                                             style = GlasmioTheme.textStyles.headline,
                                             color = colors.content,
                                             textAlign = TextAlign.Center,
                                         )
-                                        Text(
+                                        GlasmioText(
                                             text = stringResource(R.string.link_share_cloud_empty_body),
                                             style = GlasmioTheme.textStyles.subheadline,
                                             color = colors.secondaryContent,
@@ -873,7 +871,7 @@ private fun SharedLinkRowCard(
             ) {
                 FileTypeBadge(category = category, size = 44.dp)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
+                    GlasmioText(
                         text = fileName,
                         style = GlasmioTheme.textStyles.headline,
                         color = colors.content,
@@ -885,7 +883,7 @@ private fun SharedLinkRowCard(
                         add(expiryCodeToBadgeText(expiryCode))
                         add(FormatUtils.formatRelativeTime(timestampEpochMs))
                     }.joinToString(" • ")
-                    Text(
+                    GlasmioText(
                         text = meta,
                         style = GlasmioTheme.textStyles.caption1,
                         color = colors.secondaryContent,
@@ -896,7 +894,7 @@ private fun SharedLinkRowCard(
             }
 
             if (note.isNotBlank()) {
-                Text(
+                GlasmioText(
                     text = note,
                     style = GlasmioTheme.textStyles.footnote,
                     color = colors.content.copy(alpha = 0.85f),
@@ -922,7 +920,7 @@ private fun SharedLinkRowCard(
                     tint = semantic.accentBlue,
                     size = 16.dp,
                 )
-                Text(
+                GlasmioText(
                     text = url,
                     style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
                     color = semantic.accentBlue,
@@ -958,7 +956,7 @@ private fun SharedLinkRowCard(
                         size = 15.dp,
                     )
                     Spacer(modifier = Modifier.width(5.dp))
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.link_share_copy_button),
                         style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         color = Color.White,
@@ -978,7 +976,7 @@ private fun SharedLinkRowCard(
                         size = 15.dp,
                     )
                     Spacer(modifier = Modifier.width(5.dp))
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.received_files_share),
                         style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         color = colors.accent,

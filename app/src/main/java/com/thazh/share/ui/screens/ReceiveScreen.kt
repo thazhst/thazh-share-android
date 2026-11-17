@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Text
+import com.thazh.share.ui.components.GlasmioText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -210,7 +210,7 @@ fun ReceiveScreen(
                                 size = 18.dp,
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.visibility_enable_prompt),
                                 style = GlasmioTheme.textStyles.headline,
                                 color = Color.White,
@@ -263,7 +263,7 @@ fun ReceiveScreen(
                             size = GlasmioButtonSize.Small,
                             modifier = Modifier.testTag("receive_clear_finished_button"),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.transfer_clear_finished),
                                 style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
                                 color = colors.accent,
@@ -291,13 +291,13 @@ fun ReceiveScreen(
                                 tint = colors.tertiaryContent,
                                 size = 34.dp,
                             )
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.receive_empty_title),
                                 style = GlasmioTheme.textStyles.headline,
                                 color = colors.content,
                                 textAlign = TextAlign.Center,
                             )
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.receive_empty_body),
                                 style = GlasmioTheme.textStyles.subheadline,
                                 color = colors.secondaryContent,

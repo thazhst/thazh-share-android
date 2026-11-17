@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,8 +75,8 @@ fun NfcTapCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (isPairing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                        GlasmioActivityIndicator(
+                            size = 20.dp,
                             color = semantic.accentBlue,
                             strokeWidth = 2.2.dp,
                         )
@@ -97,7 +95,7 @@ fun NfcTapCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
+                        GlasmioText(
                             text = stringResource(R.string.nfc_card_title),
                             style = GlasmioTheme.textStyles.headline,
                             color = colors.content,
@@ -109,7 +107,7 @@ fun NfcTapCard(
                                     .background(semantic.accentGreen.copy(alpha = if (colors.isDark) 0.24f else 0.18f))
                                     .padding(horizontal = 8.dp, vertical = 2.dp),
                             ) {
-                                Text(
+                                GlasmioText(
                                     text = stringResource(R.string.nfc_status_ready),
                                     style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                     color = semantic.accentGreen,
@@ -118,7 +116,7 @@ fun NfcTapCard(
                         }
                     }
                     Spacer(modifier = Modifier.height(3.dp))
-                    Text(
+                    GlasmioText(
                         text = when {
                             isPairing -> stringResource(R.string.nfc_card_connecting, nfcPairingPeerName!!)
                             isNfcEnabled -> stringResource(R.string.nfc_card_ready)
@@ -138,7 +136,7 @@ fun NfcTapCard(
                         size = GlasmioButtonSize.Medium,
                         modifier = Modifier.testTag("enable_nfc_button"),
                     ) {
-                        Text(
+                        GlasmioText(
                             text = stringResource(R.string.nfc_open_settings),
                             style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                             color = Color.White,

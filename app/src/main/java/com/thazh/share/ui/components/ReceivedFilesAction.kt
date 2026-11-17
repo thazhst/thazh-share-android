@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +47,7 @@ fun ReceivedFilesAction(
                     .background(GlasmioTheme.colors.destructive),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
+                GlasmioText(
                     text = if (unseenCount > 99) "99+" else unseenCount.toString(),
                     style = GlasmioTheme.textStyles.caption2.copy(
                         fontSize = 10.sp,

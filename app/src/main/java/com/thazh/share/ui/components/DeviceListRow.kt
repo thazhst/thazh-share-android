@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,7 +116,7 @@ fun DiscoveredPeerRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
+                GlasmioText(
                     text = peer.deviceName.ifBlank { peer.deviceAddress },
                     style = GlasmioTheme.textStyles.headline,
                     color = colors.content,
@@ -132,7 +130,7 @@ fun DiscoveredPeerRow(
                         .background(badgeColor.copy(alpha = if (colors.isDark) 0.24f else 0.14f))
                         .padding(horizontal = 7.dp, vertical = 2.dp),
                 ) {
-                    Text(
+                    GlasmioText(
                         text = transportLabel,
                         style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
                         color = badgeColor,
@@ -155,7 +153,7 @@ fun DiscoveredPeerRow(
                     }.joinToString(" • ")
                 }
             }
-            Text(
+            GlasmioText(
                 text = statusSubtitle,
                 style = GlasmioTheme.textStyles.footnote,
                 color = colors.secondaryContent,
@@ -168,14 +166,14 @@ fun DiscoveredPeerRow(
 
         when {
             isConnecting || peer.status == PeerStatus.INVITED -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
+                GlasmioActivityIndicator(
+                    size = 20.dp,
                     color = colors.accent,
                     strokeWidth = 2.2.dp,
                 )
             }
             peer.status == PeerStatus.CONNECTED -> {
-                Text(
+                GlasmioText(
                     text = stringResource(R.string.discover_connect),
                     style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     color = semantic.accentGreen,
@@ -188,7 +186,7 @@ fun DiscoveredPeerRow(
                     size = GlasmioButtonSize.Medium,
                     modifier = Modifier.testTag("connect_peer_button_${peer.deviceAddress}"),
                 ) {
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.discover_connect),
                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                         color = Color.White,
@@ -244,7 +242,7 @@ fun SavedDeviceRow(
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            GlasmioText(
                 text = device.effectiveName,
                 style = GlasmioTheme.textStyles.headline,
                 color = colors.content,
@@ -261,7 +259,7 @@ fun SavedDeviceRow(
                     tint = colors.tertiaryContent,
                     size = 13.dp,
                 )
-                Text(
+                GlasmioText(
                     text = FormatUtils.formatRelativeTime(device.lastConnectedAtEpochMs),
                     style = GlasmioTheme.textStyles.footnote,
                     color = colors.secondaryContent,

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,7 +89,7 @@ fun VisibilitySelectorCard(
                         tint = accentColor,
                         size = 20.dp,
                     )
-                    Text(
+                    GlasmioText(
                         text = stringResource(R.string.visibility_card_title),
                         style = GlasmioTheme.textStyles.headline,
                         color = colors.content,
@@ -114,7 +113,7 @@ fun VisibilitySelectorCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.visibility_timer_badge, formattedTimer),
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = semantic.accentBlue,
@@ -137,7 +136,7 @@ fun VisibilitySelectorCard(
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                                 .testTag("visibility_always_badge"),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = stringResource(R.string.visibility_active_always_badge),
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                                 color = semantic.accentGreen,
@@ -154,7 +153,7 @@ fun VisibilitySelectorCard(
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                                 .testTag("visibility_hidden_badge"),
                         ) {
-                            Text(
+                            GlasmioText(
                                 text = hiddenLabel,
                                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.Medium),
                                 color = colors.secondaryContent,
@@ -205,7 +204,7 @@ fun VisibilitySelectorCard(
                         size = 15.dp,
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
+                    GlasmioText(
                         text = label,
                         style = GlasmioTheme.textStyles.caption1.copy(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,

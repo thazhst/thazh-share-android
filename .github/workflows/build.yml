@@ -95,33 +95,51 @@ jobs:
           fi
           echo "app/google-services.json is present."
 
-      - name: Restore or sanity-check release keystore
+      - name: Restore keystore from RELEASE_KEYSTORE_BASE64 secret
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-debug.keystore
-            echo "Restored persistent release keystore from RELEASE_KEYSTORE_BASE64 secret."
-          fi
-          if [ ! -f release-debug.keystore ]; then
-            echo "::error::release-debug.keystore is missing from the repository root."
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::RELEASE_KEYSTORE_BASE64 secret is missing. Please configure RELEASE_KEYSTORE_BASE64 in GitHub Secrets."
             exit 1
           fi
-          echo "Keystore present, proceeding with build."
+          rm -f /tmp/secret.keystore release-debug.keystore debug.keystore
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > /tmp/secret.keystore
 
-      - name: Ensure debug keystore is present
-        run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+          # Determine source keystore password & alias (supports custom secrets, 'wifidirectchat', or 'android')
+          SRC_PASS=""
+          for candidate in "$RELEASE_STORE_PASSWORD" "wifidirectchat" "android"; do
+            if [ -n "$candidate" ] && keytool -list -keystore /tmp/secret.keystore -storepass "$candidate" >/dev/null 2>&1; then
+              SRC_PASS="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SRC_PASS" ]; then
+            echo "::error::Unable to unlock keystore from RELEASE_KEYSTORE_BASE64. Check RELEASE_STORE_PASSWORD."
+            exit 1
           fi
+
+          if [ -n "$RELEASE_KEY_ALIAS" ]; then
+            SRC_ALIAS="$RELEASE_KEY_ALIAS"
+          else
+            SRC_ALIAS=$(keytool -list -v -keystore /tmp/secret.keystore -storepass "$SRC_PASS" | awk '/Alias name:/ {print $3; exit}')
+          fi
+          SRC_KEY_PASS="${RELEASE_KEY_PASSWORD:-$SRC_PASS}"
+
+          # Provision release-debug.keystore and debug.keystore with the exact certificate from RELEASE_KEYSTORE_BASE64
+          keytool -importkeystore \
+            -srckeystore /tmp/secret.keystore -srcstorepass "$SRC_PASS" -srcalias "$SRC_ALIAS" -srckeypass "$SRC_KEY_PASS" \
+            -destkeystore release-debug.keystore -deststorepass wifidirectchat -destalias wifidirectchat -destkeypass wifidirectchat \
+            -noprompt
+          keytool -importkeystore \
+            -srckeystore /tmp/secret.keystore -srcstorepass "$SRC_PASS" -srcalias "$SRC_ALIAS" -srckeypass "$SRC_KEY_PASS" \
+            -destkeystore debug.keystore -deststorepass android -destalias androiddebugkey -destkeypass android \
+            -noprompt
+          rm -f /tmp/secret.keystore
+          echo "Restored signing keystores exclusively from RELEASE_KEYSTORE_BASE64 secret."
 
       - name: Lint (non-blocking)
         run: ./gradlew lintDebug --stacktrace
@@ -230,13 +248,48 @@ jobs:
             exit 1
           fi
 
-      - name: Restore persistent release keystore (if configured)
+      - name: Restore keystore from RELEASE_KEYSTORE_BASE64 secret
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release-debug.keystore
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::RELEASE_KEYSTORE_BASE64 secret is missing. Please configure RELEASE_KEYSTORE_BASE64 in GitHub Secrets."
+            exit 1
           fi
+          rm -f /tmp/secret.keystore release-debug.keystore debug.keystore
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > /tmp/secret.keystore
+
+          SRC_PASS=""
+          for candidate in "$RELEASE_STORE_PASSWORD" "wifidirectchat" "android"; do
+            if [ -n "$candidate" ] && keytool -list -keystore /tmp/secret.keystore -storepass "$candidate" >/dev/null 2>&1; then
+              SRC_PASS="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SRC_PASS" ]; then
+            echo "::error::Unable to unlock keystore from RELEASE_KEYSTORE_BASE64. Check RELEASE_STORE_PASSWORD."
+            exit 1
+          fi
+
+          if [ -n "$RELEASE_KEY_ALIAS" ]; then
+            SRC_ALIAS="$RELEASE_KEY_ALIAS"
+          else
+            SRC_ALIAS=$(keytool -list -v -keystore /tmp/secret.keystore -storepass "$SRC_PASS" | awk '/Alias name:/ {print $3; exit}')
+          fi
+          SRC_KEY_PASS="${RELEASE_KEY_PASSWORD:-$SRC_PASS}"
+
+          keytool -importkeystore \
+            -srckeystore /tmp/secret.keystore -srcstorepass "$SRC_PASS" -srcalias "$SRC_ALIAS" -srckeypass "$SRC_KEY_PASS" \
+            -destkeystore release-debug.keystore -deststorepass wifidirectchat -destalias wifidirectchat -destkeypass wifidirectchat \
+            -noprompt
+          keytool -importkeystore \
+            -srckeystore /tmp/secret.keystore -srcstorepass "$SRC_PASS" -srcalias "$SRC_ALIAS" -srckeypass "$SRC_KEY_PASS" \
+            -destkeystore debug.keystore -deststorepass android -destalias androiddebugkey -destkeypass android \
+            -noprompt
+          rm -f /tmp/secret.keystore
 
       - name: Build release APK (signed)
         run: ./gradlew assembleRelease --stacktrace

@@ -13,8 +13,8 @@ android {
         applicationId = "com.thazh.share"
         minSdk = 33
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -74,6 +74,11 @@ android {
 }
 
 dependencies {
+    // Glasmio Liquid Glass Design System modules
+    implementation(project(":glasmio-core"))
+    implementation(project(":glasmio-icons"))
+    implementation(project(":glasmio-glass"))
+    implementation(project(":glasmio-ui"))
     implementation(project(":glasmio-scaffold"))
     implementation(project(":glasmio-preference"))
 
@@ -91,7 +96,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-util")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
     // Coroutines

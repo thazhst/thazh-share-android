@@ -1,14 +1,18 @@
-# Add project specific ProGuard rules here.
+# ProGuard / R8 configuration for Thazh Share (Uptodown & Release Store Build)
 
-# Keep WiFi P2P framework classes
+# Keep Wi-Fi P2P & Bluetooth & NFC framework classes
 -keep class android.net.wifi.p2p.** { *; }
+-keep class android.bluetooth.** { *; }
+-keep class android.nfc.** { *; }
 
-# Keep our data models (used with kotlinx.serialization reflection)
+# Keep our data & network models (used with kotlinx.serialization & Firestore reflection)
 -keep class com.thazh.share.data.** { *; }
 -keepclassmembers class com.thazh.share.data.** { *; }
+-keep class com.thazh.share.network.** { *; }
+-keepclassmembers class com.thazh.share.network.** { *; }
 
 # kotlinx.serialization
--keepattributes *Annotation*, InnerClasses
+-keepattributes *Annotation*, InnerClasses, Signature, EnclosingMethod
 -dontnote kotlinx.serialization.AnnotationsKt
 -keepclassmembers class kotlinx.serialization.json.** {
     *** Companion;
@@ -24,6 +28,11 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+# Firebase Firestore & Auth & Google Credential Manager
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class androidx.credentials.** { *; }
+
 # Keep Parcelable implementations
 -keepclassmembers class * implements android.os.Parcelable {
     static ** CREATOR;
@@ -36,3 +45,4 @@
 
 -dontoptimize
 -dontwarn org.jetbrains.annotations.**
+-dontwarn com.google.errorprone.annotations.**

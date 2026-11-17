@@ -20,14 +20,14 @@ captures/
 .externalNativeBuild/
 .cxx/
 
-# Keystores — this project intentionally commits release-debug.keystore
-# (a throwaway, publicly-known-password signing key used only so CI can
-# produce an installable, consistently-signed APK without secrets). Any
-# OTHER keystore you add for real distribution should NOT be committed —
-# ignore those patterns below and manage real keys as CI secrets instead.
+# Keystores — all keystores are managed via GitHub Secrets (RELEASE_KEYSTORE_BASE64)
+# and must never be committed to the repository.
 *.jks
 *.keystore
-!release-debug.keystore
+*.keystore.base64
+debug.keystore
+debug.keystore.base64
+release-debug.keystore
 
 # OS files
 .DS_Store
