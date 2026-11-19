@@ -1,6 +1,7 @@
 package com.thazh.share.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -13,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -21,10 +21,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -48,16 +47,17 @@ private const val IOS_DIM_MAX_ALPHA = 0.14f
 
 /**
  * Interactive iOS-style left-to-right swipe-back container with:
- * - Full-page and left-edge horizontal gesture recognition
+ * - Zero-recomposition frame updates (all drag/settle progress read strictly in Draw/Layer phases)
+ * - Touch-down underlay pre-warming so heavy screens never stutter on the first drag frame
+ * - Hold-at-1f commit state so the outgoing screen never snaps back or double-animates on pop
  * - Automatic exclusion of horizontal controls via [LocalGlasmioSwipeBackExclusions]
- * - 30% underlying page parallax, 14% dimming scrim, and left-edge drop shadow
- * - UIKit 3-sample velocity + acceleration release projection and spring completion
  */
 @Composable
 fun IosSwipeBackContainer(
     enabled: Boolean,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    contentKey: Any? = Unit,
     previousContent: (@Composable () -> Unit)? = null,
     currentContent: @Composable () -> Unit,
 ) {
@@ -69,42 +69,49 @@ fun IosSwipeBackContainer(
     val currentOnBack by rememberUpdatedState(onBack)
     val currentEnabled by rememberUpdatedState(enabled)
 
-    var isDragging by remember { mutableStateOf(false) }
-    var dragProgress by remember { mutableFloatStateOf(0f) }
-    val settleAnimatable = remember { Animatable(0f) }
-    var isSettling by remember { mutableStateOf(false) }
+    // Single Animatable drives both finger tracking and spring settle without recomposing the tree.
+    val progressAnimatable = remember(contentKey) { Animatable(0f) }
+    var isGestureActive by remember(contentKey) { mutableStateOf(false) }
+    var isSettling by remember(contentKey) { mutableStateOf(false) }
+    var isCommitted by remember(contentKey) { mutableStateOf(false) }
 
-    LaunchedEffect(enabled) {
+    LaunchedEffect(enabled, contentKey) {
         if (!enabled) {
-            isDragging = false
+            isGestureActive = false
             isSettling = false
-            dragProgress = 0f
-            settleAnimatable.snapTo(0f)
+            isCommitted = false
+            progressAnimatable.snapTo(0f)
         }
     }
 
-    val activeProgress = when {
-        isDragging -> dragProgress
-        isSettling -> settleAnimatable.value
-        else -> 0f
-    }.coerceIn(0f, 1f)
+    val currentProgress: () -> Float = remember(progressAnimatable) {
+        {
+            if (isCommitted) 1f else progressAnimatable.value.coerceIn(0f, 1f)
+        }
+    }
 
-    val showUnderlay = previousContent != null && activeProgress > 0.0005f
-    val cornerShape = remember(activeProgress > 0.005f) {
-        if (activeProgress > 0.005f) ContinuousRoundedRectangle(24.dp) else RectangleShape
+    val draggedCornerShape = remember { ContinuousRoundedRectangle(24.dp) }
+    val edgeShadowBrush = remember {
+        Brush.horizontalGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color.Black.copy(alpha = 0.16f),
+            ),
+        )
     }
 
     val gestureModifier = if (!enabled) {
         Modifier
     } else {
-        Modifier.pointerInput(layoutDirection, exclusions) {
+        Modifier.pointerInput(layoutDirection, exclusions, contentKey) {
             val sign = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
-            val edgePriorityWidthPx = 28.dp.toPx()
+            val edgePriorityWidthPx = 32.dp.toPx()
+            val edgePrewarmWidthPx = 56.dp.toPx()
             val slopPx = max(viewConfiguration.touchSlop, 10.dp.toPx())
 
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
-                if (!currentEnabled || isSettling) return@awaitEachGesture
+                if (!currentEnabled || isSettling || isCommitted) return@awaitEachGesture
                 val root = rootCoordinates[0]?.takeIf { it.isAttached } ?: return@awaitEachGesture
 
                 val isLeftEdgeStart = if (layoutDirection == LayoutDirection.Ltr) {
@@ -112,9 +119,20 @@ fun IosSwipeBackContainer(
                 } else {
                     down.position.x >= size.width - edgePriorityWidthPx
                 }
+                val isNearLeftEdge = if (layoutDirection == LayoutDirection.Ltr) {
+                    down.position.x <= edgePrewarmWidthPx
+                } else {
+                    down.position.x >= size.width - edgePrewarmWidthPx
+                }
 
                 if (!isLeftEdgeStart && exclusions.hitTest(root.localToWindow(down.position))) {
                     return@awaitEachGesture
+                }
+
+                // Pre-warm underlay composition on left-edge touch-down while finger is still at 0f
+                // so the first drag movement frame never drops frames composing previousContent.
+                if (isNearLeftEdge && previousContent != null && !isGestureActive) {
+                    isGestureActive = true
                 }
 
                 val widthPx = size.width.toFloat().coerceAtLeast(1f)
@@ -129,11 +147,13 @@ fun IosSwipeBackContainer(
 
                 while (!claimed) {
                     val event = awaitPointerEvent(PointerEventPass.Final)
-                    val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
-                    if (!change.pressed || event.changes.count { it.pressed } != 1 || !currentEnabled) {
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed || event.changes.count { it.pressed } != 1 || !currentEnabled) {
+                        if (!isSettling && !isCommitted) isGestureActive = false
                         return@awaitEachGesture
                     }
                     if (change.uptimeMillis - down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) {
+                        if (!isSettling && !isCommitted) isGestureActive = false
                         return@awaitEachGesture
                     }
 
@@ -144,24 +164,28 @@ fun IosSwipeBackContainer(
                     totalDy += delta.y
 
                     if (!isLeftEdgeStart && change.isConsumed) {
+                        if (!isSettling && !isCommitted) isGestureActive = false
                         return@awaitEachGesture
                     }
                     if (totalDx < -slopPx || (abs(totalDy) > slopPx && abs(totalDy) > abs(totalDx))) {
+                        if (!isSettling && !isCommitted) isGestureActive = false
                         return@awaitEachGesture
                     }
-                    if (totalDx > slopPx && totalDx > abs(totalDy) * 1.15f) {
+                    if (totalDx > slopPx && totalDx > abs(totalDy) * 1.12f) {
                         val initialTravel = (totalDx - slopPx).coerceAtLeast(0f)
                         totalDx = initialTravel
-                        dragProgress = (initialTravel / widthPx).coerceIn(0f, 1f)
+                        val initialProgress = (initialTravel / widthPx).coerceIn(0f, 1f)
+                        isGestureActive = true
+                        scope.launch { progressAnimatable.snapTo(initialProgress) }
                         val vx = sign * velocityTracker.calculateVelocity().x / widthPx
-                        releaseProjector.sample(dragProgress, change.uptimeMillis, vx)
-                        isDragging = true
+                        releaseProjector.sample(initialProgress, change.uptimeMillis, vx)
                         change.consume()
                         claimed = true
                     }
                 }
 
                 var cancelled = false
+                var latestProgress = (totalDx / widthPx).coerceIn(0f, 1f)
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
                     val change = event.changes.firstOrNull { it.id == down.id }
@@ -175,43 +199,48 @@ fun IosSwipeBackContainer(
                     if (event.changes.none { it.pressed }) {
                         if (change != null && !cancelled) {
                             totalDx = (totalDx + sign * change.positionChangeIgnoreConsumed().x).coerceAtLeast(0f)
-                            dragProgress = (totalDx / widthPx).coerceIn(0f, 1f)
+                            latestProgress = (totalDx / widthPx).coerceIn(0f, 1f)
+                            scope.launch { progressAnimatable.snapTo(latestProgress) }
                             val vx = sign * velocityTracker.calculateVelocity().x / widthPx
-                            releaseProjector.sample(dragProgress, change.uptimeMillis, vx)
+                            releaseProjector.sample(latestProgress, change.uptimeMillis, vx)
                         }
                         break
                     }
                     if (cancelled || change == null) continue
                     totalDx = (totalDx + sign * change.positionChangeIgnoreConsumed().x).coerceAtLeast(0f)
-                    dragProgress = (totalDx / widthPx).coerceIn(0f, 1f)
+                    latestProgress = (totalDx / widthPx).coerceIn(0f, 1f)
+                    scope.launch { progressAnimatable.snapTo(latestProgress) }
                     val vx = sign * velocityTracker.calculateVelocity().x / widthPx
-                    releaseProjector.sample(dragProgress, change.uptimeMillis, vx)
+                    releaseProjector.sample(latestProgress, change.uptimeMillis, vx)
                 }
 
                 val releaseVelocity = if (cancelled) 0f else sign * velocityTracker.calculateVelocity().x / widthPx
-                val endProgress = dragProgress
-                val shouldCommit = !cancelled && releaseProjector.shouldCommit(endProgress, releaseVelocity)
+                val shouldCommit = !cancelled && releaseProjector.shouldCommit(latestProgress, releaseVelocity)
 
-                isDragging = false
                 isSettling = true
                 scope.launch {
-                    settleAnimatable.snapTo(endProgress)
+                    progressAnimatable.snapTo(latestProgress)
                     val target = if (shouldCommit) 1f else 0f
-                    settleAnimatable.animateTo(
+                    progressAnimatable.animateTo(
                         targetValue = target,
                         initialVelocity = releaseVelocity,
                         animationSpec = spring(
-                            dampingRatio = 0.88f,
-                            stiffness = 460f,
-                            visibilityThreshold = 0.001f,
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = 560f,
+                            visibilityThreshold = 0.004f,
                         ),
                     )
                     if (shouldCommit) {
+                        // Lock visual progress at 1f before invoking onBack() so the outgoing page
+                        // never snaps back to 0f before the parent navigation state updates.
+                        isCommitted = true
+                        isSettling = false
                         currentOnBack()
+                    } else {
+                        progressAnimatable.snapTo(0f)
+                        isSettling = false
+                        isGestureActive = false
                     }
-                    dragProgress = 0f
-                    settleAnimatable.snapTo(0f)
-                    isSettling = false
                 }
             }
         }
@@ -223,49 +252,46 @@ fun IosSwipeBackContainer(
             .onGloballyPositioned { rootCoordinates[0] = it }
             .then(gestureModifier),
     ) {
-        if (showUnderlay && previousContent != null) {
+        if (isGestureActive && previousContent != null) {
             val underlayExclusions = remember { GlasmioSwipeBackExclusionRegistry() }
             CompositionLocalProvider(LocalGlasmioSwipeBackExclusions provides underlayExclusions) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
+                            val p = currentProgress()
                             val sign = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
-                            translationX = -sign * size.width * IOS_PARALLAX_FACTOR * (1f - activeProgress)
+                            translationX = -sign * size.width * IOS_PARALLAX_FACTOR * (1f - p)
+                            alpha = if (p > 0.0005f) 1f else 0f
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            val p = currentProgress()
+                            val dimAlpha = IOS_DIM_MAX_ALPHA * (1f - p)
+                            if (dimAlpha > 0.001f) {
+                                drawRect(color = Color.Black, alpha = dimAlpha)
+                            }
                         },
                 ) {
                     previousContent()
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Color.Black.copy(alpha = IOS_DIM_MAX_ALPHA * (1f - activeProgress)),
-                            ),
-                    )
                 }
             }
         }
 
-        if (activeProgress > 0.001f) {
+        if (isGestureActive) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(18.dp)
                     .align(Alignment.CenterStart)
                     .graphicsLayer {
+                        val p = currentProgress()
                         val parentW = (rootCoordinates[0]?.size?.width ?: 0).toFloat()
                         val sign = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
-                        translationX = sign * (parentW * activeProgress - size.width)
-                        alpha = (1f - activeProgress).coerceIn(0f, 1f)
+                        translationX = sign * (parentW * p - size.width)
+                        alpha = if (p > 0.002f && p < 0.998f) (1f - p).coerceIn(0f, 1f) else 0f
                     }
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.14f),
-                            ),
-                        ),
-                    ),
+                    .background(edgeShadowBrush),
             )
         }
 
@@ -274,10 +300,16 @@ fun IosSwipeBackContainer(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
+                        val p = currentProgress()
                         val sign = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
-                        translationX = sign * size.width * activeProgress
-                    }
-                    .clip(cornerShape),
+                        translationX = sign * size.width * p
+                        if (p > 0.002f && p < 0.999f) {
+                            shape = draggedCornerShape
+                            clip = true
+                        } else {
+                            clip = false
+                        }
+                    },
             ) {
                 currentContent()
             }
@@ -289,7 +321,7 @@ fun IosSwipeBackContainer(
  * UIKit three-sample velocity + acceleration projection in normalized screen-width units.
  */
 private class IosReleaseProjector(widthPoints: Float) {
-    private val threshold = minOf(165f / widthPoints.coerceAtLeast(1f), 0.36f)
+    private val threshold = minOf(165f / widthPoints.coerceAtLeast(1f), 0.35f)
     private val velocities = FloatArray(3)
     private val accelerations = FloatArray(3)
     private var count = 0
@@ -318,11 +350,11 @@ private class IosReleaseProjector(widthPoints: Float) {
 
     fun shouldCommit(progress: Float, releaseVelocity: Float): Boolean {
         if (releaseVelocity < -0.45f) return false
-        if (progress >= 0.36f || releaseVelocity >= 0.75f) return true
+        if (progress >= 0.34f || releaseVelocity >= 0.70f) return true
         val samples = minOf(count, 3)
         if (samples == 0) return false
         val avgVelocity = velocities.sum() / samples
-        if (count < 3) return avgVelocity > 0.3f
+        if (count < 3) return avgVelocity > 0.28f
         val avgAcceleration = accelerations.sum() / samples
         return progress + 0.35f * avgVelocity + 0.5f * 0.35f * 0.35f * avgAcceleration > threshold
     }

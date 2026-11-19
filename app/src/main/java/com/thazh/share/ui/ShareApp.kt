@@ -6,11 +6,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -146,6 +148,8 @@ fun ShareApp(viewModel: ShareViewModel) {
     val isBleSupported = remember { viewModel.isBleFastDiscoverySupported() }
 
     var selectedTab by rememberSaveable { mutableStateOf(ShareTab.SEND) }
+    var isTabSwipePop by remember { mutableStateOf(false) }
+    var isNavSwipePop by remember { mutableStateOf(false) }
     val tabHistory = rememberSaveable(
         saver = listSaver(
             save = { list -> list.map { it.name } },
@@ -160,6 +164,7 @@ fun ShareApp(viewModel: ShareViewModel) {
 
     fun navigateToTab(targetTab: ShareTab) {
         if (targetTab == selectedTab) return
+        isTabSwipePop = false
         // Avoid unbounded duplicate cycles while preserving exact previous-page history
         if (tabHistory.lastOrNull() == targetTab) {
             tabHistory.removeAt(tabHistory.lastIndex)
@@ -172,7 +177,8 @@ fun ShareApp(viewModel: ShareViewModel) {
         selectedTab = targetTab
     }
 
-    fun popToPreviousTab() {
+    fun popToPreviousTab(fromSwipe: Boolean = false) {
+        isTabSwipePop = fromSwipe
         val prev = tabHistory.removeLastOrNull()
         if (prev != null) {
             selectedTab = prev
@@ -289,6 +295,7 @@ fun ShareApp(viewModel: ShareViewModel) {
         NavigationBarSurfaceHeight + 24.dp
 
     val openSettings = {
+        isNavSwipePop = false
         navController.navigate(ShareRoutes.SETTINGS) { launchSingleTop = true }
     }
 
@@ -348,6 +355,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                     }
                     IosSwipeBackContainer(
                         enabled = allowInteractiveSwipe,
+                        contentKey = "send_transfer_session",
                         onBack = { showTransferSessionOnSendTab = false },
                         previousContent = { RenderDiscoveryContent() },
                     ) {
@@ -505,13 +513,16 @@ fun ShareApp(viewModel: ShareViewModel) {
 
         if (interactiveBackHandler) {
             BackHandler(enabled = canPopTab) {
-                popToPreviousTab()
+                popToPreviousTab(fromSwipe = false)
             }
         }
 
         val tabsContentBackdrop = rememberLayerBackdrop()
         val tabsOverlayBackdrop = rememberCombinedBackdrop(hostBackdrop, tabsContentBackdrop)
         val compactProgress = remember { mutableFloatStateOf(0f) }
+        val tabSlideSpec = remember {
+            spring<IntOffset>(dampingRatio = 0.94f, stiffness = 430f)
+        }
 
         val sendLabel = stringResource(R.string.tab_send)
         val receiveLabel = stringResource(R.string.tab_receive)
@@ -562,8 +573,22 @@ fun ShareApp(viewModel: ShareViewModel) {
                     AnimatedContent(
                         targetState = selectedTab,
                         transitionSpec = {
-                            (fadeIn(tween(200)) + scaleIn(initialScale = 0.985f, animationSpec = tween(220))) togetherWith
-                                fadeOut(tween(150))
+                            if (isTabSwipePop) {
+                                // Interactive swipe-back already completed the 100% slide to the previous tab;
+                                // hand off immediately so the transition never repeats.
+                                EnterTransition.None togetherWith ExitTransition.None
+                            } else {
+                                // Directional horizontal slide linked to tab index order (left <-> right)
+                                val direction = if (targetState.index >= initialState.index) 1 else -1
+                                (
+                                    slideInHorizontally(tabSlideSpec) { fullWidth -> direction * fullWidth } +
+                                        fadeIn(tween(190), initialAlpha = 0.45f)
+                                    ) togetherWith (
+                                    slideOutHorizontally(tabSlideSpec) { fullWidth ->
+                                        -direction * (fullWidth * 0.42f).toInt()
+                                    } + fadeOut(tween(170))
+                                    ) using SizeTransform(clip = false)
+                            }
                         },
                         label = "main_tab_transition",
                     ) { tab ->
@@ -573,7 +598,8 @@ fun ShareApp(viewModel: ShareViewModel) {
 
                         IosSwipeBackContainer(
                             enabled = tabSwipeEnabled,
-                            onBack = { popToPreviousTab() },
+                            contentKey = tab,
+                            onBack = { popToPreviousTab(fromSwipe = true) },
                             previousContent = if (prevTab != null) {
                                 { RenderTabPageSurface(tab = prevTab, allowInteractiveSwipe = false) }
                             } else {
@@ -632,10 +658,18 @@ fun ShareApp(viewModel: ShareViewModel) {
                     slideOutHorizontally(iosSlideSpec) { -(it * 0.30f).toInt() }
                 },
                 popEnterTransition = {
-                    slideInHorizontally(iosSlideSpec) { -(it * 0.30f).toInt() }
+                    if (isNavSwipePop) {
+                        EnterTransition.None
+                    } else {
+                        slideInHorizontally(iosSlideSpec) { -(it * 0.30f).toInt() }
+                    }
                 },
                 popExitTransition = {
-                    slideOutHorizontally(iosSlideSpec) { it }
+                    if (isNavSwipePop) {
+                        ExitTransition.None
+                    } else {
+                        slideOutHorizontally(iosSlideSpec) { it }
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -649,7 +683,11 @@ fun ShareApp(viewModel: ShareViewModel) {
                     // returns to the Settings hub first rather than jumping back to MAIN_TABS
                     IosSwipeBackContainer(
                         enabled = !isSettingsSubPageActive,
-                        onBack = { navController.popBackStack() },
+                        contentKey = ShareRoutes.SETTINGS,
+                        onBack = {
+                            isNavSwipePop = true
+                            navController.popBackStack()
+                        },
                         previousContent = { RenderMainTabsBody(interactiveBackHandler = false) },
                     ) {
                         SettingsScreen(
@@ -686,6 +724,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                             onToggleLiquidGlass = { viewModel.setLiquidGlassEnabled(it) },
                             onOpenNfcSettings = { viewModel.openNfcSettings() },
                             onOpenReceivedFiles = {
+                                isNavSwipePop = false
                                 navigateToTab(ShareTab.RECEIVED_FILES)
                                 navController.popBackStack(ShareRoutes.MAIN_TABS, inclusive = false)
                             },
@@ -708,12 +747,16 @@ fun ShareApp(viewModel: ShareViewModel) {
                                 }
                             },
                             onOpenAboutApp = {
+                                isNavSwipePop = false
                                 navController.navigate(ShareRoutes.ABOUT_APP) { launchSingleTop = true }
                             },
                             onSubPageActiveChange = { active ->
                                 isSettingsSubPageActive = active
                             },
-                            onBack = { navController.popBackStack() },
+                            onBack = {
+                                isNavSwipePop = false
+                                navController.popBackStack()
+                            },
                         )
                     }
                 }
@@ -722,7 +765,11 @@ fun ShareApp(viewModel: ShareViewModel) {
                     val totalReceivedBytes = remember(receivedFiles) { receivedFiles.sumOf { it.sizeBytes } }
                     IosSwipeBackContainer(
                         enabled = true,
-                        onBack = { navController.popBackStack() },
+                        contentKey = ShareRoutes.ABOUT_APP,
+                        onBack = {
+                            isNavSwipePop = true
+                            navController.popBackStack()
+                        },
                         previousContent = {
                             SettingsScreen(
                                 currentDisplayName = displayName,
@@ -766,7 +813,10 @@ fun ShareApp(viewModel: ShareViewModel) {
                         },
                     ) {
                         AboutAppScreen(
-                            onBack = { navController.popBackStack() },
+                            onBack = {
+                                isNavSwipePop = false
+                                navController.popBackStack()
+                            },
                         )
                     }
                 }

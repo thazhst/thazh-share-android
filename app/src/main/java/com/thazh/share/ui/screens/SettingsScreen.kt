@@ -4,6 +4,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -192,12 +194,14 @@ fun SettingsScreen(
 
     // Sub-page navigation state inside Settings (each of the 6 categories has its own dedicated page)
     var selectedCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
+    var isCategorySwipePop by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedCategory) {
         onSubPageActiveChange(selectedCategory != null)
     }
 
     BackHandler(enabled = selectedCategory != null) {
+        isCategorySwipePop = false
         selectedCategory = null
     }
 
@@ -231,7 +235,10 @@ fun SettingsScreen(
             manufacturer = manufacturer,
             appVersion = appVersion,
             interactive = interactive,
-            onSelectCategory = { category -> selectedCategory = category },
+            onSelectCategory = { category ->
+                isCategorySwipePop = false
+                selectedCategory = category
+            },
             onUpdateDisplayName = onUpdateDisplayName,
             onToggleSyncDeviceNameWithAccount = onToggleSyncDeviceNameWithAccount,
             onSelectVisibilityMode = onSelectVisibilityMode,
@@ -259,6 +266,10 @@ fun SettingsScreen(
                 if (targetState != null && initialState == null) {
                     slideInHorizontally(slideSpec) { it } + fadeIn(tween(180)) togetherWith
                         slideOutHorizontally(slideSpec) { -(it * 0.28f).toInt() } + fadeOut(tween(150))
+                } else if (isCategorySwipePop) {
+                    // Interactive swipe-back already slid the sub-page 100% off-screen;
+                    // hand off immediately so the pop transition never repeats.
+                    EnterTransition.None togetherWith ExitTransition.None
                 } else {
                     slideInHorizontally(slideSpec) { -(it * 0.28f).toInt() } + fadeIn(tween(180)) togetherWith
                         slideOutHorizontally(slideSpec) { it } + fadeOut(tween(150))
@@ -269,9 +280,17 @@ fun SettingsScreen(
             if (category == null) {
                 RenderMainSettingsHub(interactive = true)
             } else {
+                val closeSubPageByButton = {
+                    isCategorySwipePop = false
+                    selectedCategory = null
+                }
                 IosSwipeBackContainer(
                     enabled = true,
-                    onBack = { selectedCategory = null },
+                    contentKey = category,
+                    onBack = {
+                        isCategorySwipePop = true
+                        selectedCategory = null
+                    },
                     previousContent = { RenderMainSettingsHub(interactive = false) },
                 ) {
                     when (category) {
@@ -282,7 +301,7 @@ fun SettingsScreen(
                                 currentUser = currentUser,
                                 onUpdateDisplayName = onUpdateDisplayName,
                                 onToggleSyncDeviceNameWithAccount = onToggleSyncDeviceNameWithAccount,
-                                onBack = { selectedCategory = null },
+                                onBack = closeSubPageByButton,
                             )
                         }
 
@@ -299,7 +318,7 @@ fun SettingsScreen(
                                 onSelectDefaultVisibilityMode = onSelectDefaultVisibilityMode,
                                 onToggleBleFastDiscovery = onToggleBleFastDiscovery,
                                 onOpenNfcSettings = onOpenNfcSettings,
-                                onBack = { selectedCategory = null },
+                                onBack = closeSubPageByButton,
                             )
                         }
 
@@ -313,7 +332,7 @@ fun SettingsScreen(
                                 onToggleBackgroundConnectionDialog = onToggleBackgroundConnectionDialog,
                                 onToggleAutoSaveToDownloads = onToggleAutoSaveToDownloads,
                                 onToggleSoundVibration = onToggleSoundVibration,
-                                onBack = { selectedCategory = null },
+                                onBack = closeSubPageByButton,
                             )
                         }
 
@@ -325,7 +344,7 @@ fun SettingsScreen(
                                 onSelectThemeMode = onSelectThemeMode,
                                 onToggleReduceTransparency = onToggleReduceTransparency,
                                 onToggleLiquidGlass = onToggleLiquidGlass,
-                                onBack = { selectedCategory = null },
+                                onBack = closeSubPageByButton,
                             )
                         }
 
@@ -338,13 +357,13 @@ fun SettingsScreen(
                                 onOpenReceivedFiles = onOpenReceivedFiles,
                                 onClearTempStagingCache = onClearTempStagingCache,
                                 onRequestClearSavedDevices = { showClearSavedDevicesDialog = true },
-                                onBack = { selectedCategory = null },
+                                onBack = closeSubPageByButton,
                             )
                         }
 
                         SettingsCategory.ABOUT -> {
                             AboutAppScreen(
-                                onBack = { selectedCategory = null },
+                                onBack = closeSubPageByButton,
                             )
                         }
                     }

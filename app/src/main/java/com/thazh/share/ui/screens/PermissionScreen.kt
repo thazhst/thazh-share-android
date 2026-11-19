@@ -8,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -101,6 +103,7 @@ fun PermissionRationaleScreen(
     var currentPageIndex by rememberSaveable { mutableIntStateOf(-1) }
     var deniedOnCurrentStep by rememberSaveable { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
+    var isStepSwipePop by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner, currentPageIndex) {
         val observer = LifecycleEventObserver { _, event ->
@@ -112,6 +115,7 @@ fun PermissionRationaleScreen(
                     val step = steps[currentPageIndex]
                     if (PermissionUtils.isStepGranted(context, step)) {
                         deniedOnCurrentStep = false
+                        isStepSwipePop = false
                         if (currentPageIndex < steps.lastIndex) {
                             currentPageIndex++
                         } else if (PermissionUtils.hasAllRequiredPermissions(context)) {
@@ -126,6 +130,7 @@ fun PermissionRationaleScreen(
     }
 
     BackHandler(enabled = currentPageIndex >= 0) {
+        isStepSwipePop = false
         deniedOnCurrentStep = false
         currentPageIndex = (currentPageIndex - 1).coerceAtLeast(-1)
     }
@@ -138,6 +143,7 @@ fun PermissionRationaleScreen(
         val currentStep = steps[stepIndex]
         val stepGranted = result.values.all { it } || PermissionUtils.isStepGranted(context, currentStep)
         if (stepGranted) {
+            isStepSwipePop = false
             deniedOnCurrentStep = false
             if (stepIndex < steps.lastIndex) {
                 currentPageIndex = stepIndex + 1
@@ -166,6 +172,8 @@ fun PermissionRationaleScreen(
                 if (targetState > initialState) {
                     (slideInHorizontally(springSpec) { width -> width / 3 } + fadeIn(tween(220)) + scaleIn(initialScale = 0.96f)) togetherWith
                         (slideOutHorizontally(springSpec) { width -> -width / 3 } + fadeOut(tween(180)))
+                } else if (isStepSwipePop) {
+                    EnterTransition.None togetherWith ExitTransition.None
                 } else {
                     (slideInHorizontally(springSpec) { width -> -width / 3 } + fadeIn(tween(220)) + scaleIn(initialScale = 0.96f)) togetherWith
                         (slideOutHorizontally(springSpec) { width -> width / 3 } + fadeOut(tween(180)))
@@ -176,6 +184,7 @@ fun PermissionRationaleScreen(
             if (pageIndex < 0) {
                 WelcomeOnboardingPage(
                     onStartClick = {
+                        isStepSwipePop = false
                         deniedOnCurrentStep = false
                         if (PermissionUtils.hasAllRequiredPermissions(context)) {
                             onPermissionsGranted()
@@ -189,13 +198,20 @@ fun PermissionRationaleScreen(
                 val isStepAlreadyGranted = remember(pageIndex, refreshTrigger) {
                     PermissionUtils.isStepGranted(context, step)
                 }
-                val goBackToPreviousStep = {
+                val goBackByButton = {
+                    isStepSwipePop = false
+                    deniedOnCurrentStep = false
+                    currentPageIndex = (pageIndex - 1).coerceAtLeast(-1)
+                }
+                val goBackBySwipe = {
+                    isStepSwipePop = true
                     deniedOnCurrentStep = false
                     currentPageIndex = (pageIndex - 1).coerceAtLeast(-1)
                 }
                 IosSwipeBackContainer(
                     enabled = true,
-                    onBack = goBackToPreviousStep,
+                    contentKey = pageIndex,
+                    onBack = goBackBySwipe,
                     previousContent = {
                         if (pageIndex - 1 < 0) {
                             WelcomeOnboardingPage(onStartClick = {})
@@ -220,10 +236,11 @@ fun PermissionRationaleScreen(
                         totalSteps = steps.size,
                         isGranted = isStepAlreadyGranted,
                         showDeniedHint = deniedOnCurrentStep,
-                        onBackClick = goBackToPreviousStep,
+                        onBackClick = goBackByButton,
                         onGrantClick = {
                             val permsToRequest = PermissionUtils.permissionsForStep(step)
                             if (permsToRequest.isEmpty() || PermissionUtils.isStepGranted(context, step)) {
+                                isStepSwipePop = false
                                 deniedOnCurrentStep = false
                                 if (pageIndex < steps.lastIndex) {
                                     currentPageIndex = pageIndex + 1
