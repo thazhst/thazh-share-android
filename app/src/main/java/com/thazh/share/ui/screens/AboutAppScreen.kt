@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
+import com.thazh.share.network.NativeCoreEngine
 import com.thazh.share.ui.components.GlasmioText
 import com.thazh.share.ui.components.ThazhAppIconBadge
 import com.thazh.share.ui.components.ThazhSquircleIconBox
@@ -92,10 +93,10 @@ fun AboutAppScreen(
     val versionDisplay = remember(context) {
         runCatching {
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            val vName = info.versionName ?: "1.2.0"
+            val vName = info.versionName ?: "1.2.3"
             val vCode = info.longVersionCode
             "$vName ($vCode)"
-        }.getOrDefault("1.2.0 (3)")
+        }.getOrDefault("1.2.3 (4)")
     }
 
     val attachedApacheLicenseText = remember(context) {
@@ -109,7 +110,7 @@ fun AboutAppScreen(
     var showApacheLicenseDialog by rememberSaveable { mutableStateOf(false) }
 
     val pulseTransition = rememberInfiniteTransition(label = "about_hero_pulse")
-    val haloScale by pulseTransition.animateFloat(
+    val haloScaleState = pulseTransition.animateFloat(
         initialValue = 0.96f,
         targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
@@ -147,8 +148,9 @@ fun AboutAppScreen(
                                 modifier = Modifier
                                     .size(76.dp)
                                     .graphicsLayer {
-                                        scaleX = haloScale
-                                        scaleY = haloScale
+                                        val s = haloScaleState.value
+                                        scaleX = s
+                                        scaleY = s
                                     }
                                     .clip(CircleShape)
                                     .background(
@@ -282,6 +284,29 @@ fun AboutAppScreen(
                         onClick = { copyTextToClipboard(context, "Version", versionDisplay) },
                         showTopSeparator = true,
                         modifier = Modifier.testTag("about_app_version_row"),
+                    )
+
+                    val engineDesc = remember { NativeCoreEngine.engineDescriptor }
+                    GlasmioPreferenceEntry(
+                        title = { GlasmioText("Lõi truyền tải & Tín hiệu") },
+                        description = engineDesc,
+                        icon = {
+                            ThazhSquircleIconBox(
+                                symbol = ThazhSymbols.LiquidGlass,
+                                accentColor = semantic.accentBlue,
+                            )
+                        },
+                        trailingContent = {
+                            SfIcon(
+                                systemName = ThazhSymbols.Copy,
+                                contentDescription = null,
+                                tint = colors.tertiaryContent,
+                                size = 16.dp,
+                            )
+                        },
+                        onClick = { copyTextToClipboard(context, "Core Engine", engineDesc) },
+                        showTopSeparator = true,
+                        modifier = Modifier.testTag("about_app_engine_row"),
                     )
                 }
             }

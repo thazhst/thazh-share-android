@@ -1,5 +1,6 @@
 package com.thazh.share.data
 
+import androidx.compose.runtime.Immutable
 import com.thazh.share.util.FileNameUtils
 import kotlinx.serialization.Serializable
 
@@ -42,6 +43,7 @@ enum class FileCategory {
  * [seen] is false until the manager screen has been shown once after the
  * file arrived; it drives the "Mới" badge and the unread counter on the tab.
  */
+@Immutable
 @Serializable
 data class ReceivedFile(
     val id: String,

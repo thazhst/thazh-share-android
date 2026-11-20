@@ -309,6 +309,7 @@ fun ShareApp(viewModel: ShareViewModel) {
             savedDevices = savedDevices,
             isDiscovering = isDiscovering,
             screenState = screenState,
+            connectionQuality = connectionQuality,
             isBleSupported = isBleSupported,
             isBleEnabled = bleFastDiscoveryEnabled,
             isNfcSupported = isNfcSupported,

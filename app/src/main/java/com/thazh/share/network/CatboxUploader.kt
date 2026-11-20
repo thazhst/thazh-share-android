@@ -6,6 +6,7 @@ import com.thazh.share.data.PickedFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -55,13 +56,13 @@ data class CatboxUploadResult(
 )
 
 /**
- * Real HTTP multipart/form-data uploader to Catbox.moe (`https://catbox.moe/user/api.php`)
- * and Litterbox (`https://litterbox.catbox.moe/resources/internals/api.php`).
+ * High-speed HTTP multipart/form-data uploader to Catbox.moe and Litterbox.
+ * Uses 128 KB buffered I/O slabs from [ChunkBufferPool] and [NativeCoreEngine.computeEwmaSpeed].
  */
 object CatboxUploader {
     private const val CATBOX_API_URL = "https://catbox.moe/user/api.php"
     private const val LITTERBOX_API_URL = "https://litterbox.catbox.moe/resources/internals/api.php"
-    private const val CHUNK_SIZE = 32 * 1024
+    private const val UPLOAD_CHUNK_SIZE = 128 * 1024
     private const val CRLF = "\r\n"
 
     suspend fun uploadFile(
@@ -83,7 +84,7 @@ object CatboxUploader {
                 .ifBlank { "file.bin" }
             val safeMime = file.mimeType.ifBlank { "application/octet-stream" }
 
-            val preambleBuilder = StringBuilder()
+            val preambleBuilder = StringBuilder(256)
             fun appendFormField(name: String, value: String) {
                 preambleBuilder.append("--").append(boundary).append(CRLF)
                 preambleBuilder.append("Content-Disposition: form-data; name=\"").append(name).append("\"").append(CRLF)
@@ -113,33 +114,37 @@ object CatboxUploader {
                 doInput = true
                 doOutput = true
                 useCaches = false
-                connectTimeout = 25_000
+                connectTimeout = 20_000
                 readTimeout = 90_000
                 setRequestProperty("User-Agent", "ThazhShareAndroid/1.2 (+https://catbox.moe)")
                 setRequestProperty("Accept", "text/plain, */*")
+                setRequestProperty("Connection", "Keep-Alive")
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                 if (file.sizeBytes > 0L) {
                     val totalFixedLength = preambleBytes.size.toLong() + file.sizeBytes + closingBytes.size.toLong()
                     setFixedLengthStreamingMode(totalFixedLength)
                 } else {
-                    setChunkedStreamingMode(CHUNK_SIZE)
+                    setChunkedStreamingMode(UPLOAD_CHUNK_SIZE)
                 }
             }
 
+            var pooledSlab: ByteArray? = null
             try {
-                val inputStream = context.contentResolver.openInputStream(file.uri)
+                val rawStream = context.contentResolver.openInputStream(file.uri)
                     ?: throw IllegalStateException("Không thể mở tệp nguồn để tải lên")
 
-                inputStream.use { input ->
-                    BufferedOutputStream(connection.outputStream, CHUNK_SIZE).use { output ->
+                pooledSlab = ChunkBufferPool.acquire(UPLOAD_CHUNK_SIZE)
+                val buffer = pooledSlab
+
+                BufferedInputStream(rawStream, UPLOAD_CHUNK_SIZE).use { input ->
+                    BufferedOutputStream(connection.outputStream, UPLOAD_CHUNK_SIZE).use { output ->
                         output.write(preambleBytes)
 
-                        val buffer = ByteArray(CHUNK_SIZE)
                         var uploaded = 0L
                         val total = file.sizeBytes.coerceAtLeast(0L)
                         var lastUiTime = SystemClock.elapsedRealtime()
                         var lastBytesForSpeed = 0L
-                        var smoothedSpeed = 0.0
+                        var smoothedSpeed = 0L
 
                         onProgress(
                             CatboxUploadProgress(
@@ -152,17 +157,20 @@ object CatboxUploader {
 
                         while (true) {
                             coroutineContext.ensureActive()
-                            val read = input.read(buffer)
+                            val read = input.read(buffer, 0, minOf(UPLOAD_CHUNK_SIZE, buffer.size))
                             if (read <= 0) break
                             output.write(buffer, 0, read)
                             uploaded += read
 
                             val now = SystemClock.elapsedRealtime()
                             val elapsed = now - lastUiTime
-                            if (elapsed >= 120L || (total > 0L && uploaded >= total)) {
+                            if (elapsed >= 110L || (total > 0L && uploaded >= total)) {
                                 if (elapsed > 0L) {
-                                    val instSpeed = (uploaded - lastBytesForSpeed) * 1000.0 / elapsed
-                                    smoothedSpeed = if (smoothedSpeed <= 0.0) instSpeed else smoothedSpeed * 0.65 + instSpeed * 0.35
+                                    smoothedSpeed = NativeCoreEngine.computeEwmaSpeed(
+                                        previousSpeedBytesPerSec = smoothedSpeed,
+                                        deltaBytes = uploaded - lastBytesForSpeed,
+                                        elapsedMs = elapsed,
+                                    )
                                     lastBytesForSpeed = uploaded
                                     lastUiTime = now
                                 }
@@ -171,7 +179,7 @@ object CatboxUploader {
                                         fileName = file.name,
                                         bytesUploaded = uploaded,
                                         totalBytes = total.coerceAtLeast(uploaded),
-                                        speedBytesPerSec = smoothedSpeed.toLong().coerceAtLeast(0L),
+                                        speedBytesPerSec = smoothedSpeed,
                                     )
                                 )
                             }
@@ -210,6 +218,7 @@ object CatboxUploader {
                     uploadedAtEpochMs = nowEpoch,
                 )
             } finally {
+                ChunkBufferPool.release(pooledSlab)
                 connection.disconnect()
             }
         }

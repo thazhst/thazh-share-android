@@ -105,8 +105,12 @@ fun GlasmioText(
     )
 }
 
+private val SPOKE_COS = FloatArray(8) { i -> cos((i * 45.0) * (PI / 180.0)).toFloat() }
+private val SPOKE_SIN = FloatArray(8) { i -> sin((i * 45.0) * (PI / 180.0)).toFloat() }
+
 /**
  * iOS / Glasmio style spoke activity spinner rendered via Compose Foundation [Canvas].
+ * Reads [phaseState] exclusively inside the DrawScope to avoid parent recompositions.
  */
 @Composable
 fun GlasmioActivityIndicator(
@@ -116,7 +120,7 @@ fun GlasmioActivityIndicator(
     strokeWidth: Dp = 2.2.dp,
 ) {
     val transition = rememberInfiniteTransition(label = "glasmio_activity_spinner")
-    val phase by transition.animateFloat(
+    val phaseState = transition.animateFloat(
         initialValue = 0f,
         targetValue = 8f,
         animationSpec = infiniteRepeatable(
@@ -133,23 +137,17 @@ fun GlasmioActivityIndicator(
         val outerRadius = radius * 0.90f
         val center = Offset(this.size.width / 2f, this.size.height / 2f)
         val strokePx = strokeWidth.toPx()
+        val activeSpoke = phaseState.value.toInt()
 
         for (i in 0 until spokeCount) {
-            val angleRad = (i * 45.0) * (PI / 180.0)
-            val distance = ((i - phase.toInt() + spokeCount) % spokeCount).toFloat()
+            val distance = ((i - activeSpoke + spokeCount) % spokeCount).toFloat()
             val spokeAlpha = (1f - (distance / spokeCount) * 0.78f).coerceIn(0.18f, 1f)
-            val start = Offset(
-                x = center.x + (cos(angleRad) * innerRadius).toFloat(),
-                y = center.y + (sin(angleRad) * innerRadius).toFloat(),
-            )
-            val end = Offset(
-                x = center.x + (cos(angleRad) * outerRadius).toFloat(),
-                y = center.y + (sin(angleRad) * outerRadius).toFloat(),
-            )
+            val ux = SPOKE_COS[i]
+            val uy = SPOKE_SIN[i]
             drawLine(
                 color = color.copy(alpha = spokeAlpha),
-                start = start,
-                end = end,
+                start = Offset(x = center.x + ux * innerRadius, y = center.y + uy * innerRadius),
+                end = Offset(x = center.x + ux * outerRadius, y = center.y + uy * outerRadius),
                 strokeWidth = strokePx,
                 cap = StrokeCap.Round,
             )
@@ -158,7 +156,8 @@ fun GlasmioActivityIndicator(
 }
 
 /**
- * Liquid Glass continuous capsule progress bar.
+ * Liquid Glass continuous capsule progress bar rendered directly in the Draw phase
+ * so 60/120Hz progress animations never trigger Compose layout/measurement passes.
  */
 @Composable
 fun GlasmioLinearProgressBar(
@@ -168,31 +167,38 @@ fun GlasmioLinearProgressBar(
     trackColor: Color = color.copy(alpha = 0.18f),
     height: Dp = 6.dp,
 ) {
-    val animatedProgress by animateFloatAsState(
+    val animatedProgressState = animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "glasmio_linear_progress",
     )
-    Box(
+    Canvas(
         modifier = modifier
+            .fillMaxWidth()
             .height(height)
-            .clip(ContinuousCapsule)
-            .background(trackColor),
+            .clip(ContinuousCapsule),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(fraction = animatedProgress)
-                .clip(ContinuousCapsule)
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            color.copy(alpha = 0.85f),
-                            color,
-                        ),
-                    ),
-                ),
+        val w = size.width
+        val h = size.height
+        val corner = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
+        drawRoundRect(
+            color = trackColor,
+            size = size,
+            cornerRadius = corner,
         )
+        val fillFraction = animatedProgressState.value.coerceIn(0f, 1f)
+        val fillWidth = (w * fillFraction).coerceAtLeast(if (fillFraction > 0.005f) h else 0f)
+        if (fillWidth > 0f) {
+            drawRoundRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(color.copy(alpha = 0.85f), color),
+                    startX = 0f,
+                    endX = fillWidth,
+                ),
+                size = androidx.compose.ui.geometry.Size(fillWidth.coerceAtMost(w), h),
+                cornerRadius = corner,
+            )
+        }
     }
 }
 

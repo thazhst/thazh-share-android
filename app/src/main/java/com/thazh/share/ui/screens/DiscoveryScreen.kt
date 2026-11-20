@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
+import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.SavedDevice
@@ -82,6 +83,7 @@ fun DiscoveryScreen(
     savedDevices: List<SavedDevice>,
     isDiscovering: Boolean,
     screenState: ConnectScreenState,
+    connectionQuality: ConnectionQuality = ConnectionQuality.STRONG,
     isBleSupported: Boolean = true,
     isBleEnabled: Boolean = true,
     isNfcSupported: Boolean,
@@ -325,6 +327,7 @@ fun DiscoveryScreen(
                         isConnecting = isConnecting,
                         isConnected = connectedPeer != null,
                         connectedPeerName = connectedPeer,
+                        connectionQuality = connectionQuality,
                         peers = peers,
                         isBleSupported = isBleSupported,
                         isBleEnabled = isBleEnabled,

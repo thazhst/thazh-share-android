@@ -13,8 +13,8 @@ android {
         applicationId = "com.thazh.share"
         minSdk = 33
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.2.3"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -69,6 +69,31 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    val sdkRoot = System.getenv("ANDROID_SDK_ROOT")
+        ?: System.getenv("ANDROID_HOME")
+        ?: ""
+    val hasInstalledNdk = sdkRoot.isNotEmpty() && (
+        file("$sdkRoot/ndk-bundle/build/cmake/android.toolchain.cmake").isFile ||
+            file("$sdkRoot/ndk").listFiles()?.any {
+                it.isDirectory && File(it, "build/cmake/android.toolchain.cmake").isFile
+            } == true
+        )
+    val hasInstalledCmake = (
+        sdkRoot.isNotEmpty() &&
+            file("$sdkRoot/cmake").listFiles()?.any {
+                it.isDirectory && File(it, "bin/cmake").isFile
+            } == true
+        ) || file("/usr/bin/cmake").isFile || file("/usr/local/bin/cmake").isFile
+
+    if (hasInstalledNdk && hasInstalledCmake) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
         }
     }
 }

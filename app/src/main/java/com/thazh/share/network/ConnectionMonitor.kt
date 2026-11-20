@@ -9,23 +9,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.collections.ArrayDeque // NOT java.util.ArrayDeque — that one throws NPE when a null element is added
+import kotlin.collections.ArrayDeque
 
-private const val PING_INTERVAL_MS = 2_500L
-private const val PONG_TIMEOUT_MS = 4_000L
+private const val INITIAL_PING_DELAY_MS = 120L
+private const val PING_INTERVAL_MS = 2_200L
+private const val PONG_TIMEOUT_MS = 3_500L
 private const val HISTORY_SIZE = 8
+private const val ACTIVE_WIFI_KALMAN_KEY = "WIFI_P2P_ACTIVE_LINK"
 
 /**
  * Sends periodic [Frame.Ping]s over an active [PeerConnection] and turns the
  * observed round-trip latency + delivery success rate into a
  * [ConnectionQuality] tier for display (Mạnh/Trung bình/Yếu/Kém/Mất kết nối).
  *
- * Also samples [WifiManager.getConnectionInfo] on the same cadence to drive
- * a rough RSSI-based distance estimate (see [DistanceEstimator]) — piggybacking
- * on the existing ping loop rather than running a second timer.
- *
- * A sliding window of the last [HISTORY_SIZE] round trips smooths out one-off
- * blips from large file transfers momentarily saturating the link.
+ * Also samples [WifiManager.getConnectionInfo] on the same cadence and passes
+ * RSSI through [DistanceEstimator] (backed by the C++20 1D Kalman Filter).
  */
 class ConnectionMonitor(
     private val connection: PeerConnection,
@@ -46,8 +44,10 @@ class ConnectionMonitor(
     fun start() {
         stop()
         monitorJob = scope.launch {
+            var isFirstPing = true
             while (true) {
-                delay(PING_INTERVAL_MS)
+                delay(if (isFirstPing) INITIAL_PING_DELAY_MS else PING_INTERVAL_MS)
+                isFirstPing = false
                 if (!connection.isConnected) {
                     recordResult(null)
                     _estimatedDistanceMeters.value = null
@@ -64,10 +64,12 @@ class ConnectionMonitor(
                     continue
                 }
 
-                delay(PONG_TIMEOUT_MS)
-                // If still pending after the timeout window, count it as lost.
-                if (pendingPings.remove(seq) != null) {
-                    recordResult(null)
+                // Check timeout asynchronously so the next ping cycle isn't artificially delayed
+                launch {
+                    delay(PONG_TIMEOUT_MS)
+                    if (pendingPings.remove(seq) != null) {
+                        recordResult(null)
+                    }
                 }
             }
         }
@@ -76,7 +78,7 @@ class ConnectionMonitor(
     /** Call when a [Frame.Pong] arrives on the read loop. */
     fun onPongReceived(pong: Frame.Pong) {
         val sentAt = pendingPings.remove(pong.sequence) ?: return
-        val rtt = System.currentTimeMillis() - sentAt
+        val rtt = (System.currentTimeMillis() - sentAt).coerceAtLeast(1L)
         recordResult(rtt)
     }
 
@@ -84,14 +86,22 @@ class ConnectionMonitor(
     fun onConnectionStateHint(isConnected: Boolean) {
         if (!isConnected) {
             rttHistoryMs.clear()
+            NativeCoreEngine.clearKalmanHistory(ACTIVE_WIFI_KALMAN_KEY)
             _quality.value = ConnectionQuality.DISCONNECTED
             _estimatedDistanceMeters.value = null
+        } else if (_quality.value == ConnectionQuality.DISCONNECTED) {
+            _quality.value = ConnectionQuality.STRONG
+            sampleDistance()
         }
     }
 
     private fun sampleDistance() {
+        @Suppress("DEPRECATION")
         val rssi = runCatching { wifiManager?.connectionInfo?.rssi }.getOrNull()
-        _estimatedDistanceMeters.value = DistanceEstimator.estimateMeters(rssi)
+        _estimatedDistanceMeters.value = DistanceEstimator.estimateMeters(
+            rssiDbm = rssi,
+            deviceKey = ACTIVE_WIFI_KALMAN_KEY,
+        )
     }
 
     private fun recordResult(rttMs: Long?) {
@@ -122,6 +132,7 @@ class ConnectionMonitor(
         monitorJob = null
         pendingPings.clear()
         rttHistoryMs.clear()
+        NativeCoreEngine.clearKalmanHistory(ACTIVE_WIFI_KALMAN_KEY)
         _quality.value = ConnectionQuality.DISCONNECTED
         _estimatedDistanceMeters.value = null
     }

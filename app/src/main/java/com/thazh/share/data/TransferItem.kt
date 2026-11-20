@@ -1,6 +1,7 @@
 package com.thazh.share.data
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import java.util.UUID
 
 enum class TransferDirection { SENT, RECEIVED }
@@ -8,6 +9,7 @@ enum class TransferDirection { SENT, RECEIVED }
 enum class TransferState { PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED }
 
 /** A file picked by the user to send, with metadata resolved from its content [uri]. */
+@Immutable
 data class PickedFile(
     val uri: Uri,
     val name: String,
@@ -20,6 +22,7 @@ data class PickedFile(
  * Held in memory by [com.thazh.share.service.WifiDirectService]; once a received
  * file finishes it is persisted in [ReceivedFilesRepository].
  */
+@Immutable
 data class TransferItem(
     val id: String = UUID.randomUUID().toString(),
     val direction: TransferDirection,

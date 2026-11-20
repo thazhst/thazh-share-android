@@ -102,15 +102,21 @@ fun ReceiveScreen(
         ?: (screenState as? ConnectScreenState.Connected)?.peerName
         ?: stringResource(R.string.transfer_unknown_peer)
 
+    val qualityLabel = when (connectionQuality) {
+        ConnectionQuality.STRONG -> stringResource(R.string.quality_strong)
+        ConnectionQuality.MEDIUM -> stringResource(R.string.quality_medium)
+        ConnectionQuality.WEAK -> stringResource(R.string.quality_weak)
+        ConnectionQuality.POOR -> stringResource(R.string.quality_poor)
+        ConnectionQuality.DISCONNECTED -> stringResource(R.string.quality_disconnected)
+    }
+
     val topSubtitle = if (isConnected) {
         buildList {
             add(
                 if (isSocketConnected) stringResource(R.string.transfer_send_subtitle, peerDisplay)
                 else stringResource(R.string.transfer_connecting),
             )
-            if (estimatedDistanceMeters != null) {
-                add(FormatUtils.formatDistance(estimatedDistanceMeters))
-            }
+            add(qualityLabel)
         }.joinToString(" • ")
     } else {
         when (visibilityMode) {
@@ -176,7 +182,7 @@ fun ReceiveScreen(
                         isConnecting = screenState is ConnectScreenState.Connecting || !nfcPairingPeerName.isNullOrBlank(),
                         isConnected = isConnected,
                         connectedPeerName = if (isConnected) peerDisplay else null,
-                        connectedDistanceMeters = estimatedDistanceMeters,
+                        connectionQuality = connectionQuality,
                         peers = peers,
                         isBleSupported = isBleSupported,
                         isBleEnabled = isBleEnabled,
@@ -308,7 +314,11 @@ fun ReceiveScreen(
                 }
             }
         } else {
-            items(transfers, key = { it.id }) { item ->
+            items(
+                items = transfers,
+                key = { it.id },
+                contentType = { "transfer_item" },
+            ) { item ->
                 CenteredReceiveContent {
                     TransferActivityCard(
                         item = item,

@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -29,7 +30,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,7 +86,6 @@ import io.github.neoruaa.glasmio.glass.GlassEmphasis
 import io.github.neoruaa.glasmio.icons.SfIcon
 import io.github.neoruaa.glasmio.ui.GlasmioButton
 import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
-import io.github.neoruaa.glasmio.ui.GlasmioCard
 import io.github.neoruaa.glasmio.ui.GlasmioIconButton
 
 @Composable
@@ -158,8 +157,7 @@ fun PermissionRationaleScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 24.dp, vertical = 20.dp),
+            .windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedContent(
@@ -169,7 +167,7 @@ fun PermissionRationaleScreen(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessMediumLow,
                 )
-                if (targetState > initialState) {
+                val transform = if (targetState > initialState) {
                     (slideInHorizontally(springSpec) { width -> width / 3 } + fadeIn(tween(220)) + scaleIn(initialScale = 0.96f)) togetherWith
                         (slideOutHorizontally(springSpec) { width -> -width / 3 } + fadeOut(tween(180)))
                 } else if (isStepSwipePop) {
@@ -178,8 +176,10 @@ fun PermissionRationaleScreen(
                     (slideInHorizontally(springSpec) { width -> -width / 3 } + fadeIn(tween(220)) + scaleIn(initialScale = 0.96f)) togetherWith
                         (slideOutHorizontally(springSpec) { width -> width / 3 } + fadeOut(tween(180)))
                 }
+                transform using SizeTransform(clip = false)
             },
             label = "onboarding_page_transition",
+            modifier = Modifier.fillMaxSize(),
         ) { pageIndex ->
             if (pageIndex < 0) {
                 WelcomeOnboardingPage(
@@ -274,7 +274,7 @@ private fun WelcomeOnboardingPage(
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
 
-    val entryScale by animateFloatAsState(
+    val entryScaleState = animateFloatAsState(
         targetValue = if (entered) 1f else 0.88f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -282,14 +282,14 @@ private fun WelcomeOnboardingPage(
         ),
         label = "welcome_entry_scale",
     )
-    val entryAlpha by animateFloatAsState(
+    val entryAlphaState = animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
         animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
         label = "welcome_entry_alpha",
     )
 
     val infiniteTransition = rememberInfiniteTransition(label = "welcome_breathing")
-    val pulseScale by infiniteTransition.animateFloat(
+    val pulseScaleState = infiniteTransition.animateFloat(
         initialValue = 0.96f,
         targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
@@ -298,104 +298,113 @@ private fun WelcomeOnboardingPage(
         ),
         label = "welcome_pulse_scale",
     )
-    val haloAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.16f,
-        targetValue = 0.34f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "welcome_halo_alpha",
-    )
 
-    Column(
+    // Scrollable full-screen container with generous inner padding so LiquidGlass bounce expansion never clips
+    Box(
         modifier = Modifier
-            .widthIn(max = 420.dp)
-            .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = entryScale
-                scaleY = entryScale
-                alpha = entryAlpha
-            }
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 28.dp, vertical = 28.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Animated Breathing Apple HIG App Icon Emblem (Clean, feature-card-free Welcome page)
-        Box(
-            modifier = Modifier.size(140.dp),
-            contentAlignment = Alignment.Center,
+        Column(
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .fillMaxWidth()
+                .graphicsLayer {
+                    val s = entryScaleState.value
+                    scaleX = s
+                    scaleY = s
+                    alpha = entryAlphaState.value
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Animated Breathing Apple HIG App Icon Emblem
             Box(
-                modifier = Modifier
-                    .size(136.dp)
-                    .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
-                    }
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                semantic.accentBlue.copy(alpha = haloAlpha),
-                                semantic.accentCyan.copy(alpha = haloAlpha * 0.45f),
-                                Color.Transparent,
+                modifier = Modifier.size(144.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(136.dp)
+                        .graphicsLayer {
+                            val s = pulseScaleState.value
+                            scaleX = s
+                            scaleY = s
+                        }
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    semantic.accentBlue.copy(alpha = 0.26f),
+                                    semantic.accentCyan.copy(alpha = 0.12f),
+                                    Color.Transparent,
+                                ),
                             ),
                         ),
-                    ),
-            )
-            ThazhAppIconBadge(
-                size = 96.dp,
-                cornerRadius = 22.dp,
-                contentDescription = stringResource(R.string.app_name),
-            )
-        }
+                )
+                ThazhAppIconBadge(
+                    size = 96.dp,
+                    cornerRadius = 22.dp,
+                    contentDescription = stringResource(R.string.app_name),
+                )
+            }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            GlasmioText(
-                text = stringResource(R.string.welcome_title),
-                style = GlasmioTheme.textStyles.largeTitle.copy(fontWeight = FontWeight.Bold),
-                color = colors.content,
-                textAlign = TextAlign.Center,
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                GlasmioText(
+                    text = stringResource(R.string.welcome_title),
+                    style = GlasmioTheme.textStyles.largeTitle.copy(fontWeight = FontWeight.Bold),
+                    color = colors.content,
+                    textAlign = TextAlign.Center,
+                )
 
-            GlasmioText(
-                text = stringResource(R.string.welcome_subtitle),
-                style = GlasmioTheme.textStyles.subheadline,
-                color = colors.secondaryContent,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
+                GlasmioText(
+                    text = stringResource(R.string.welcome_subtitle),
+                    style = GlasmioTheme.textStyles.subheadline,
+                    color = colors.secondaryContent,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        GlasmioButton(
-            onClick = onStartClick,
-            emphasis = GlassEmphasis.Prominent,
-            navigationSurfaceColor = semantic.accentBlue,
-            size = GlasmioButtonSize.Large,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("welcome_start_button"),
-        ) {
-            GlasmioText(
-                text = stringResource(R.string.welcome_start_button),
-                style = GlasmioTheme.textStyles.headline,
-                color = Color.White,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            SfIcon(
-                systemName = ThazhSymbols.ChevronRight,
-                contentDescription = null,
-                tint = Color.White,
-                size = 18.dp,
-            )
+            // Extra padding around button prevents LiquidGlass interactive scale bounce from clipping
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                GlasmioButton(
+                    onClick = onStartClick,
+                    emphasis = GlassEmphasis.Prominent,
+                    navigationSurfaceColor = semantic.accentBlue,
+                    size = GlasmioButtonSize.Large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("welcome_start_button"),
+                ) {
+                    GlasmioText(
+                        text = stringResource(R.string.welcome_start_button),
+                        style = GlasmioTheme.textStyles.headline,
+                        color = Color.White,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SfIcon(
+                        systemName = ThazhSymbols.ChevronRight,
+                        contentDescription = null,
+                        tint = Color.White,
+                        size = 18.dp,
+                    )
+                }
+            }
         }
     }
 }
@@ -439,7 +448,7 @@ private fun PreparationPermissionPage(
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "prep_icon_pulse")
-    val iconPulse by infiniteTransition.animateFloat(
+    val iconPulseState = infiniteTransition.animateFloat(
         initialValue = 0.96f,
         targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
@@ -449,183 +458,206 @@ private fun PreparationPermissionPage(
         label = "prep_icon_scale",
     )
 
-    Column(
+    // Scrollable full-screen container with inner padding so LiquidGlass bounce scale is never clipped
+    Box(
         modifier = Modifier
-            .widthIn(max = 420.dp)
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 28.dp, vertical = 28.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        // Top Header with Back Button and Step Indicator Pill
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Column(
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            GlasmioIconButton(
-                onClick = onBackClick,
-                modifier = Modifier.testTag("prep_back_button"),
-            ) {
-                SfIcon(
-                    systemName = ThazhSymbols.Back,
-                    contentDescription = stringResource(R.string.back),
-                )
-            }
-
-            Box(
+            // Top Header with Back Button and Step Indicator Pill (padded so bounce never clips)
+            Row(
                 modifier = Modifier
-                    .clip(ContinuousCapsule)
-                    .background(accentColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f))
-                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                GlasmioText(
-                    text = stringResource(R.string.prep_step_badge, stepNumber, totalSteps),
-                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
-                    color = accentColor,
-                )
+                GlasmioIconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.testTag("prep_back_button"),
+                ) {
+                    SfIcon(
+                        systemName = ThazhSymbols.Back,
+                        contentDescription = stringResource(R.string.back),
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(ContinuousCapsule)
+                        .background(accentColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f))
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                ) {
+                    GlasmioText(
+                        text = stringResource(R.string.prep_step_badge, stepNumber, totalSteps),
+                        style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                        color = accentColor,
+                    )
+                }
+
+                Spacer(modifier = Modifier.size(44.dp))
             }
 
-            Spacer(modifier = Modifier.size(40.dp))
-        }
+            // Animated Step Progress Dots
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                for (index in 1..totalSteps) {
+                    val active = index == stepNumber
+                    val completed = index < stepNumber
+                    val dotWidth by animateDpAsState(
+                        targetValue = if (active) 28.dp else 8.dp,
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "step_dot_width_$index",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(8.dp)
+                            .width(dotWidth)
+                            .clip(ContinuousCapsule)
+                            .background(
+                                when {
+                                    active -> accentColor
+                                    completed -> accentColor.copy(alpha = 0.55f)
+                                    else -> colors.separator.copy(alpha = 0.5f)
+                                },
+                            ),
+                    )
+                }
+            }
 
-        // Animated Step Progress Dots
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            for (index in 1..totalSteps) {
-                val active = index == stepNumber
-                val completed = index < stepNumber
-                val dotWidth by animateDpAsState(
-                    targetValue = if (active) 28.dp else 8.dp,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    label = "step_dot_width_$index",
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Borderless Soft Ambient Halo Icon Emblem
+            Box(
+                modifier = Modifier.size(104.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer {
+                            val s = iconPulseState.value
+                            scaleX = s
+                            scaleY = s
+                        }
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    accentColor.copy(alpha = if (colors.isDark) 0.30f else 0.20f),
+                                    accentColor.copy(alpha = if (colors.isDark) 0.10f else 0.06f),
+                                    Color.Transparent,
+                                ),
+                            ),
+                        ),
                 )
                 Box(
                     modifier = Modifier
-                        .height(8.dp)
-                        .width(dotWidth)
-                        .clip(ContinuousCapsule)
-                        .background(
-                            when {
-                                active -> accentColor
-                                completed -> accentColor.copy(alpha = 0.55f)
-                                else -> colors.separator.copy(alpha = 0.5f)
-                            },
-                        ),
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Step Icon Circle with subtle pulse
-        Box(
-            modifier = Modifier
-                .size(84.dp)
-                .graphicsLayer {
-                    scaleX = iconPulse
-                    scaleY = iconPulse
+                        .size(76.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = if (colors.isDark) 0.22f else 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    SfIcon(
+                        systemName = stepIcon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        size = 36.dp,
+                    )
                 }
-                .clip(CircleShape)
-                .background(accentColor.copy(alpha = if (colors.isDark) 0.24f else 0.14f))
-                .border(
-                    width = 1.dp,
-                    color = accentColor.copy(alpha = 0.4f),
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            SfIcon(
-                systemName = stepIcon,
-                contentDescription = null,
-                tint = accentColor,
-                size = 38.dp,
-            )
-        }
-
-        GlasmioText(
-            text = stepTitle,
-            style = GlasmioTheme.textStyles.title1.copy(fontWeight = FontWeight.Bold),
-            color = colors.content,
-            textAlign = TextAlign.Center,
-        )
-
-        // Concise explanation card
-        GlasmioCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                GlasmioText(
-                    text = stepWhyReason,
-                    style = GlasmioTheme.textStyles.body,
-                    color = colors.secondaryContent,
-                    textAlign = TextAlign.Center,
-                )
             }
-        }
 
-        AnimatedVisibility(
-            visible = showDeniedHint && !isGranted,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
             GlasmioText(
-                text = stringResource(R.string.prep_denied_hint),
-                style = GlasmioTheme.textStyles.footnote,
-                color = semantic.warningOrange,
+                text = stepTitle,
+                style = GlasmioTheme.textStyles.title1.copy(fontWeight = FontWeight.Bold),
+                color = colors.content,
                 textAlign = TextAlign.Center,
             )
-        }
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            GlasmioButton(
-                onClick = onGrantClick,
-                emphasis = GlassEmphasis.Prominent,
-                navigationSurfaceColor = accentColor,
-                size = GlasmioButtonSize.Large,
+            // Frameless concise explanation (no GlasmioCard frame around the text)
+            GlasmioText(
+                text = stepWhyReason,
+                style = GlasmioTheme.textStyles.body,
+                color = colors.secondaryContent,
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("grant_permission_button"),
-            ) {
-                GlasmioText(
-                    text = when {
-                        isGranted && stepNumber < totalSteps -> stringResource(R.string.prep_continue_next)
-                        isGranted -> stringResource(R.string.prep_finish_button)
-                        stepNumber < totalSteps -> stringResource(R.string.prep_grant_and_continue)
-                        else -> stringResource(R.string.prep_grant_and_finish)
-                    },
-                    style = GlasmioTheme.textStyles.headline,
-                    color = Color.White,
-                )
-            }
+                    .padding(horizontal = 12.dp),
+            )
 
             AnimatedVisibility(
                 visible = showDeniedHint && !isGranted,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                enter = fadeIn() + expandVertically(clip = false),
+                exit = fadeOut() + shrinkVertically(clip = false),
+            ) {
+                GlasmioText(
+                    text = stringResource(R.string.prep_denied_hint),
+                    style = GlasmioTheme.textStyles.footnote,
+                    color = semantic.warningOrange,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Generous margin around LiquidGlass action buttons so press bounce never clips
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 GlasmioButton(
-                    onClick = onOpenSettingsClick,
-                    emphasis = GlassEmphasis.Regular,
+                    onClick = onGrantClick,
+                    emphasis = GlassEmphasis.Prominent,
+                    navigationSurfaceColor = accentColor,
                     size = GlasmioButtonSize.Large,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("open_app_settings_button"),
+                        .testTag("grant_permission_button"),
                 ) {
                     GlasmioText(
-                        text = stringResource(R.string.permission_open_settings),
+                        text = when {
+                            isGranted && stepNumber < totalSteps -> stringResource(R.string.prep_continue_next)
+                            isGranted -> stringResource(R.string.prep_finish_button)
+                            stepNumber < totalSteps -> stringResource(R.string.prep_grant_and_continue)
+                            else -> stringResource(R.string.prep_grant_and_finish)
+                        },
                         style = GlasmioTheme.textStyles.headline,
-                        color = colors.accent,
+                        color = Color.White,
                     )
+                }
+
+                AnimatedVisibility(
+                    visible = showDeniedHint && !isGranted,
+                    enter = fadeIn() + expandVertically(clip = false),
+                    exit = fadeOut() + shrinkVertically(clip = false),
+                ) {
+                    GlasmioButton(
+                        onClick = onOpenSettingsClick,
+                        emphasis = GlassEmphasis.Regular,
+                        size = GlasmioButtonSize.Large,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_app_settings_button"),
+                    ) {
+                        GlasmioText(
+                            text = stringResource(R.string.permission_open_settings),
+                            style = GlasmioTheme.textStyles.headline,
+                            color = colors.accent,
+                        )
+                    }
                 }
             }
         }

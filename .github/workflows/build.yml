@@ -47,7 +47,7 @@ jobs:
         # fails fast with a clear step name if something's wrong, rather
         # than surfacing as an opaque Gradle build error later.
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "ndk;27.2.12479018" "cmake;3.22.1"
 
       # This repository's committed gradlew/gradlew.bat scripts and
       # gradle-wrapper.jar were authored without access to a real Gradle
@@ -211,7 +211,7 @@ jobs:
 
       - name: Install required Android SDK packages
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" "ndk;27.2.12479018" "cmake;3.22.1"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

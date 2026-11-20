@@ -20,6 +20,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -84,42 +85,31 @@ fun GlasmioSearchBar(
     )
 
     Row(
-        modifier = modifier.height(controlHeight).graphicsLayer { alpha = if (enabled) 1f else 0.45f },
+        modifier = modifier
+            .defaultMinSize(minHeight = controlHeight)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
+        GlassSurface(
+            modifier = Modifier
                 .weight(1f)
-                .height(controlHeight)
-                .clickable(
-                    enabled = enabled,
-                    interactionSource = null,
-                    indication = null,
-                ) {
+                .height(controlHeight),
+            backdrop = backdrop,
+            shape = Capsule(),
+            style = style,
+            onClick = if (enabled) {
+                {
                     onActiveChange(true)
                     focusRequester.requestFocus()
-                },
+                }
+            } else {
+                null
+            },
         ) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .graphicsLayer { alpha = 1f - transitionProgress }
-                    .background(colors.segmentedControlBackground, Capsule()),
-            )
-            if (transitionProgress > 0f) {
-                GlassSurface(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer { alpha = transitionProgress },
-                    backdrop = backdrop,
-                    shape = Capsule(),
-                    style = style,
-                ) {}
-            }
             Row(
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 11.dp, end = 10.dp),
+                    .padding(start = 13.dp, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SfIcon(
@@ -168,10 +158,11 @@ fun GlasmioSearchBar(
         }
 
         AnimatedVisibility(
-            visible = active && enabled,
+            visible = (active || query.text.isNotEmpty()) && enabled,
             enter = expandHorizontally(
                 animationSpec = tween(GlassSearchTransitionMillis, easing = FastOutSlowInEasing),
                 expandFrom = Alignment.End,
+                clip = false,
             ) + slideInHorizontally(
                 animationSpec = tween(GlassSearchTransitionMillis, easing = FastOutSlowInEasing),
                 initialOffsetX = { it },
@@ -179,13 +170,14 @@ fun GlasmioSearchBar(
             exit = shrinkHorizontally(
                 animationSpec = tween(GlassSearchTransitionMillis, easing = FastOutSlowInEasing),
                 shrinkTowards = Alignment.End,
+                clip = false,
             ) + slideOutHorizontally(
                 animationSpec = tween(GlassSearchTransitionMillis, easing = FastOutSlowInEasing),
                 targetOffsetX = { it },
             ) + fadeOut(animationSpec = tween(GlassSearchTransitionMillis)),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(10.dp))
                 GlasmioIconButton(
                     onClick = onClose,
                     modifier = Modifier.size(controlHeight),

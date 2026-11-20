@@ -35,6 +35,7 @@ import com.thazh.share.network.BleDiscoveryManager
 import com.thazh.share.network.ConnectionMonitor
 import com.thazh.share.network.FileTransferManager
 import com.thazh.share.network.Frame
+import com.thazh.share.network.NativeCoreEngine
 import com.thazh.share.network.NfcConnectionCoordinator
 import com.thazh.share.network.NfcPeerExchange
 import com.thazh.share.network.P2pConnectionState
@@ -78,6 +79,7 @@ class WifiDirectService : Service() {
     private val wifiManager: WifiManager? by lazy {
         applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
     }
+    private var activeWifiLock: WifiManager.WifiLock? = null
 
     private val bleDiscoveryManager: BleDiscoveryManager by lazy { BleDiscoveryManager(applicationContext) }
     private var bleFastDiscoveryEnabled = true
@@ -174,7 +176,7 @@ class WifiDirectService : Service() {
         var lastUiUpdateMs: Long,
         var lastSpeedMs: Long,
         var lastSpeedBytes: Long,
-        var speedBytesPerSec: Double,
+        var speedBytesPerSec: Long,
     )
 
     override fun onCreate() {
@@ -545,7 +547,9 @@ class WifiDirectService : Service() {
                 }
                 enrichedWifi + bleOnly
             }.collect { merged ->
-                _peers.value = merged
+                if (_peers.value != merged) {
+                    _peers.value = merged
+                }
                 tryCompletePendingNfcMatch(merged)
             }
         }
@@ -623,6 +627,7 @@ class WifiDirectService : Service() {
         val groupOwnerAddr = state.groupOwnerAddress
         currentGroupOwnerAddress = groupOwnerAddr
         updateNotification(getString(R.string.notif_connecting))
+        acquireLowLatencyWifiLock()
 
         val connection = PeerConnection(serviceScope)
         peerConnection = connection
@@ -1082,21 +1087,24 @@ class WifiDirectService : Service() {
     private fun onTransferProgress(transferId: String, transferred: Long, total: Long) {
         val now = SystemClock.elapsedRealtime()
         val sample = transferSamples.getOrPut(transferId) {
-            TransferSample(lastUiUpdateMs = 0L, lastSpeedMs = now, lastSpeedBytes = 0L, speedBytesPerSec = 0.0)
+            TransferSample(lastUiUpdateMs = 0L, lastSpeedMs = now, lastSpeedBytes = 0L, speedBytesPerSec = 0L)
         }
         val finished = total > 0 && transferred >= total
         if (!finished && now - sample.lastUiUpdateMs < PROGRESS_UI_INTERVAL_MS) return
 
         val elapsed = now - sample.lastSpeedMs
         if (elapsed > 0) {
-            val instantaneous = (transferred - sample.lastSpeedBytes) * 1000.0 / elapsed
-            sample.speedBytesPerSec = if (sample.speedBytesPerSec <= 0.0) instantaneous else sample.speedBytesPerSec * 0.7 + instantaneous * 0.3
+            sample.speedBytesPerSec = NativeCoreEngine.computeEwmaSpeed(
+                previousSpeedBytesPerSec = sample.speedBytesPerSec,
+                deltaBytes = transferred - sample.lastSpeedBytes,
+                elapsedMs = elapsed,
+            )
             sample.lastSpeedMs = now
             sample.lastSpeedBytes = transferred
         }
         sample.lastUiUpdateMs = now
 
-        val speed = sample.speedBytesPerSec.toLong().coerceAtLeast(0L)
+        val speed = sample.speedBytesPerSec.coerceAtLeast(0L)
         updateTransfer(transferId) {
             if (it.isActive) {
                 it.copy(state = TransferState.IN_PROGRESS, bytesTransferred = transferred, speedBytesPerSec = speed)
@@ -1215,7 +1223,31 @@ class WifiDirectService : Service() {
         }
     }
 
+    private fun acquireLowLatencyWifiLock() {
+        runCatching {
+            val wm = wifiManager ?: return
+            val lock = activeWifiLock ?: wm.createWifiLock(
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY,
+                "ThazhShare:P2pLowLatencyLock",
+            ).apply {
+                setReferenceCounted(false)
+            }.also { activeWifiLock = it }
+            if (!lock.isHeld) {
+                lock.acquire()
+            }
+        }
+    }
+
+    private fun releaseLowLatencyWifiLock() {
+        runCatching {
+            activeWifiLock?.let { lock ->
+                if (lock.isHeld) lock.release()
+            }
+        }
+    }
+
     private fun tearDownActiveConnection() {
+        releaseLowLatencyWifiLock()
         connectionMonitor?.stop()
         failInFlightTransfers()
         resetIncomingGate()
@@ -1397,7 +1429,7 @@ class WifiDirectService : Service() {
         private const val NOTIFICATION_ID = 1001
         private const val INCOMING_CONN_NOTIFICATION_ID = 1003
         private const val NEW_FILE_NOTIFICATION_ID = 1004
-        private const val PROGRESS_UI_INTERVAL_MS = 150L
+        private const val PROGRESS_UI_INTERVAL_MS = 100L
         private const val TEMPORARY_VISIBILITY_SECONDS = 10 * 60
         private const val INCOMING_REQUEST_TIMEOUT_MS = 60_000L
         const val ACTION_ACCEPT_INCOMING = "com.thazh.share.action.ACCEPT_INCOMING"

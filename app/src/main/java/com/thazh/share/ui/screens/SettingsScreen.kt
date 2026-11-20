@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -189,7 +190,7 @@ fun SettingsScreen(
     val appVersion = remember(context) {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0)?.versionName
-        }.getOrNull() ?: "1.2.0"
+        }.getOrNull() ?: "1.2.3"
     }
 
     // Sub-page navigation state inside Settings (each of the 6 categories has its own dedicated page)
@@ -263,7 +264,7 @@ fun SettingsScreen(
         AnimatedContent(
             targetState = selectedCategory,
             transitionSpec = {
-                if (targetState != null && initialState == null) {
+                val transform = if (targetState != null && initialState == null) {
                     slideInHorizontally(slideSpec) { it } + fadeIn(tween(180)) togetherWith
                         slideOutHorizontally(slideSpec) { -(it * 0.28f).toInt() } + fadeOut(tween(150))
                 } else if (isCategorySwipePop) {
@@ -274,6 +275,7 @@ fun SettingsScreen(
                     slideInHorizontally(slideSpec) { -(it * 0.28f).toInt() } + fadeIn(tween(180)) togetherWith
                         slideOutHorizontally(slideSpec) { it } + fadeOut(tween(150))
                 }
+                transform using SizeTransform(clip = false)
             },
             label = "settings_category_page_transition",
         ) { category ->
@@ -796,7 +798,7 @@ private fun SettingsHubPage(
             }
         }
 
-        // iOS & Glasmio Floating Liquid Glass Search Bar (Thanh tìm kiếm nổi)
+        // iOS & Glasmio Floating Liquid Glass Search Bar (frameless so LiquidGlass bounce scale never clips)
         if (interactive) {
             CompositionLocalProvider(
                 LocalGlassBackdrop provides floatingSearchBackdrop,
@@ -807,59 +809,36 @@ private fun SettingsHubPage(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .padding(floatingBottomInsets)
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 20.dp)
                         .swipeBackExcluded(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(
+                    GlasmioSearchBar(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        active = searchActive,
+                        onActiveChange = { searchActive = it },
+                        onClose = {
+                            searchQuery = TextFieldValue("")
+                            searchActive = false
+                            focusManager.clearFocus()
+                            keyboard?.hide()
+                        },
+                        onSearch = {
+                            focusManager.clearFocus()
+                            keyboard?.hide()
+                        },
+                        placeholder = stringResource(R.string.settings_search_placeholder),
+                        closeContentDescription = stringResource(R.string.close),
+                        backdrop = floatingSearchBackdrop,
+                        style = GlassSurfaceStyle.Navigation,
+                        controlHeight = 48.dp,
+                        focusRequester = searchFocusRequester,
                         modifier = Modifier
                             .widthIn(max = 520.dp)
                             .fillMaxWidth()
-                            .shadow(
-                                elevation = 14.dp,
-                                shape = ContinuousCapsule,
-                                ambientColor = Color.Black.copy(alpha = 0.18f),
-                                spotColor = Color.Black.copy(alpha = 0.22f),
-                            )
-                            .clip(ContinuousCapsule)
-                            .background(
-                                colors.elevatedBackground.copy(
-                                    alpha = if (appearance.reduceTransparency) 0.96f else 0.76f
-                                )
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = colors.content.copy(alpha = if (colors.isDark) 0.16f else 0.10f),
-                                shape = ContinuousCapsule,
-                            )
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                    ) {
-                        GlasmioSearchBar(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            active = searchActive,
-                            onActiveChange = { searchActive = it },
-                            onClose = {
-                                searchQuery = TextFieldValue("")
-                                searchActive = false
-                                focusManager.clearFocus()
-                                keyboard?.hide()
-                            },
-                            onSearch = {
-                                focusManager.clearFocus()
-                                keyboard?.hide()
-                            },
-                            placeholder = stringResource(R.string.settings_search_placeholder),
-                            closeContentDescription = stringResource(R.string.close),
-                            backdrop = floatingSearchBackdrop,
-                            style = GlassSurfaceStyle.Navigation,
-                            controlHeight = 46.dp,
-                            focusRequester = searchFocusRequester,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("settings_search_bar"),
-                        )
-                    }
+                            .testTag("settings_search_bar"),
+                    )
                 }
             }
         }

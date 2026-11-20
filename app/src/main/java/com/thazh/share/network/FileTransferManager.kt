@@ -9,13 +9,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
 
-private const val CHUNK_SIZE_BYTES = 64 * 1024 // 64KB chunks: good balance of throughput vs latency over P2P
+private const val DEFAULT_CHUNK_SIZE_BYTES = 256 * 1024 // 256KB default high-speed P2P chunk size
+private const val DISK_IO_BUFFER_BYTES = 256 * 1024
 
 /** Extra room required on top of a file's size before accepting it, so the disk is never filled to the last byte. */
 private const val FREE_SPACE_MARGIN_BYTES = 16L * 1024 * 1024
@@ -35,55 +38,51 @@ sealed class TransferProgressEvent {
 }
 
 /**
- * Drives outgoing file sends (reading a content [Uri] or [File] in
- * [CHUNK_SIZE_BYTES] pieces and pushing them through [PeerConnection]) and
- * assembles incoming files chunk-by-chunk as [Frame.FileChunkHeader] +
- * raw-byte events arrive from the connection's read loop.
+ * High-throughput file transfer engine driving outgoing file sends and incoming file assembly.
  *
- * The caller (WifiDirectService) is responsible for routing
- * [SocketConnectionEvent.FrameReceived]/[RawChunkReceived] pairs for
- * file-related frames into [onFileOfferReceived]/[onChunkBytesReceived]; this
- * class does not read the socket directly, keeping a single read-loop owner.
- *
- * The same instance serves both the chat attachments and the dedicated file
- * transfer tab; the only difference is where an incoming file is written
- * (see [onFileOfferReceived]).
+ * Optimizations:
+ * - Adaptive chunk sizing (`64 KB .. 512 KB`) computed via [NativeCoreEngine.recommendChunkSize].
+ * - Zero-allocation double-buffering backed by [ChunkBufferPool] slabs.
+ * - Direct IO-thread chunk reception via [PeerConnection.directChunkHandler] bypassing Main-thread
+ *   dispatch and using 256 KB buffered sequential disk output streams.
  */
 class FileTransferManager(
     private val context: Context,
     private val connection: PeerConnection,
     private val outputDir: File
 ) {
-    // Terminal events (Completed/Failed) are sent with the suspending emit() so a
-    // burst of Progress events can never push them out of the buffer; Progress
-    // itself uses tryEmit(), where dropping an update is harmless.
     private val _progressEvents = MutableSharedFlow<TransferProgressEvent>(extraBufferCapacity = 64)
     val progressEvents: SharedFlow<TransferProgressEvent> = _progressEvents
 
-    // Written by the service's event collector (offers) and by the user's cancel
-    // button, while chunks are being written from an IO thread — hence concurrent.
     private val activeIncoming = ConcurrentHashMap<String, IncomingWriteState>()
-
-    /** Ids of outgoing transfers the sender loop should stop at its next chunk. */
     private val cancelledOutgoing: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private class IncomingWriteState(
-        /** The file bytes are written to: either the final file, or a staging file that is moved on completion. */
         val file: File,
-        val raf: RandomAccessFile,
+        val outputStream: BufferedOutputStream,
         val totalBytes: Long,
-        /** Non-null when [file] is a staging file that must be moved into this folder, under [finalName], once complete. */
         val finalDir: File? = null,
         val finalName: String? = null,
         var bytesWritten: Long = 0L,
-        var nextExpectedChunkIndex: Int = 0
-    )
+        var nextExpectedChunkIndex: Int = 0,
+        var rollingHashFnv64: Long = 0L,
+    ) {
+        fun closeQuietly() {
+            runCatching { outputStream.flush() }
+            runCatching { outputStream.close() }
+        }
+    }
 
-    /** Synchronizes destination filename reservation and final staging move so concurrent transfers never collide. */
     private val destinationLock = Any()
 
-    /** True while a header has been read and we're awaiting its raw chunk on the next event. */
+    @Volatile
     private var pendingHeader: Frame.FileChunkHeader? = null
+
+    init {
+        connection.directChunkHandler = { header, pooledBuffer, length ->
+            writeIncomingChunkInternal(header, pooledBuffer, length)
+        }
+    }
 
     suspend fun sendFile(
         messageId: String,
@@ -91,24 +90,28 @@ class FileTransferManager(
         fileName: String,
         fileSizeBytes: Long
     ): Boolean = withContext(Dispatchers.IO) {
+        var currentSlab: ByteArray? = null
+        var nextSlab: ByteArray? = null
         try {
-            val input = if (sourceUri.scheme == "file") {
+            val rawInput = if (sourceUri.scheme == "file") {
                 sourceUri.path?.let { path -> File(path).takeIf { it.isFile }?.inputStream() }
             } else {
                 context.contentResolver.openInputStream(sourceUri)
             }
-            if (input == null) {
+            if (rawInput == null) {
                 _progressEvents.emit(TransferProgressEvent.Failed(messageId, "Không thể mở tệp"))
                 return@withContext false
             }
-            input.use { stream ->
-                // Read one chunk ahead so "is this the last chunk?" is decided by actually hitting
-                // the end of the stream rather than by trusting the size reported up front: some
-                // content providers report 0 or a wrong size, which would otherwise truncate the
-                // file or leave the receiver waiting for a final chunk that never comes.
-                var current = ByteArray(CHUNK_SIZE_BYTES)
-                var next = ByteArray(CHUNK_SIZE_BYTES)
-                var currentLength = stream.readUpTo(current)
+
+            val adaptiveChunkSize = NativeCoreEngine.recommendChunkSize(fileSizeBytes)
+                .coerceIn(64 * 1024, ChunkBufferPool.DEFAULT_SLAB_BYTES)
+            currentSlab = ChunkBufferPool.acquire(adaptiveChunkSize)
+            nextSlab = ChunkBufferPool.acquire(adaptiveChunkSize)
+
+            BufferedInputStream(rawInput, DISK_IO_BUFFER_BYTES).use { stream ->
+                var current = currentSlab!!
+                var next = nextSlab!!
+                var currentLength = stream.readUpTo(current, adaptiveChunkSize)
                 var chunkIndex = 0
                 var totalSent = 0L
 
@@ -118,7 +121,7 @@ class FileTransferManager(
                         return@withContext false
                     }
 
-                    val nextLength = stream.readUpTo(next)
+                    val nextLength = stream.readUpTo(next, adaptiveChunkSize)
                     val isLast = nextLength <= 0
 
                     val header = Frame.FileChunkHeader(
@@ -153,29 +156,20 @@ class FileTransferManager(
             _progressEvents.emit(TransferProgressEvent.Failed(messageId, e.message ?: "Lỗi không xác định"))
             false
         } finally {
+            ChunkBufferPool.release(currentSlab)
+            ChunkBufferPool.release(nextSlab)
             cancelledOutgoing.remove(messageId)
         }
     }
 
-    /** Asks the sender loop of [messageId] to stop at its next chunk. */
     fun cancelOutgoing(messageId: String) {
         cancelledOutgoing.add(messageId)
     }
 
-    /** Forgets a pending cancel request, so a retry of the same transfer id starts clean. */
     fun clearOutgoingCancel(messageId: String) {
         cancelledOutgoing.remove(messageId)
     }
 
-    /**
-     * Call when a [Frame.FileOffer] arrives, to prime the destination file for the upcoming chunk stream.
-     *
-     * Automatically resolves a unique file name (adding suffix ` (1)`, ` (2)`, etc.) if a file with the
-     * same name already exists in [destinationDir], in [existingNames], or among other active incoming transfers.
-     *
-     * @return The resolved (potentially auto-renamed) file name.
-     * @throws IOException if the file can't be created or there isn't enough free space.
-     */
     @Throws(IOException::class)
     fun onFileOfferReceived(
         offer: Frame.FileOffer,
@@ -183,9 +177,8 @@ class FileTransferManager(
         stagingDir: File? = null,
         existingNames: Set<String> = emptySet()
     ): String {
-        // A repeated offer for the same id (e.g. a retry) replaces whatever was left of the earlier attempt.
         activeIncoming.remove(offer.messageId)?.let {
-            runCatching { it.raf.close() }
+            it.closeQuietly()
             runCatching { it.file.delete() }
         }
 
@@ -208,7 +201,7 @@ class FileTransferManager(
                 val partial = File(stagingDir, FileNameUtils.sanitizeId(offer.messageId) + ".part")
                 IncomingWriteState(
                     file = partial,
-                    raf = RandomAccessFile(partial, "rw").also { it.setLength(0L) },
+                    outputStream = BufferedOutputStream(FileOutputStream(partial, false), DISK_IO_BUFFER_BYTES),
                     totalBytes = size,
                     finalDir = destinationDir,
                     finalName = resolvedName
@@ -218,7 +211,7 @@ class FileTransferManager(
                 resolvedName = target.name
                 IncomingWriteState(
                     file = target,
-                    raf = RandomAccessFile(target, "rw").also { it.setLength(0L) },
+                    outputStream = BufferedOutputStream(FileOutputStream(target, false), DISK_IO_BUFFER_BYTES),
                     totalBytes = size,
                     finalName = resolvedName
                 )
@@ -227,8 +220,6 @@ class FileTransferManager(
         Log.d(TAG, "Priming incoming file $safeName -> $resolvedName (${state.file.absolutePath})")
 
         if (size == 0L) {
-            // An empty file has no chunks to wait for (the sender can't send a zero-length chunk),
-            // so it is complete as soon as it is announced.
             try {
                 val finished = finishIncoming(state)
                 _progressEvents.tryEmit(TransferProgressEvent.Completed(offer.messageId, finished))
@@ -243,12 +234,12 @@ class FileTransferManager(
         return resolvedName
     }
 
-    /** Call for every [Frame.FileChunkHeader] read from the socket. */
+    /** Fallback header setter when not using directChunkHandler. */
     fun onChunkHeaderReceived(header: Frame.FileChunkHeader) {
         pendingHeader = header
     }
 
-    /** Call for the raw bytes event that immediately follows a chunk header. */
+    /** Fallback raw chunk writer when not using directChunkHandler. */
     suspend fun onChunkBytesReceived(bytes: ByteArray) = withContext(Dispatchers.IO) {
         val header = pendingHeader
         pendingHeader = null
@@ -256,18 +247,33 @@ class FileTransferManager(
             Log.w(TAG, "Received raw chunk with no pending header; dropping ${bytes.size} bytes")
             return@withContext
         }
+        writeIncomingChunkInternal(header, bytes, header.chunkSizeBytes)
+    }
+
+    private suspend fun writeIncomingChunkInternal(
+        header: Frame.FileChunkHeader,
+        bytes: ByteArray,
+        length: Int,
+    ) {
         val state = activeIncoming[header.messageId]
         if (state == null) {
-            // Normal after a cancel: the sender may still have chunks in flight.
-            Log.w(TAG, "Received chunk for unknown transfer ${header.messageId}")
-            return@withContext
+            return
         }
+        val bytesToWrite = minOf(header.chunkSizeBytes, length, bytes.size)
+        if (bytesToWrite <= 0) return
 
         try {
-            state.raf.seek(state.bytesWritten)
-            state.raf.write(bytes, 0, header.chunkSizeBytes)
-            state.bytesWritten += header.chunkSizeBytes
-            state.nextExpectedChunkIndex = header.chunkIndex + 1
+            synchronized(state) {
+                state.outputStream.write(bytes, 0, bytesToWrite)
+                state.bytesWritten += bytesToWrite
+                state.nextExpectedChunkIndex = header.chunkIndex + 1
+                state.rollingHashFnv64 = NativeCoreEngine.computeFnv1a64(
+                    buffer = bytes,
+                    offset = 0,
+                    length = bytesToWrite,
+                    seed = state.rollingHashFnv64,
+                )
+            }
 
             _progressEvents.tryEmit(
                 TransferProgressEvent.Progress(header.messageId, state.bytesWritten, state.totalBytes)
@@ -277,34 +283,34 @@ class FileTransferManager(
                 activeIncoming.remove(header.messageId)
                 val finished = finishIncoming(state)
                 _progressEvents.emit(TransferProgressEvent.Completed(header.messageId, finished))
-                Log.d(TAG, "Completed incoming file ${finished.name} (${state.bytesWritten} bytes)")
+                Log.d(
+                    TAG,
+                    "Completed incoming file ${finished.name} (${state.bytesWritten} bytes, fnv64=${java.lang.Long.toUnsignedString(state.rollingHashFnv64, 16)})"
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed writing chunk: ${e.message}", e)
-            runCatching { state.raf.close() }
+            state.closeQuietly()
             activeIncoming.remove(header.messageId)
             runCatching { state.file.delete() }
             _progressEvents.emit(TransferProgressEvent.Failed(header.messageId, e.message ?: "Lỗi ghi tệp"))
         }
     }
 
-    /** Drops an incoming transfer (the person cancelled, or the sender did) and deletes what was written so far. */
     fun cancelTransfer(messageId: String) {
         activeIncoming.remove(messageId)?.let {
-            runCatching { it.raf.close() }
+            it.closeQuietly()
             runCatching { it.file.delete() }
         }
     }
 
-    /** Called when the connection is torn down: discards every unfinished incoming file. */
     fun abortAll() {
         activeIncoming.keys.toList().forEach { cancelTransfer(it) }
         pendingHeader = null
     }
 
-    /** Closes the written file and, for staged transfers, moves it into its final folder under a unique name. */
     private fun finishIncoming(state: IncomingWriteState): File {
-        runCatching { state.raf.close() }
+        state.closeQuietly()
         val finalDir = state.finalDir ?: return state.file
 
         synchronized(destinationLock) {
@@ -317,11 +323,11 @@ class FileTransferManager(
         }
     }
 
-    /** Reads until [buffer] is full or the stream ends; returns the number of bytes read (0 at end of stream). */
-    private fun InputStream.readUpTo(buffer: ByteArray): Int {
+    private fun InputStream.readUpTo(buffer: ByteArray, targetBytes: Int = buffer.size): Int {
+        val maxLen = minOf(targetBytes, buffer.size)
         var total = 0
-        while (total < buffer.size) {
-            val read = read(buffer, total, buffer.size - total)
+        while (total < maxLen) {
+            val read = read(buffer, total, maxLen - total)
             if (read < 0) break
             total += read
         }
@@ -330,6 +336,6 @@ class FileTransferManager(
 
     companion object {
         private const val TAG = "FileTransferManager"
-        const val CHUNK_SIZE = CHUNK_SIZE_BYTES
+        const val CHUNK_SIZE = DEFAULT_CHUNK_SIZE_BYTES
     }
 }

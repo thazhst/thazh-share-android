@@ -144,25 +144,37 @@ class WifiDirectManager(
             wps.setup = android.net.wifi.WpsInfo.PBC
         }
         _connectionState.value = P2pConnectionState.Connecting
-        try {
-            manager.connect(ch, config, object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    Log.d(TAG, "connect: onSuccess (negotiation started)")
-                    onResult(true, null)
-                }
 
-                override fun onFailure(reasonCode: Int) {
-                    val reason = reasonToString(reasonCode)
-                    Log.w(TAG, "connect: onFailure $reason")
-                    _connectionState.value = P2pConnectionState.Failed(reason)
-                    onResult(false, reason)
-                }
-            })
-        } catch (e: Exception) {
-            val msg = e.message ?: "Không thể kết nối WiFi Direct"
-            _connectionState.value = P2pConnectionState.Failed(msg)
-            onResult(false, msg)
+        fun attemptConnect(allowBusyRetry: Boolean) {
+            try {
+                manager.connect(ch, config, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        Log.d(TAG, "connect: onSuccess (negotiation started)")
+                        onResult(true, null)
+                    }
+
+                    override fun onFailure(reasonCode: Int) {
+                        if (allowBusyRetry && reasonCode == WifiP2pManager.BUSY) {
+                            Log.d(TAG, "connect busy; stopping peer discovery and retrying immediately")
+                            stopDiscovery {
+                                attemptConnect(allowBusyRetry = false)
+                            }
+                            return
+                        }
+                        val reason = reasonToString(reasonCode)
+                        Log.w(TAG, "connect: onFailure $reason")
+                        _connectionState.value = P2pConnectionState.Failed(reason)
+                        onResult(false, reason)
+                    }
+                })
+            } catch (e: Exception) {
+                val msg = e.message ?: "Không thể kết nối WiFi Direct"
+                _connectionState.value = P2pConnectionState.Failed(msg)
+                onResult(false, msg)
+            }
         }
+
+        attemptConnect(allowBusyRetry = true)
     }
 
     fun disconnect(onResult: ((Boolean) -> Unit)? = null) {
@@ -215,13 +227,16 @@ class WifiDirectManager(
         val ch = channel ?: return
         runCatching {
             manager.requestPeers(ch) { deviceList: WifiP2pDeviceList ->
-                _peers.value = deviceList.deviceList.map { d ->
+                val mapped = deviceList.deviceList.map { d ->
                     DiscoveredPeer(
                         deviceName = d.deviceName ?: d.deviceAddress,
                         deviceAddress = d.deviceAddress,
                         status = PeerStatus.fromWifiP2pStatus(d.status),
                         isGroupOwner = d.isGroupOwner
                     )
+                }
+                if (_peers.value != mapped) {
+                    _peers.value = mapped
                 }
             }
         }.onFailure {

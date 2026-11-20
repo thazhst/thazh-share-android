@@ -138,14 +138,19 @@ fun DiscoveredPeerRow(
                 }
             }
 
+            val signalBars = rssiToSignalBars(peer.rssiDbm)
+            val signalQualityText = when (signalBars) {
+                4 -> stringResource(R.string.quality_strong)
+                3 -> stringResource(R.string.quality_medium)
+                2 -> stringResource(R.string.quality_weak)
+                else -> stringResource(R.string.quality_poor)
+            }
             val statusSubtitle = when (peer.status) {
                 PeerStatus.CONNECTED -> stringResource(R.string.notif_connected, peer.deviceName)
                 PeerStatus.INVITED -> stringResource(R.string.discover_connecting)
                 PeerStatus.AVAILABLE, PeerStatus.FAILED, PeerStatus.UNAVAILABLE -> {
                     buildList {
-                        if (peer.estimatedDistanceMeters != null) {
-                            add(FormatUtils.formatDistance(peer.estimatedDistanceMeters))
-                        }
+                        add(signalQualityText)
                         if (peer.rssiDbm != null) {
                             add("${peer.rssiDbm} dBm")
                         }
@@ -153,13 +158,24 @@ fun DiscoveredPeerRow(
                     }.joinToString(" • ")
                 }
             }
-            GlasmioText(
-                text = statusSubtitle,
-                style = GlasmioTheme.textStyles.footnote,
-                color = colors.secondaryContent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SignalStrengthMiniBars(
+                    barsFilled = signalBars,
+                    activeColor = badgeColor,
+                    width = 13.dp,
+                    height = 10.dp,
+                )
+                GlasmioText(
+                    text = statusSubtitle,
+                    style = GlasmioTheme.textStyles.footnote,
+                    color = colors.secondaryContent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(10.dp))

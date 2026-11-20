@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousCapsule
 import com.thazh.share.R
+import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
 import com.thazh.share.data.PeerDiscoveryTransport
@@ -57,7 +58,6 @@ import com.thazh.share.data.PeerStatus
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
-import com.thazh.share.util.FormatUtils
 import io.github.neoruaa.glasmio.core.GlasmioTheme
 import io.github.neoruaa.glasmio.icons.SfIcon
 import kotlin.math.PI
@@ -71,6 +71,29 @@ enum class RadarMode {
     RECEIVE
 }
 
+/**
+ * Precomputed trigonometry table for the 36-tick azimuth bezel around the spatial radar.
+ * Avoids 72 sin/cos evaluations per 120Hz frame inside Canvas DrawScope.
+ */
+private object RadarAzimuthTable {
+    const val TICK_COUNT = 36
+    val cosTable = FloatArray(TICK_COUNT)
+    val sinTable = FloatArray(TICK_COUNT)
+    val isCardinal = BooleanArray(TICK_COUNT)
+    val isMajor = BooleanArray(TICK_COUNT)
+
+    init {
+        for (i in 0 until TICK_COUNT) {
+            val deg = i * 10
+            val rad = deg * (PI / 180.0)
+            cosTable[i] = cos(rad).toFloat()
+            sinTable[i] = sin(rad).toFloat()
+            isCardinal[i] = (deg % 90 == 0)
+            isMajor[i] = (deg % 30 == 0)
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun InteractiveRadarCard(
@@ -82,7 +105,7 @@ fun InteractiveRadarCard(
     isConnecting: Boolean = false,
     isConnected: Boolean = false,
     connectedPeerName: String? = null,
-    connectedDistanceMeters: Int? = null,
+    connectionQuality: ConnectionQuality = ConnectionQuality.STRONG,
     peers: List<DiscoveredPeer> = emptyList(),
     isBleSupported: Boolean = true,
     isBleEnabled: Boolean = true,
@@ -107,18 +130,29 @@ fun InteractiveRadarCard(
         isHidden -> colors.secondaryContent
         else -> semantic.accentBlue
     }
+    val secondaryAccent = when {
+        isConnected -> semantic.accentCyan
+        isHidden -> colors.tertiaryContent
+        else -> semantic.accentCyan
+    }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "spatial_radar")
-    val sweepAngle by infiniteTransition.animateFloat(
+    val activeRadar = isDiscovering || isConnected || (!isHidden && mode == RadarMode.RECEIVE)
+
+    val infiniteTransition = if (activeRadar) {
+        rememberInfiniteTransition(label = "spatial_radar")
+    } else {
+        null
+    }
+    val sweepAngleState = infiniteTransition?.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3400, easing = LinearEasing),
+            animation = tween(durationMillis = 3000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "radar_sweep_angle",
     )
-    val pulsePhase by infiniteTransition.animateFloat(
+    val pulsePhaseState = infiniteTransition?.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -127,8 +161,9 @@ fun InteractiveRadarCard(
         ),
         label = "radar_pulse_phase",
     )
-
-    val activeRadar = isDiscovering || isConnected || (!isHidden && mode == RadarMode.RECEIVE)
+    val cachedDashEffect = remember {
+        PathEffect.dashPathEffect(floatArrayOf(7f, 9f), 0f)
+    }
 
     // Borderless open spatial Radar section on both Send and Receive screens
     Column(
@@ -137,7 +172,7 @@ fun InteractiveRadarCard(
             .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Top header bar: Local device badge + live visibility badge
+        // Top header bar: Local device badge + Live Signal Quality / Visibility badge
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -151,7 +186,7 @@ fun InteractiveRadarCard(
                 modifier = Modifier
                     .clip(ContinuousCapsule)
                     .background(primaryAccent.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                    .padding(horizontal = 11.dp, vertical = 5.dp),
             ) {
                 Box(
                     modifier = Modifier
@@ -168,36 +203,50 @@ fun InteractiveRadarCard(
                 )
             }
 
-            val visibilityBadgeText = when {
-                isConnected -> stringResource(R.string.quality_strong)
-                visibilityMode == DeviceVisibilityMode.HIDDEN -> stringResource(R.string.visibility_mode_hidden)
-                visibilityMode == DeviceVisibilityMode.TEMPORARY_10_MIN -> stringResource(
-                    R.string.visibility_timer_badge,
-                    WifiDirectService.formatCountdown(visibilityRemainingSeconds ?: 600),
+            if (isConnected) {
+                ConnectionQualityIndicator(
+                    quality = connectionQuality,
+                    showLabel = true,
                 )
-                else -> stringResource(R.string.visibility_active_always_badge)
-            }
-            Box(
-                modifier = Modifier
-                    .clip(ContinuousCapsule)
-                    .background(colors.secondaryContent.copy(alpha = if (colors.isDark) 0.18f else 0.10f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-            ) {
-                GlasmioText(
-                    text = visibilityBadgeText,
-                    style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.Medium),
-                    color = colors.secondaryContent,
-                )
+            } else {
+                val visibilityBadgeText = when (visibilityMode) {
+                    DeviceVisibilityMode.HIDDEN -> stringResource(R.string.visibility_mode_hidden)
+                    DeviceVisibilityMode.TEMPORARY_10_MIN -> stringResource(
+                        R.string.visibility_timer_badge,
+                        WifiDirectService.formatCountdown(visibilityRemainingSeconds ?: 600),
+                    )
+                    else -> stringResource(R.string.visibility_active_always_badge)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    modifier = Modifier
+                        .clip(ContinuousCapsule)
+                        .background(colors.secondaryContent.copy(alpha = if (colors.isDark) 0.18f else 0.10f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                ) {
+                    SignalStrengthMiniBars(
+                        barsFilled = if (isHidden) 0 else 4,
+                        activeColor = primaryAccent,
+                        width = 13.dp,
+                        height = 10.dp,
+                    )
+                    GlasmioText(
+                        text = visibilityBadgeText,
+                        style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.Medium),
+                        color = colors.secondaryContent,
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // 2D Spatial Radar Canvas + Interactive Peer Nodes (No outer frame/border)
+        // 2D Spatial Signal Radar Canvas + Interactive Peer Nodes (No distance labels, pure signal visualization)
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(244.dp),
+                .height(256.dp),
             contentAlignment = Alignment.Center,
         ) {
             val radarSizeDp = minOf(maxWidth, maxHeight)
@@ -207,15 +256,15 @@ fun InteractiveRadarCard(
                 modifier = Modifier.size(radarSizeDp),
             ) {
                 val centerOffset = Offset(size.width / 2f, size.height / 2f)
-                val maxR = size.minDimension / 2f * 0.92f
-                val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+                val maxR = size.minDimension / 2f * 0.94f
+                val outerOrbitR = maxR * 0.91f
 
-                // Soft ambient radial glow behind the radar rings (no hard border)
+                // 1. Multi-stop ambient radial field glow
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            primaryAccent.copy(alpha = if (colors.isDark) 0.16f else 0.10f),
-                            primaryAccent.copy(alpha = if (colors.isDark) 0.05f else 0.03f),
+                            primaryAccent.copy(alpha = if (colors.isDark) 0.20f else 0.12f),
+                            secondaryAccent.copy(alpha = if (colors.isDark) 0.08f else 0.05f),
                             Color.Transparent,
                         ),
                         center = centerOffset,
@@ -225,141 +274,217 @@ fun InteractiveRadarCard(
                     center = centerOffset,
                 )
 
-                // Subtle crosshairs
+                // 2. Reticle crosshairs with clean center aperture gap
+                val gapR = maxR * 0.26f
+                val crossAlpha = if (colors.isDark) 0.16f else 0.12f
                 drawLine(
-                    color = primaryAccent.copy(alpha = 0.12f),
-                    start = Offset(centerOffset.x - maxR, centerOffset.y),
-                    end = Offset(centerOffset.x + maxR, centerOffset.y),
+                    color = primaryAccent.copy(alpha = crossAlpha),
+                    start = Offset(centerOffset.x - outerOrbitR, centerOffset.y),
+                    end = Offset(centerOffset.x - gapR, centerOffset.y),
                     strokeWidth = 1.dp.toPx(),
-                    pathEffect = dashEffect,
+                    pathEffect = cachedDashEffect,
                 )
                 drawLine(
-                    color = primaryAccent.copy(alpha = 0.12f),
-                    start = Offset(centerOffset.x, centerOffset.y - maxR),
-                    end = Offset(centerOffset.x, centerOffset.y + maxR),
+                    color = primaryAccent.copy(alpha = crossAlpha),
+                    start = Offset(centerOffset.x + gapR, centerOffset.y),
+                    end = Offset(centerOffset.x + outerOrbitR, centerOffset.y),
                     strokeWidth = 1.dp.toPx(),
-                    pathEffect = dashEffect,
+                    pathEffect = cachedDashEffect,
+                )
+                drawLine(
+                    color = primaryAccent.copy(alpha = crossAlpha),
+                    start = Offset(centerOffset.x, centerOffset.y - outerOrbitR),
+                    end = Offset(centerOffset.x, centerOffset.y - gapR),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = cachedDashEffect,
+                )
+                drawLine(
+                    color = primaryAccent.copy(alpha = crossAlpha),
+                    start = Offset(centerOffset.x, centerOffset.y + gapR),
+                    end = Offset(centerOffset.x, centerOffset.y + outerOrbitR),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = cachedDashEffect,
                 )
 
-                // 3 Concentric Distance Rings (1m = 0.36, 3m = 0.66, 10m = 0.95)
-                val ringFractions = listOf(0.36f, 0.66f, 0.95f)
-                ringFractions.forEachIndexed { idx, frac ->
+                // 3. Four Concentric Signal Quality Orbit Rings (no distance text)
+                val ringFractions = floatArrayOf(0.29f, 0.50f, 0.71f, 0.91f)
+                for (i in ringFractions.indices) {
+                    val r = maxR * ringFractions[i]
+                    val isOuter = i == ringFractions.lastIndex
+                    val ringAlpha = when (i) {
+                        0 -> 0.18f
+                        1 -> 0.15f
+                        2 -> 0.16f
+                        else -> 0.24f
+                    }
                     drawCircle(
-                        color = primaryAccent.copy(alpha = if (idx == 2) 0.18f else 0.14f),
-                        radius = maxR * frac,
+                        color = primaryAccent.copy(alpha = ringAlpha),
+                        radius = r,
                         center = centerOffset,
-                        style = Stroke(width = 1.1.dp.toPx()),
+                        style = Stroke(width = if (isOuter) 1.4.dp.toPx() else 1.05.dp.toPx()),
                     )
                 }
 
-                // Expanding pulse wave when active
+                // 4. Precision 36-Tick Azimuth Bezel around outer ring (precomputed trigonometry)
+                val bezelOuterR = maxR * 0.985f
+                for (i in 0 until RadarAzimuthTable.TICK_COUNT) {
+                    val c = RadarAzimuthTable.cosTable[i]
+                    val s = RadarAzimuthTable.sinTable[i]
+                    val tickLen = when {
+                        RadarAzimuthTable.isCardinal[i] -> 6.5.dp.toPx()
+                        RadarAzimuthTable.isMajor[i] -> 4.5.dp.toPx()
+                        else -> 2.8.dp.toPx()
+                    }
+                    val tickAlpha = when {
+                        RadarAzimuthTable.isCardinal[i] -> 0.48f
+                        RadarAzimuthTable.isMajor[i] -> 0.28f
+                        else -> 0.15f
+                    }
+                    val tickWidth = if (RadarAzimuthTable.isCardinal[i]) 1.6.dp.toPx() else 1.0.dp.toPx()
+                    val innerR = bezelOuterR - tickLen
+                    drawLine(
+                        color = primaryAccent.copy(alpha = tickAlpha),
+                        start = Offset(centerOffset.x + c * innerR, centerOffset.y + s * innerR),
+                        end = Offset(centerOffset.x + c * bezelOuterR, centerOffset.y + s * bezelOuterR),
+                        strokeWidth = tickWidth,
+                        cap = StrokeCap.Round,
+                    )
+                }
+
+                // 5. Dynamic Expanding Signal Waves & Dual-Gradient Sweep Beam (read strictly in DrawScope)
                 if (activeRadar) {
+                    val currentPulse = pulsePhaseState?.value ?: 0f
+                    val currentSweep = sweepAngleState?.value ?: 0f
+
+                    // Dual harmonic expanding signal ripples
                     for (ring in 0..1) {
-                        val phase = (pulsePhase + ring * 0.5f) % 1f
-                        val radius = maxR * (0.22f + 0.73f * phase)
-                        val alpha = (1f - phase) * 0.34f
+                        val phase = (currentPulse + ring * 0.5f) % 1f
+                        val radius = maxR * (0.24f + 0.67f * phase)
+                        val alpha = (1f - phase) * (1f - phase) * 0.38f
                         drawCircle(
                             color = primaryAccent.copy(alpha = alpha),
                             radius = radius,
                             center = centerOffset,
-                            style = Stroke(width = 2.dp.toPx()),
+                            style = Stroke(width = (2.2f - phase * 1.1f).dp.toPx()),
                         )
                     }
 
-                    // Rotating Radar Sweep Sector
-                    rotate(degrees = sweepAngle, pivot = centerOffset) {
+                    // Rotating luminous sweep fan + laser beam + outer beacon tip
+                    rotate(degrees = currentSweep, pivot = centerOffset) {
                         drawArc(
                             brush = Brush.sweepGradient(
                                 0.0f to Color.Transparent,
-                                0.78f to Color.Transparent,
-                                0.92f to primaryAccent.copy(alpha = 0.12f),
-                                1.0f to primaryAccent.copy(alpha = 0.34f),
+                                0.72f to Color.Transparent,
+                                0.86f to secondaryAccent.copy(alpha = 0.09f),
+                                0.95f to primaryAccent.copy(alpha = 0.22f),
+                                1.0f to primaryAccent.copy(alpha = 0.38f),
                                 center = centerOffset,
                             ),
                             startAngle = 0f,
                             sweepAngle = 360f,
                             useCenter = true,
-                            topLeft = Offset(centerOffset.x - maxR * 0.95f, centerOffset.y - maxR * 0.95f),
-                            size = Size(maxR * 1.90f, maxR * 1.90f),
+                            topLeft = Offset(centerOffset.x - outerOrbitR, centerOffset.y - outerOrbitR),
+                            size = Size(outerOrbitR * 2f, outerOrbitR * 2f),
                         )
+                        // Leading laser beam
                         drawLine(
-                            color = primaryAccent.copy(alpha = 0.62f),
-                            start = centerOffset,
-                            end = Offset(centerOffset.x + maxR * 0.95f, centerOffset.y),
-                            strokeWidth = 2.dp.toPx(),
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    primaryAccent.copy(alpha = 0.15f),
+                                    primaryAccent.copy(alpha = 0.85f),
+                                ),
+                                start = centerOffset,
+                                end = Offset(centerOffset.x + outerOrbitR, centerOffset.y),
+                            ),
+                            start = Offset(centerOffset.x + gapR * 0.7f, centerOffset.y),
+                            end = Offset(centerOffset.x + outerOrbitR, centerOffset.y),
+                            strokeWidth = 2.2.dp.toPx(),
                             cap = StrokeCap.Round,
+                        )
+                        // Glowing beacon tip on the outer orbit ring
+                        val tipCenter = Offset(centerOffset.x + outerOrbitR, centerOffset.y)
+                        drawCircle(
+                            color = primaryAccent.copy(alpha = 0.32f),
+                            radius = 6.5.dp.toPx(),
+                            center = tipCenter,
+                        )
+                        drawCircle(
+                            color = primaryAccent,
+                            radius = 3.2.dp.toPx(),
+                            center = tipCenter,
                         )
                     }
                 }
 
-                // Center glow aura
+                // 6. Center Core Aura Halo
+                val breathPhase = if (activeRadar) {
+                    val p = pulsePhaseState?.value ?: 0f
+                    0.88f + 0.24f * sin(p * PI.toFloat())
+                } else {
+                    1f
+                }
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            primaryAccent.copy(alpha = 0.32f),
-                            primaryAccent.copy(alpha = 0.05f),
+                            primaryAccent.copy(alpha = 0.36f),
+                            secondaryAccent.copy(alpha = 0.10f),
                             Color.Transparent,
                         ),
                         center = centerOffset,
-                        radius = maxR * 0.38f,
+                        radius = maxR * 0.36f * breathPhase,
                     ),
-                    radius = maxR * 0.38f,
+                    radius = maxR * 0.36f * breathPhase,
                     center = centerOffset,
                 )
             }
 
-            // Distance ring labels (1m, 3m, 10m)
-            val ringLabels = listOf(0.36f to "1m", 0.66f to "3m", 0.95f to "10m")
-            ringLabels.forEach { (fraction, label) ->
-                val yOffsetPx = -(maxRadiusPx * 0.92f * fraction).roundToInt()
-                GlasmioText(
-                    text = label,
-                    style = GlasmioTheme.textStyles.caption2,
-                    color = colors.tertiaryContent.copy(alpha = 0.78f),
-                    modifier = Modifier.offset { IntOffset(x = 0, y = yOffsetPx + 8) },
-                )
-            }
-
-            // Connected Peer Node (if in active session)
+            // Connected Peer Node (shows Connection Signal Quality instead of distance)
             if (isConnected && !connectedPeerName.isNullOrBlank()) {
-                val distM = connectedDistanceMeters ?: 2
-                val normalizedDist = when {
-                    distM <= 1 -> 0.40f
-                    distM <= 3 -> 0.58f
-                    distM <= 7 -> 0.74f
-                    else -> 0.84f
+                val qualityBars = connectionQuality.barsFilled.coerceAtLeast(1)
+                val signalLabel = when (connectionQuality) {
+                    ConnectionQuality.STRONG -> stringResource(R.string.quality_strong)
+                    ConnectionQuality.MEDIUM -> stringResource(R.string.quality_medium)
+                    ConnectionQuality.WEAK -> stringResource(R.string.quality_weak)
+                    ConnectionQuality.POOR -> stringResource(R.string.quality_poor)
+                    ConnectionQuality.DISCONNECTED -> stringResource(R.string.quality_disconnected)
+                }
+                val orbitFraction = when (qualityBars) {
+                    4 -> 0.52f
+                    3 -> 0.64f
+                    2 -> 0.74f
+                    else -> 0.82f
                 }
                 val angleRad = -PI / 4.0
-                val nodeRadius = maxRadiusPx * 0.85f * normalizedDist
+                val nodeRadius = maxRadiusPx * 0.86f * orbitFraction
                 val offsetX = (cos(angleRad) * nodeRadius).roundToInt()
                 val offsetY = (sin(angleRad) * nodeRadius).roundToInt()
 
                 RadarPeerChip(
                     name = connectedPeerName,
-                    subtitle = FormatUtils.formatDistance(distM),
+                    subtitle = signalLabel,
+                    signalBars = qualityBars,
                     accentColor = semantic.accentGreen,
                     iconName = ThazhSymbols.CheckCircle,
                     onClick = onCenterClick,
                     modifier = Modifier.offset { IntOffset(offsetX, offsetY) },
                 )
             } else {
-                // Orbiting Discovered Peers (up to 6 plotted around the radar)
+                // Orbiting Discovered Peers (positioned by signal strength tier, showing signal bars)
                 val plottedPeers = peers.take(6)
                 plottedPeers.forEachIndexed { index, peer ->
                     val hashSeed = abs(peer.deviceAddress.hashCode())
-                    val baseAngleDeg = (index * (360f / plottedPeers.size.coerceAtLeast(1)) + (hashSeed % 28) - 14f) - 65f
+                    val baseAngleDeg = (index * (360f / plottedPeers.size.coerceAtLeast(1)) + (hashSeed % 24) - 12f) - 65f
                     val angleRad = baseAngleDeg * (PI / 180.0)
 
-                    val distM = peer.estimatedDistanceMeters
-                    val radiusFraction = when {
-                        distM == null -> 0.56f + (index % 3) * 0.12f
-                        distM <= 1 -> 0.38f
-                        distM <= 3 -> 0.56f
-                        distM <= 7 -> 0.72f
+                    val signalBars = rssiToSignalBars(peer.rssiDbm)
+                    val radiusFraction = when (signalBars) {
+                        4 -> 0.48f + (index % 2) * 0.08f
+                        3 -> 0.62f + (index % 2) * 0.06f
+                        2 -> 0.74f
                         else -> 0.84f
                     }
 
-                    val orbitPx = maxRadiusPx * 0.85f * radiusFraction
+                    val orbitPx = maxRadiusPx * 0.86f * radiusFraction
                     val offsetX = (cos(angleRad) * orbitPx).roundToInt()
                     val offsetY = (sin(angleRad) * orbitPx).roundToInt()
 
@@ -375,15 +500,21 @@ fun InteractiveRadarCard(
 
                     val subLabel = when {
                         peer.status == PeerStatus.INVITED -> stringResource(R.string.discover_connecting)
-                        distM != null -> FormatUtils.formatDistance(distM)
+                        peer.rssiDbm != null -> when (signalBars) {
+                            4 -> stringResource(R.string.quality_strong)
+                            3 -> stringResource(R.string.quality_medium)
+                            2 -> stringResource(R.string.quality_weak)
+                            else -> stringResource(R.string.quality_poor)
+                        }
                         peer.discoveryTransport == PeerDiscoveryTransport.BLE -> "BLE"
                         peer.discoveryTransport == PeerDiscoveryTransport.WIFI_AND_BLE -> "Wi-Fi+BLE"
-                        else -> stringResource(R.string.discover_connect)
+                        else -> stringResource(R.string.quality_strong)
                     }
 
                     RadarPeerChip(
                         name = peer.deviceName.ifBlank { peer.deviceAddress },
                         subtitle = subLabel,
+                        signalBars = signalBars,
                         accentColor = nodeColor,
                         iconName = when (peer.discoveryTransport) {
                             PeerDiscoveryTransport.BLE -> ThazhSymbols.Bluetooth
@@ -398,22 +529,22 @@ fun InteractiveRadarCard(
                 }
             }
 
-            // Center Device Avatar Node (Tap to start/stop scan or toggle visibility)
+            // Center Device Core Node (Tap to start/stop scan or toggle visibility)
             Box(
                 modifier = Modifier
-                    .size(66.dp)
+                    .size(68.dp)
                     .clip(CircleShape)
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 primaryAccent,
-                                primaryAccent.copy(alpha = 0.80f),
+                                primaryAccent.copy(alpha = 0.82f),
                             )
                         )
                     )
                     .border(
-                        width = 1.5.dp,
-                        color = Color.White.copy(alpha = 0.36f),
+                        width = 1.6.dp,
+                        color = Color.White.copy(alpha = 0.42f),
                         shape = CircleShape,
                     )
                     .clickable(
@@ -538,6 +669,7 @@ fun InteractiveRadarCard(
 private fun RadarPeerChip(
     name: String,
     subtitle: String,
+    signalBars: Int,
     accentColor: Color,
     iconName: String,
     onClick: () -> Unit,
@@ -547,20 +679,20 @@ private fun RadarPeerChip(
     Row(
         modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .widthIn(max = 148.dp)
+            .widthIn(max = 158.dp)
             .clip(ContinuousCapsule)
             .background(
-                color = colors.elevatedBackground.copy(alpha = if (colors.isDark) 0.92f else 0.95f),
+                color = colors.elevatedBackground.copy(alpha = if (colors.isDark) 0.93f else 0.96f),
             )
-            .border(1.2.dp, accentColor.copy(alpha = 0.65f), ContinuousCapsule)
+            .border(1.2.dp, accentColor.copy(alpha = 0.68f), ContinuousCapsule)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(26.dp)
+                .size(28.dp)
                 .clip(CircleShape)
                 .background(accentColor.copy(alpha = if (colors.isDark) 0.26f else 0.16f)),
             contentAlignment = Alignment.Center,
@@ -572,7 +704,7 @@ private fun RadarPeerChip(
                 size = 14.dp,
             )
         }
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             GlasmioText(
                 text = name,
                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
@@ -580,13 +712,24 @@ private fun RadarPeerChip(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            GlasmioText(
-                text = subtitle,
-                style = GlasmioTheme.textStyles.caption2,
-                color = accentColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                SignalStrengthMiniBars(
+                    barsFilled = signalBars,
+                    activeColor = accentColor,
+                    width = 12.dp,
+                    height = 9.dp,
+                )
+                GlasmioText(
+                    text = subtitle,
+                    style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.Medium),
+                    color = accentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

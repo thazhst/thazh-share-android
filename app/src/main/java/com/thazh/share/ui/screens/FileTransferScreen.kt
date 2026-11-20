@@ -41,6 +41,7 @@ import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.TransferDirection
 import com.thazh.share.data.TransferItem
 import com.thazh.share.data.TransferState
+import com.thazh.share.network.NativeCoreEngine
 import com.thazh.share.ui.components.ConnectionQualityIndicator
 import com.thazh.share.ui.components.FileTypeBadge
 import com.thazh.share.ui.theme.ThazhSymbols
@@ -87,6 +88,18 @@ fun FileTransferScreen(
     val semantic = ThazhTheme.semantic
     var showDisconnectDialog by remember { mutableStateOf(false) }
 
+    val activeSpeedBytesPerSec = remember(transfers) {
+        transfers.sumOf { if (it.state == TransferState.IN_PROGRESS) it.speedBytesPerSec else 0L }
+    }
+
+    val qualityLabel = when (connectionQuality) {
+        ConnectionQuality.STRONG -> stringResource(R.string.quality_strong)
+        ConnectionQuality.MEDIUM -> stringResource(R.string.quality_medium)
+        ConnectionQuality.WEAK -> stringResource(R.string.quality_weak)
+        ConnectionQuality.POOR -> stringResource(R.string.quality_poor)
+        ConnectionQuality.DISCONNECTED -> stringResource(R.string.quality_disconnected)
+    }
+
     val subtitleParts = buildList {
         add(
             if (isSocketConnected) {
@@ -95,8 +108,9 @@ fun FileTransferScreen(
                 stringResource(R.string.transfer_connecting)
             },
         )
-        if (estimatedDistanceMeters != null) {
-            add(FormatUtils.formatDistance(estimatedDistanceMeters))
+        add(qualityLabel)
+        if (activeSpeedBytesPerSec > 0L) {
+            add(FormatUtils.formatSpeed(activeSpeedBytesPerSec))
         }
     }
 
@@ -138,7 +152,7 @@ fun FileTransferScreen(
             }
         },
     ) {
-        item(key = "send_panel") {
+        item(key = "send_panel", contentType = "send_panel") {
             CenteredTransferContent {
                 GlasmioCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -165,11 +179,37 @@ fun FileTransferScreen(
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
-                                GlasmioText(
-                                    text = stringResource(R.string.transfer_send_title),
-                                    style = GlasmioTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
-                                    color = colors.content,
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    GlasmioText(
+                                        text = stringResource(R.string.transfer_send_title),
+                                        style = GlasmioTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                                        color = colors.content,
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(ContinuousCapsule)
+                                            .background(
+                                                (if (activeSpeedBytesPerSec > 0L) semantic.accentGreen else semantic.accentBlue)
+                                                    .copy(alpha = if (colors.isDark) 0.22f else 0.14f),
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    ) {
+                                        GlasmioText(
+                                            text = if (activeSpeedBytesPerSec > 0L) {
+                                                FormatUtils.formatSpeed(activeSpeedBytesPerSec)
+                                            } else if (NativeCoreEngine.isNativeLoaded) {
+                                                "C++20 Turbo"
+                                            } else {
+                                                "Direct IO"
+                                            },
+                                            style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
+                                            color = if (activeSpeedBytesPerSec > 0L) semantic.accentGreen else semantic.accentBlue,
+                                        )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 GlasmioText(
                                     text = if (isSocketConnected) {
@@ -302,7 +342,11 @@ fun FileTransferScreen(
                 }
             }
         } else {
-            items(transfers, key = { it.id }) { item ->
+            items(
+                items = transfers,
+                key = { it.id },
+                contentType = { "transfer_item" },
+            ) { item ->
                 CenteredTransferContent {
                     TransferActivityCard(
                         item = item,

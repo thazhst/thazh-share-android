@@ -1,5 +1,6 @@
 package com.thazh.share.data
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 enum class PeerDiscoveryTransport {
@@ -14,6 +15,7 @@ enum class PeerDiscoveryTransport {
  * MAC address ([deviceAddress]) is the stable key Android gives us for a
  * peer for the lifetime of a discovery session.
  */
+@Immutable
 data class DiscoveredPeer(
     val deviceName: String,
     val deviceAddress: String,
@@ -45,6 +47,7 @@ enum class PeerStatus {
  * Persisted to DataStore as JSON so the "saved devices" list survives app
  * restarts and lets the user reconnect / rename without a fresh scan.
  */
+@Immutable
 @Serializable
 data class SavedDevice(
     val deviceAddress: String,

@@ -26,9 +26,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 // Fixed app-private UUID identifying a Thazh Share BLE fast-discovery beacon.
 private val SERVICE_UUID: UUID = UUID.fromString("6ac2c2c0-2f1a-4a3f-9c7f-9e2b6a2d9b41")
+private val SERVICE_PARCEL_UUID: ParcelUuid = ParcelUuid(SERVICE_UUID)
+
+private const val FLOW_EMIT_THROTTLE_MS = 260L
+private const val BEACON_STALE_TIMEOUT_MS = 14_000L
 
 data class BleDiscoveredBeacon(
     val deviceAddress: String,
@@ -39,15 +44,13 @@ data class BleDiscoveredBeacon(
 )
 
 /**
- * Real Bluetooth Low Energy (BLE) fast discovery manager:
- * - Advertises a compact service data payload containing the 6-byte Wi-Fi Direct MAC
- *   (or a session-stable synthetic 6-byte beacon ID when Android anonymizes local MACs)
- *   plus a UTF-8 snippet of the device's display name (up to 12 bytes) so nearby
- *   Thazh Share devices see both the peer's name and real-time RSSI/distance on the Radar!
- * - Scans in low-latency mode for nearby Thazh Share BLE beacons and exposes both
- *   [discoveredBeacons] (with RSSI dBm & estimated distance) and [discoveredAddresses].
+ * High-speed Bluetooth Low Energy (BLE) discovery manager with C++20 1D Kalman RSSI
+ * stabilization, stale beacon pruning, and throttled StateFlow emission to eliminate
+ * downstream UI recomposition storms during low-latency scanning.
  */
 class BleDiscoveryManager(private val context: Context) {
+
+    private val liveBeacons = ConcurrentHashMap<String, BleDiscoveredBeacon>()
 
     private val _discoveredBeacons = MutableStateFlow<Map<String, BleDiscoveredBeacon>>(emptyMap())
     val discoveredBeacons: StateFlow<Map<String, BleDiscoveredBeacon>> = _discoveredBeacons.asStateFlow()
@@ -79,6 +82,8 @@ class BleDiscoveryManager(private val context: Context) {
     private var isScanning = false
     private var lastAdvertisedMac: String? = null
     private var lastAdvertisedName: String? = null
+    @Volatile
+    private var lastFlowEmitElapsedMs: Long = 0L
 
     fun isSupported(): Boolean {
         return runCatching {
@@ -119,6 +124,8 @@ class BleDiscoveryManager(private val context: Context) {
         runCatching {
             stopAdvertising()
             stopScanning()
+            liveBeacons.clear()
+            NativeCoreEngine.clearKalmanHistory()
             _discoveredBeacons.value = emptyMap()
             _discoveredAddresses.value = emptySet()
         }
@@ -149,8 +156,8 @@ class BleDiscoveryManager(private val context: Context) {
 
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
-            .addServiceUuid(ParcelUuid(SERVICE_UUID))
-            .addServiceData(ParcelUuid(SERVICE_UUID), payload)
+            .addServiceUuid(SERVICE_PARCEL_UUID)
+            .addServiceData(SERVICE_PARCEL_UUID, payload)
             .build()
 
         try {
@@ -180,10 +187,11 @@ class BleDiscoveryManager(private val context: Context) {
         val sc = adapter.bluetoothLeScanner ?: return
 
         val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(SERVICE_UUID))
+            .setServiceUuid(SERVICE_PARCEL_UUID)
             .build()
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setReportDelay(0L)
             .build()
 
         try {
@@ -215,11 +223,10 @@ class BleDiscoveryManager(private val context: Context) {
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val data = result.scanRecord?.getServiceData(ParcelUuid(SERVICE_UUID)) ?: return
+            val data = result.scanRecord?.getServiceData(SERVICE_PARCEL_UUID) ?: return
             if (data.size < 6) return
-            val macBytes = data.copyOfRange(0, 6)
-            if (macBytes.contentEquals(fallbackSessionMacBytes)) return
-            val mac = macBytesToString(macBytes) ?: return
+            if (isMatchingFallbackMac(data)) return
+            val mac = macBytesToString(data, offset = 0) ?: return
             if (mac.equals(lastAdvertisedMac, ignoreCase = true)) return
 
             val parsedName = if (data.size > 6) {
@@ -230,22 +237,48 @@ class BleDiscoveryManager(private val context: Context) {
                 null
             }
 
-            val rssi = result.rssi
-            val distance = DistanceEstimator.estimateMeters(rssi) ?: 2
+            val (filteredRssi, filteredMeters) = DistanceEstimator.estimateFiltered(
+                deviceKey = "BLE_$mac",
+                rawRssiDbm = result.rssi,
+            )
+            val rssi = filteredRssi ?: result.rssi
+            val distance = filteredMeters ?: 2
             val now = SystemClock.elapsedRealtime()
 
+            val previous = liveBeacons[mac]
+            val resolvedName = parsedName ?: previous?.displayName
             val beacon = BleDiscoveredBeacon(
                 deviceAddress = mac,
-                displayName = parsedName,
+                displayName = resolvedName,
                 rssiDbm = rssi,
                 estimatedDistanceMeters = distance,
                 lastSeenElapsedMs = now,
             )
+            liveBeacons[mac] = beacon
 
-            val updatedMap = _discoveredBeacons.value.toMutableMap()
-            updatedMap[mac] = beacon
-            _discoveredBeacons.value = updatedMap
-            _discoveredAddresses.value = updatedMap.keys
+            // Prune stale beacons that have disappeared
+            var prunedAny = false
+            val iterator = liveBeacons.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (now - entry.value.lastSeenElapsedMs > BEACON_STALE_TIMEOUT_MS) {
+                    NativeCoreEngine.clearKalmanHistory("BLE_${entry.key}")
+                    iterator.remove()
+                    prunedAny = true
+                }
+            }
+
+            val isImmediateStructuralChange = previous == null ||
+                previous.displayName != resolvedName ||
+                previous.estimatedDistanceMeters != distance ||
+                prunedAny
+
+            if (isImmediateStructuralChange || (now - lastFlowEmitElapsedMs) >= FLOW_EMIT_THROTTLE_MS) {
+                lastFlowEmitElapsedMs = now
+                val snapshot = HashMap(liveBeacons)
+                _discoveredBeacons.value = snapshot
+                _discoveredAddresses.value = snapshot.keys.toSet()
+            }
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -253,6 +286,15 @@ class BleDiscoveryManager(private val context: Context) {
             isScanning = false
             _isScanningState.value = false
         }
+    }
+
+    private fun isMatchingFallbackMac(data: ByteArray): Boolean {
+        if (data.size < 6) return false
+        val fb = fallbackSessionMacBytes
+        for (i in 0 until 6) {
+            if (data[i] != fb[i]) return false
+        }
+        return true
     }
 
     private fun macStringToBytes(mac: String?): ByteArray? {
@@ -268,12 +310,21 @@ class BleDiscoveryManager(private val context: Context) {
         }
     }
 
-    private fun macBytesToString(bytes: ByteArray): String? {
-        if (bytes.size != 6) return null
-        return bytes.joinToString(":") { b -> String.format("%02X", b) }
+    private fun macBytesToString(bytes: ByteArray, offset: Int = 0): String? {
+        if (bytes.size - offset < 6) return null
+        val chars = CharArray(17)
+        for (i in 0 until 6) {
+            val v = bytes[offset + i].toInt() and 0xFF
+            val pos = i * 3
+            chars[pos] = HEX_CHARS[v ushr 4]
+            chars[pos + 1] = HEX_CHARS[v and 0x0F]
+            if (i < 5) chars[pos + 2] = ':'
+        }
+        return String(chars)
     }
 
     companion object {
         private const val TAG = "BleDiscoveryManager"
+        private val HEX_CHARS = "0123456789ABCDEF".toCharArray()
     }
 }
