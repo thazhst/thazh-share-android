@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Thazh Share</string>
+
+    <!-- Notification channels -->
+    <string name="notification_channel_connection">Connection Status</string>
+    <string name="notification_channel_connection_desc">Shows active Wi-Fi Direct connection status</string>
+    <string name="notification_channel_received_files">Received Files</string>
+    <string name="notification_channel_received_files_desc">Notifications when file transfers complete</string>
+    <string name="notification_channel_incoming_connection">Incoming Connections</string>
+    <string name="notification_channel_incoming_connection_desc">Confirmation prompts when a nearby device requests to send files</string>
+
+    <!-- Foreground service notification -->
+    <string name="notif_scanning">Ready to share…</string>
+    <string name="notif_visible_10min">Visible (%1$s)</string>
+    <string name="notif_visible_always">Always visible</string>
+    <string name="notif_hidden">Device hidden</string>
+    <string name="ble_nearby_device">BLE Device</string>
+    <string name="notif_connecting">Connecting…</string>
+    <string name="notif_connected">Connected to %1$s</string>
+    <string name="notif_disconnected">Disconnected</string>
+    <string name="notif_file_received_title">File received</string>
+    <string name="notif_file_received_text">%1$s • from %2$s</string>
+
+    <!-- Visibility modes -->
+    <string name="visibility_card_title">Device Visibility</string>
+    <string name="visibility_mode_hidden">Hidden</string>
+    <string name="visibility_mode_10min">10 Min</string>
+    <string name="visibility_mode_always">Always</string>
+    <string name="visibility_mode_hidden_long">Hidden</string>
+    <string name="visibility_mode_10min_long">For 10 minutes</string>
+    <string name="visibility_mode_always_long">Always visible</string>
+    <string name="visibility_desc_hidden">Your device is hidden from nearby peers.</string>
+    <string name="visibility_desc_10min">Automatically hides after %1$s.</string>
+    <string name="visibility_desc_always">Always discoverable by nearby devices.</string>
+    <string name="visibility_timer_badge">%1$s left</string>
+    <string name="visibility_timer_reset">Reset</string>
+    <string name="visibility_enable_prompt">Enable 10m</string>
+    <string name="visibility_active_always_badge">Always On</string>
+
+    <!-- Incoming connection request dialog & prompt -->
+    <string name="incoming_conn_title">Incoming File Request</string>
+    <string name="incoming_conn_message">%1$s wants to connect and send files.</string>
+    <string name="incoming_conn_message_files">%1$s wants to send %2$d files.</string>
+    <string name="incoming_conn_device_address">Address: %1$s</string>
+    <string name="incoming_conn_pending_files">Files (%1$d): %2$s</string>
+    <string name="incoming_conn_visibility_10min">Visible for 10m (%1$s)</string>
+    <string name="incoming_conn_visibility_always">Always visible</string>
+    <string name="incoming_conn_accept">Accept</string>
+    <string name="incoming_conn_accept_open">Accept &amp; Open</string>
+    <string name="incoming_conn_decline">Decline</string>
+    <string name="incoming_conn_notif_title">Receive files from %1$s</string>
+    <string name="incoming_conn_notif_body">Choose Accept or Decline below.</string>
+    <string name="incoming_conn_accepted_toast">Connected to %1$s</string>
+    <string name="incoming_conn_declined_toast">Connection declined</string>
+
+    <!-- Discovery / Home screen -->
+    <string name="discover_title">Thazh Share</string>
+    <string name="discover_subtitle">Instant nearby file sharing</string>
+    <string name="discover_scanning">Scanning…</string>
+    <string name="discover_start_scan">Scan Devices</string>
+    <string name="discover_stop_scan">Stop Scan</string>
+    <string name="discover_no_peers">No nearby devices discovered yet.</string>
+    <string name="discover_no_peers_hidden">Currently Hidden. Tap the radar to scan for devices.</string>
+    <string name="discover_available_devices">Nearby</string>
+    <string name="discover_saved_devices">Saved</string>
+    <string name="discover_connect">Connect</string>
+    <string name="discover_connecting">Connecting…</string>
+    <string name="discover_intro">Tap any device on the Radar to send files immediately.</string>
+    <string name="discover_active_session">Connected • %1$s</string>
+    <string name="discover_active_session_action">Tap to open file transfer</string>
+    <string name="discover_wifi_off">Please turn on Wi-Fi to discover nearby devices.</string>
+
+    <!-- Permissions, Welcome & Preparation Onboarding -->
+    <string name="permission_required_title">Permissions Setup</string>
+    <string name="permission_required_body">Grant required permissions to start sharing files.</string>
+    <string name="permission_grant">Grant Access</string>
+    <string name="permission_open_settings">Open Settings</string>
+
+    <string name="welcome_badge">Thazh Share</string>
+    <string name="welcome_title">Thazh Share</string>
+    <string name="welcome_subtitle">Instant, lightweight, and seamless file sharing.</string>
+    <string name="welcome_start_button">Get Started</string>
+
+    <string name="prep_step_badge">Setup • %1$d/%2$d</string>
+    <string name="prep_why_needed_header">Why this permission is needed</string>
+    <string name="prep_wifi_title">Nearby Wi-Fi Devices</string>
+    <string name="prep_wifi_summary">Radar scanning and direct P2P file transfers.</string>
+    <string name="prep_wifi_why_body">Used to discover and connect directly to nearby devices over Wi-Fi Direct without needing internet access or GPS tracking.</string>
+    <string name="prep_wifi_privacy_note">Your location is never collected.</string>
+
+    <string name="prep_ble_title">Nearby Bluetooth</string>
+    <string name="prep_ble_summary">Fast discovery and real-time signal telemetry.</string>
+    <string name="prep_ble_why_body">Enables instant sub-second peer detection and live signal strength indicators right on the Spatial Radar.</string>
+    <string name="prep_ble_privacy_note">Only active while visibility is enabled.</string>
+
+    <string name="prep_notif_title">Notifications</string>
+    <string name="prep_notif_summary">Transfer progress and incoming file alerts.</string>
+    <string name="prep_notif_why_body">Displays background transfer progress and alerts you when someone sends you files while using another app.</string>
+    <string name="prep_notif_privacy_note">Zero promotional notifications.</string>
+
+    <string name="prep_grant_and_continue">Continue</string>
+    <string name="prep_grant_and_finish">Complete</string>
+    <string name="prep_continue_next">Next</string>
+    <string name="prep_finish_button">Launch App</string>
+    <string name="prep_denied_hint">Please grant the permission or open Settings to continue.</string>
+
+    <!-- Control Center / Quick Settings Tile -->
+    <string name="qs_tile_label">Thazh Share</string>
+    <string name="qs_tile_subtitle_setup">Tap to configure</string>
+    <string name="qs_tile_toast_hidden">Thazh Share: Hidden</string>
+    <string name="qs_tile_toast_10min">Thazh Share: Visible for 10 min</string>
+    <string name="qs_tile_toast_always">Thazh Share: Always visible</string>
+
+    <!-- Connection quality labels -->
+    <string name="quality_strong">Strong</string>
+    <string name="quality_medium">Stable</string>
+    <string name="quality_weak">Weak</string>
+    <string name="quality_poor">Poor</string>
+    <string name="quality_disconnected">Offline</string>
+
+    <!-- Settings (Concise, professional titles) -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_search_placeholder">Search settings…</string>
+    <string name="settings_search_empty">No matching settings found</string>
+
+    <string name="settings_section_account_device">Account &amp; Device</string>
+    <string name="settings_account_title">Google Account</string>
+    <string name="settings_account_signed_out_desc">Sync device name &amp; cloud link history</string>
+    <string name="settings_account_sign_in_short">Sign In</string>
+    <string name="settings_display_name">Device Name</string>
+    <string name="settings_display_name_desc">Shown to nearby devices on Radar</string>
+    <string name="settings_display_name_hint">Enter device name</string>
+    <string name="settings_sync_device_name">Sync Name</string>
+    <string name="settings_sync_device_name_desc">Keep device name synced with your account</string>
+    <string name="settings_sync_device_name_active_desc">Automatically synced via cloud</string>
+    <string name="settings_use_account_name">Use account name (%1$s)</string>
+    <string name="settings_use_account_name_toast">Device name set to %1$s</string>
+
+    <string name="settings_section_visibility">Connectivity &amp; Visibility</string>
+    <string name="settings_current_visibility">Visibility Status</string>
+    <string name="settings_default_visibility">Startup Default</string>
+    <string name="settings_visibility_footer">10-minute mode automatically hides your device when the timer expires.</string>
+    <string name="settings_ble_fast_discovery">BLE Fast Scan</string>
+    <string name="settings_ble_fast_discovery_desc">Instant peer discovery over Bluetooth LE</string>
+    <string name="settings_ble_not_supported">BLE is not supported on this device</string>
+
+    <string name="settings_section_transfer_security">Receive &amp; Security</string>
+    <string name="settings_confirm_incoming">Confirm Transfers</string>
+    <string name="settings_confirm_incoming_desc">Ask for approval before accepting connections</string>
+    <string name="settings_background_prompt">Background Prompt</string>
+    <string name="settings_background_prompt_desc">How incoming requests appear while in the background</string>
+    <string name="settings_bg_mode_notification">Notification</string>
+    <string name="settings_bg_mode_popup">Pop-up</string>
+    <string name="settings_bg_mode_off">Off</string>
+    <string name="settings_bg_mode_notification_desc">Show heads-up notification with Accept / Decline actions</string>
+    <string name="settings_bg_mode_popup_desc">Show floating dialog over other apps</string>
+    <string name="settings_bg_mode_off_desc">Do not show background prompts</string>
+    <string name="settings_overlay_permission_title">Display Over Other Apps</string>
+    <string name="settings_overlay_permission_granted">Permission granted • Pop-up overlay ready</string>
+    <string name="settings_overlay_permission_missing">Permission required for floating pop-up dialog</string>
+    <string name="settings_overlay_permission_action">Grant</string>
+    <string name="settings_overlay_permission_toast">Please enable Display over other apps for Thazh Share</string>
+    <string name="settings_auto_save_downloads">Auto-Save to Downloads</string>
+    <string name="settings_auto_save_downloads_desc">Save a copy to Downloads/Thazh Share</string>
+    <string name="settings_sound_vibration">Sound &amp; Haptics</string>
+    <string name="settings_sound_vibration_desc">Audio alerts and haptic feedback</string>
+
+    <string name="settings_section_appearance">Appearance &amp; Language</string>
+    <string name="settings_theme_mode">Theme</string>
+    <string name="settings_theme_mode_system">System</string>
+    <string name="settings_theme_mode_light">Light</string>
+    <string name="settings_theme_mode_dark">Dark</string>
+    <string name="settings_theme_mode_desc_system">Follow system appearance</string>
+    <string name="settings_theme_mode_desc_light">Always use light appearance</string>
+    <string name="settings_theme_mode_desc_dark">Always use dark appearance</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_desc">Application display language</string>
+    <string name="settings_language_vi">Tiếng Việt (Default)</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_vi_short">Tiếng Việt</string>
+    <string name="settings_language_en_short">English</string>
+    <string name="settings_reduce_transparency">Reduce Transparency</string>
+    <string name="settings_reduce_transparency_desc">Increase surface contrast for readability</string>
+    <string name="settings_liquid_glass">Liquid Glass Effect</string>
+    <string name="settings_liquid_glass_desc">Real-time optical refraction on navigation bars</string>
+
+    <string name="settings_section_device">Device</string>
+    <string name="settings_section_connectivity">Connectivity</string>
+    <string name="settings_section_storage_about">Data &amp; Storage</string>
+    <string name="settings_section_system">System</string>
+    <string name="settings_received_storage_title">Received Files Storage</string>
+    <string name="settings_received_storage_summary">%1$d files • %2$s</string>
+    <string name="settings_clear_temp_cache">Clear Temp Cache</string>
+    <string name="settings_clear_temp_cache_desc">Remove incomplete temporary transfer files</string>
+    <string name="settings_clear_temp_cache_done">Temporary cache cleared</string>
+    <string name="settings_clear_saved_devices">Clear Saved Devices</string>
+    <string name="settings_clear_saved_devices_desc">%1$d saved devices</string>
+    <string name="settings_clear_saved_devices_confirm">Remove all %1$d saved devices?</string>
+    <string name="settings_clear_saved_devices_done">Saved devices cleared</string>
+    <string name="settings_about_title">Thazh Share</string>
+    <string name="settings_about_desc">Version %1$s • Wi-Fi Direct, BLE, NFC &amp; Cloud</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_background_optimization">Background Activity</string>
+    <string name="settings_background_optimization_desc">Disable battery restrictions on %1$s</string>
+    <string name="settings_background_optimization_button">Configure</string>
+
+    <!-- Saved devices -->
+    <string name="saved_device_rename">Rename Device</string>
+    <string name="saved_device_remove">Remove Device</string>
+
+    <!-- File transfer screen -->
+    <string name="transfer_title">File Transfer</string>
+    <string name="transfer_connecting">Connecting…</string>
+    <string name="transfer_disconnect">Disconnect</string>
+    <string name="transfer_send_title">Send Files</string>
+    <string name="transfer_send_subtitle">Connected to %1$s</string>
+    <string name="transfer_pick_files">Pick Files</string>
+    <string name="transfer_pick_media">Photos &amp; Videos</string>
+    <string name="transfer_waiting_socket">Synchronizing transfer channel…</string>
+    <string name="transfer_activity_title">Activity</string>
+    <string name="transfer_clear_finished">Clear Completed</string>
+    <string name="transfer_empty_title">No transfers yet</string>
+    <string name="transfer_empty_body">Pick files or photos above to send right away.</string>
+    <string name="transfer_unknown_peer">Device</string>
+    <string name="transfer_cancel">Cancel</string>
+    <string name="transfer_retry">Retry</string>
+    <string name="transfer_dismiss">Dismiss</string>
+    <string name="transfer_status_pending">Queued • %1$s</string>
+    <string name="transfer_status_sending">Sending %1$s</string>
+    <string name="transfer_status_receiving">Receiving %1$s</string>
+    <string name="transfer_status_eta">%1$s left</string>
+    <string name="transfer_status_sent">Sent • %1$s • to %2$s</string>
+    <string name="transfer_status_received">Received • %1$s • from %2$s</string>
+    <string name="transfer_status_failed">Failed • %1$s</string>
+    <string name="transfer_status_failed_generic">Failed</string>
+    <string name="transfer_status_cancelled">Cancelled</string>
+    <string name="transfer_error_connection_lost">Connection lost</string>
+    <string name="transfer_error_not_connected">Not connected</string>
+    <string name="transfer_error_cannot_open">Cannot open file</string>
+    <string name="transfer_error_no_space">Insufficient storage space</string>
+    <string name="transfer_error_receiver_failed">Receiver error</string>
+    <string name="transfer_error_sender_failed">Sender error</string>
+    <string name="transfer_cannot_open_file">Unable to open file</string>
+    <string name="transfer_toast_file_received">Received: %1$s</string>
+
+    <!-- Received files manager -->
+    <string name="received_files_title">Received Files</string>
+    <string name="received_files_shortcut_summary">%1$d files • %2$s</string>
+    <string name="received_files_shortcut_empty">Empty</string>
+    <string name="received_files_summary">%1$d files • %2$s</string>
+    <string name="received_files_summary_filtered">%1$d / %2$d files</string>
+    <string name="received_files_open">Open</string>
+    <string name="received_files_share">Share</string>
+    <string name="received_files_save">Save to Device</string>
+    <string name="received_files_rename">Rename</string>
+    <string name="received_files_details">Details</string>
+    <string name="received_files_delete">Delete</string>
+    <string name="received_files_search">Search files</string>
+    <string name="received_files_search_hint">Search file name…</string>
+    <string name="received_files_search_close">Close</string>
+    <string name="received_files_sort">Sort</string>
+    <string name="received_files_sort_newest">Newest first</string>
+    <string name="received_files_sort_oldest">Oldest first</string>
+    <string name="received_files_sort_name">Name (A–Z)</string>
+    <string name="received_files_sort_size">Size</string>
+    <string name="received_files_filter_all">All</string>
+    <string name="received_files_category_image">Photos</string>
+    <string name="received_files_category_video">Videos</string>
+    <string name="received_files_category_audio">Audio</string>
+    <string name="received_files_category_document">Docs</string>
+    <string name="received_files_category_archive">Archives</string>
+    <string name="received_files_category_apk">APKs</string>
+    <string name="received_files_category_other">Other</string>
+    <string name="received_files_selected_count">%1$d selected</string>
+    <string name="received_files_select_mode">Select</string>
+    <string name="received_files_select_all">Select All</string>
+    <string name="received_files_clear_selection">Clear</string>
+    <string name="received_files_share_wifi_direct">Send via Wi-Fi Direct</string>
+    <string name="received_files_share_wifi_direct_count">Send %1$d files</string>
+    <string name="received_files_share_wifi_direct_sending">Sending %1$d files…</string>
+    <string name="received_files_share_wifi_direct_queued">%1$d files queued — tap a device to send</string>
+    <string name="received_files_pick_peer_title">Send %1$d files</string>
+    <string name="received_files_pick_peer_subtitle">Select a device to connect and send immediately.</string>
+    <string name="received_files_open_send_tab">Open Radar</string>
+    <string name="discover_pending_files_title">%1$d files queued to send</string>
+    <string name="discover_pending_files_subtitle">Tap a device on Radar or tap via NFC to send.</string>
+    <string name="discover_pending_files_cancel">Cancel</string>
+    <string name="received_files_new_badge">New</string>
+    <string name="received_files_empty_title">No received files</string>
+    <string name="received_files_empty_body">Files you receive will appear here.</string>
+    <string name="received_files_no_match">No matching files found</string>
+    <string name="received_files_delete_title">Delete files?</string>
+    <string name="received_files_delete_body">Delete %1$d selected files from this device?</string>
+    <string name="received_files_rename_title">Rename File</string>
+    <string name="received_files_details_name">Name</string>
+    <string name="received_files_details_type">Type</string>
+    <string name="received_files_details_size">Size</string>
+    <string name="received_files_details_from">From</string>
+    <string name="received_files_details_time">Time</string>
+    <string name="received_files_cannot_open">Cannot open this file</string>
+    <string name="received_files_missing">File no longer exists</string>
+    <string name="received_files_deleted">Deleted %1$d files</string>
+    <string name="received_files_saved">Saved %1$d files to Downloads</string>
+    <string name="received_files_save_partial">Saved %1$d files, %2$d failed</string>
+    <string name="received_files_save_failed">Save failed</string>
+    <string name="received_files_storage_permission_denied">Storage permission required</string>
+    <string name="received_files_rename_taken">A file with this name already exists</string>
+    <string name="received_files_rename_invalid">Invalid file name</string>
+    <string name="received_files_rename_failed">Rename failed</string>
+    <string name="received_files_renamed">File renamed</string>
+    <string name="received_files_share_chooser">Share</string>
+
+    <!-- Bottom navigation tabs -->
+    <string name="tab_send">Send</string>
+    <string name="tab_receive">Receive</string>
+    <string name="tab_link_share">Links</string>
+    <string name="tab_received_files">Files</string>
+    <string name="tab_received_files_count">Files (%1$d)</string>
+
+    <!-- Spatial Radar & Quick Send Actions -->
+    <string name="radar_scanning_active_title">Scanning nearby…</string>
+    <string name="radar_idle_title">Tap Radar center to scan</string>
+    <string name="radar_found_peers_count">%1$d devices found</string>
+    <string name="radar_tap_peer_hint">Tap a device node on the Radar to connect.</string>
+    <string name="radar_pill_wifi_active">Wi-Fi Direct</string>
+    <string name="radar_pill_wifi_idle">Wi-Fi: Idle</string>
+    <string name="radar_pill_ble_active">BLE</string>
+    <string name="radar_pill_ble_idle">BLE: Off</string>
+    <string name="radar_pill_nfc_ready">NFC</string>
+    <string name="radar_pill_nfc_off">NFC: Off</string>
+    <string name="radar_battery_percent">%1$d%%</string>
+    <string name="radar_battery_charging">%1$d%% ⚡</string>
+    <string name="radar_pending_timeout_title">Connection pending over 10s</string>
+    <string name="radar_pending_timeout_body">No response from %1$s (%2$ds). Please check the connection prompt on the other device or retry.</string>
+    <string name="radar_pending_timeout_body_generic">Connection has been pending for %1$ds. Check the prompt on the target device or retry connecting.</string>
+    <string name="radar_pending_timeout_retry">Retry</string>
+    <string name="radar_pending_timeout_cancel">Cancel</string>
+    <string name="discover_quick_actions_title">Quick Send</string>
+    <string name="discover_quick_actions_subtitle">Queue files, photos, or create a cloud link</string>
+    <string name="discover_quick_link_share">Create Link</string>
+
+    <!-- Share via Link (Cloud Link + Cloud History + In-App Browser) -->
+    <string name="link_share_title">Cloud Links</string>
+    <string name="link_share_subtitle">Instant cloud link sharing</string>
+    <string name="link_share_hero_title">Create Instant Download Link</string>
+    <string name="link_share_hero_desc">Upload files to the cloud and get a shareable URL &amp; QR code immediately.</string>
+    <string name="link_share_expiry_label">Retention Period</string>
+    <string name="link_share_expiry_permanent">Permanent</string>
+    <string name="link_share_expiry_1h">1 hour</string>
+    <string name="link_share_expiry_12h">12 hours</string>
+    <string name="link_share_expiry_24h">24 hours</string>
+    <string name="link_share_expiry_72h">72 hours</string>
+    <string name="link_share_uploading_file">Uploading: %1$s</string>
+    <string name="link_share_session_section_title">Recent Session</string>
+    <string name="link_share_copy_button">Copy</string>
+    <string name="link_share_copied_toast">Link copied to clipboard</string>
+    <string name="link_share_qr_title">QR Code</string>
+    <string name="link_share_edit_note_title">Edit Note</string>
+    <string name="link_share_note_placeholder">Add a note…</string>
+    <string name="link_share_auth_title">Cloud History Sync</string>
+    <string name="link_share_auth_optional_badge">Optional</string>
+    <string name="link_share_auth_desc">Sign in to automatically back up your shared links and sync your device name.</string>
+    <string name="link_share_sign_in_google">Sign in with Google</string>
+    <string name="link_share_signed_in_default">Synced Account</string>
+    <string name="link_share_cloud_sync_active">Cloud sync active</string>
+    <string name="link_share_sign_out">Sign Out</string>
+    <string name="link_share_cloud_history_title">Saved Links (%1$d)</string>
+    <string name="link_share_cloud_empty_title">No saved links yet</string>
+    <string name="link_share_cloud_empty_body">Uploaded cloud links will automatically appear here.</string>
+    <string name="link_share_auth_info_title">About Account Sync</string>
+    <string name="link_share_auth_info_body">• Creating shareable links does not require signing in.\n• Signing in with Google syncs your link history and device name across devices via Cloud Firestore.</string>
+    <string name="link_share_open_in_app_browser">Browse</string>
+    <string name="link_share_browse_cloud_card_title">In-App Web Browser</string>
+    <string name="link_share_browse_cloud_card_desc">Preview cloud links, download shared files, or browse any web URL directly inside Thazh Share.</string>
+    <string name="link_share_browse_url_placeholder">Enter or paste link (https://…)</string>
+    <string name="link_share_browse_go">Go</string>
+
+    <!-- In-App Web Browser -->
+    <string name="browser_title_default">In-App Browser</string>
+    <string name="browser_url_hint">Enter web address or cloud URL…</string>
+    <string name="browser_action_back">Back</string>
+    <string name="browser_action_forward">Forward</string>
+    <string name="browser_action_reload">Reload</string>
+    <string name="browser_action_copy_url">Copy Link</string>
+    <string name="browser_action_open_external">Open in External Browser</string>
+    <string name="browser_action_share">Share Link</string>
+    <string name="browser_loading">Loading page…</string>
+    <string name="browser_secure_badge">HTTPS Secure</string>
+
+    <!-- In-App File & Photo/Media Picker -->
+    <string name="picker_files_title">In-App File Picker</string>
+    <string name="picker_media_title">Pick Photos &amp; Videos</string>
+    <string name="picker_tab_files">Files</string>
+    <string name="picker_tab_media">Photos &amp; Videos</string>
+    <string name="picker_search_placeholder">Search files or media…</string>
+    <string name="picker_browse_system_files">Browse Device Storage</string>
+    <string name="picker_browse_system_media">System Photo Library</string>
+    <string name="picker_source_in_app_section">On-Device Files &amp; Media</string>
+    <string name="picker_source_staged_section">Added from Device Storage (%1$d)</string>
+    <string name="picker_permission_banner_title">Show all on-device photos &amp; files</string>
+    <string name="picker_permission_banner_body">Grant media access to browse and pick photos, videos, audio, and files directly inside the app.</string>
+    <string name="picker_empty_media_title">No matching photos or videos found</string>
+    <string name="picker_empty_media_body">Refresh the catalog or check your search filter.</string>
+    <string name="picker_empty_files_title">No matching files found</string>
+    <string name="picker_empty_files_body">Refresh the catalog or switch to another category above.</string>
+    <string name="picker_confirm_selection">Confirm (%1$d)</string>
+    <string name="picker_selected_summary">%1$d selected • %2$s</string>
+    <string name="picker_select_all">Select All</string>
+    <string name="picker_clear_all">Clear</string>
+
+    <!-- Received text file preview & Copy to clipboard -->
+    <string name="received_files_copy_to_clipboard">Copy to clipboard</string>
+    <string name="received_files_text_preview_title">Text Content Preview</string>
+    <string name="received_files_text_preview_loading">Reading text content…</string>
+    <string name="received_files_text_preview_empty">Text file is empty or cannot be extracted.</string>
+    <string name="received_files_text_copied_toast">Text copied to clipboard</string>
+
+    <!-- NFC Tap-to-Connect (Send Reader vs Receive HCE Card roles) -->
+    <string name="nfc_service_description">Thazh Share instant NFC pairing</string>
+    <string name="nfc_card_title">NFC Tap</string>
+    <string name="nfc_role_badge_send">Send Tab • NFC Reader</string>
+    <string name="nfc_role_badge_receive">Receive Tab • NFC HCE Card</string>
+    <string name="nfc_card_ready">Hold two devices back-to-back to pair instantly.</string>
+    <string name="nfc_card_ready_send_tab">Touch back-to-back with a device on the Receive tab (with NFC enabled) to automatically pair and connect via Wi-Fi Direct.</string>
+    <string name="nfc_card_ready_receive_tab">Keep this screen on the Receive tab and touch back-to-back with a device on the Send tab to automatically accept the connection.</string>
+    <string name="nfc_card_connecting">Pairing with %1$s…</string>
+    <string name="nfc_card_disabled">Turn on NFC for instant tap pairing between Send and Receive devices.</string>
+    <string name="nfc_open_settings">Enable NFC</string>
+    <string name="nfc_status_ready">Ready</string>
+    <string name="nfc_settings_title">NFC Tap-to-Pair</string>
+    <string name="nfc_settings_ready_desc">One device on Send tab, one on Receive tab, then touch back-to-back</string>
+    <string name="nfc_settings_disabled_desc">Disabled in system settings</string>
+    <string name="nfc_settings_unsupported_desc">NFC not supported on this device</string>
+    <string name="nfc_toast_paired">NFC paired with %1$s…</string>
+
+    <!-- Receive tab -->
+    <string name="receive_title">Receive</string>
+    <string name="receive_subtitle_ready">Ready to receive</string>
+    <string name="receive_subtitle_10min">Visible for 10m • %1$s</string>
+    <string name="receive_subtitle_always">Always visible</string>
+    <string name="receive_subtitle_hidden">Hidden</string>
+    <string name="receive_ready_title">%1$s</string>
+    <string name="receive_ready_hidden_title">%1$s (Hidden)</string>
+    <string name="receive_ready_body">Ready to receive files or pair via NFC tap.</string>
+    <string name="receive_ready_hidden_body">Enable visibility so nearby devices can send you files.</string>
+    <string name="receive_connected_title">Connected • %1$s</string>
+    <string name="receive_connected_body">High-speed P2P channel active.</string>
+    <string name="receive_empty_title">Waiting for files…</string>
+    <string name="receive_empty_body">Incoming transfers will appear here in real time.</string>
+
+    <!-- About App screen (Redesigned) -->
+    <string name="about_app_title">About</string>
+    <string name="about_app_tagline">Peer-to-Peer &amp; Cloud File Sharing</string>
+    <string name="about_app_hero_badge">Official Build • v%1$s</string>
+    <string name="about_app_quick_copy_info">Copy Build Info</string>
+    <string name="about_app_quick_browse_github">Browse GitHub</string>
+    <string name="about_app_spec_protocols_title">P2P Protocols</string>
+    <string name="about_app_spec_protocols_value">Wi-Fi Direct • BLE • NFC</string>
+    <string name="about_app_spec_engine_title">Core Engine</string>
+    <string name="about_app_spec_engine_value">C++20 NDK • 512 KB Stream</string>
+    <string name="about_app_spec_ui_title">Design System</string>
+    <string name="about_app_spec_ui_value">Glasmio Liquid Glass</string>
+    <string name="about_app_spec_cloud_title">Cloud &amp; Web</string>
+    <string name="about_app_spec_cloud_value">QR Link • In-App Browser</string>
+    <string name="about_app_section_info">Specifications</string>
+    <string name="about_app_field_name">Application</string>
+    <string name="about_app_field_package">Package Name</string>
+    <string name="about_app_field_version">Version</string>
+    <string name="about_app_copied_toast">Copied: %1$s</string>
+    <string name="about_app_section_intro">Overview</string>
+    <string name="about_app_intro_body">Thazh Share is a high-speed peer-to-peer and cloud file sharing suite for Android. It combines Wi-Fi Direct, Bluetooth LE fast discovery, and NFC HCE tap-to-pair on an interactive Spatial Radar without requiring internet access, alongside an integrated file &amp; media picker, in-app cloud browser with QR generation, Google account sync, and Glasmio Liquid Glass aesthetics.</string>
+    <string name="about_app_section_credits">Credits &amp; Licenses</string>
+    <string name="about_app_credit_glasmio_title">Glasmio UI Framework</string>
+    <string name="about_app_credit_glasmio_desc">Liquid Glass design system for Jetpack Compose • NEORUAA</string>
+    <string name="about_app_credit_catbox_title">Catbox.moe Cloud</string>
+    <string name="about_app_credit_catbox_desc">Cloud storage infrastructure for instant link sharing</string>
+    <string name="about_app_section_license">Open Source License</string>
+    <string name="about_app_license_row_desc">Apache License 2.0 • Tap to view full text</string>
+    <string name="about_app_license_glasmio_title">Open Source License</string>
+    <string name="about_app_license_glasmio_subtitle">Glasmio — Apache License 2.0 (NEORUAA)</string>
+    <string name="about_app_license_github_label">Glasmio GitHub</string>
+    <string name="about_app_license_github_url">https://github.com/NEORUAA/Glasmio</string>
+    <string name="about_app_license_file_label">Apache 2.0 File (LICENSE)</string>
+    <string name="about_app_license_file_url">https://github.com/NEORUAA/Glasmio/blob/main/LICENSE</string>
+    <string name="about_app_license_copy_button">Copy License</string>
+    <string name="about_app_open_github_button">Browse GitHub</string>
+    <string name="about_app_open_license_button">Browse LICENSE</string>
+
+    <!-- Settings categories hub (Concise, professional) -->
+    <string name="settings_categories_header">Categories</string>
+    <string name="settings_search_results_header">Search Results</string>
+    <string name="settings_category_account_device_title">Account &amp; Device</string>
+    <string name="settings_category_account_device_desc">%1$s • %2$s</string>
+    <string name="settings_category_visibility_title">Connectivity &amp; Visibility</string>
+    <string name="settings_category_visibility_desc">%1$s • Wi-Fi Direct, BLE, NFC</string>
+    <string name="settings_category_transfer_security_title">Receive &amp; Security</string>
+    <string name="settings_category_transfer_security_desc">Confirmations, background prompts &amp; auto-save</string>
+    <string name="settings_category_appearance_title">Appearance &amp; Language</string>
+    <string name="settings_category_appearance_desc">%1$s • %2$s • Liquid Glass</string>
+    <string name="settings_category_data_title">Data &amp; Storage</string>
+    <string name="settings_category_data_desc">%1$d files (%2$s) • Cache &amp; background</string>
+    <string name="settings_category_about_title">About</string>
+    <string name="settings_category_about_desc">Thazh Share v%1$s • Specs &amp; License</string>
+
+    <!-- Common -->
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="back">Back</string>
+    <string name="retry">Retry</string>
+    <string name="close">Close</string>
+</resources>

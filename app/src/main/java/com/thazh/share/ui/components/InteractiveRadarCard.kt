@@ -1,11 +1,17 @@
 package com.thazh.share.ui.components
 
+import android.view.HapticFeedbackConstants
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,10 +30,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +52,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -49,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousCapsule
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
@@ -59,12 +73,18 @@ import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import io.github.neoruaa.glasmio.core.GlasmioTheme
+import io.github.neoruaa.glasmio.glass.GlassEmphasis
 import io.github.neoruaa.glasmio.icons.SfIcon
+import io.github.neoruaa.glasmio.ui.GlasmioButton
+import io.github.neoruaa.glasmio.ui.GlasmioButtonSize
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+private const val PENDING_CONNECTION_WARNING_THRESHOLD_SEC = 10
 
 enum class RadarMode {
     SEND,
@@ -107,6 +127,13 @@ fun InteractiveRadarCard(
     connectedPeerName: String? = null,
     connectionQuality: ConnectionQuality = ConnectionQuality.STRONG,
     peers: List<DiscoveredPeer> = emptyList(),
+    localBatteryPercent: Int? = null,
+    localBatteryCharging: Boolean = false,
+    connectedPeerBatteryPercent: Int? = null,
+    connectedPeerCharging: Boolean = false,
+    peerBatteryLevels: Map<String, Pair<Int, Boolean>> = emptyMap(),
+    pendingConnectPeerName: String? = null,
+    hapticsEnabled: Boolean = true,
     isBleSupported: Boolean = true,
     isBleEnabled: Boolean = true,
     isNfcSupported: Boolean = false,
@@ -115,6 +142,8 @@ fun InteractiveRadarCard(
     errorMessage: String? = null,
     onCenterClick: () -> Unit = {},
     onPeerNodeClick: (DiscoveredPeer) -> Unit = {},
+    onCancelPendingConnection: (() -> Unit)? = null,
+    onRetryPendingConnection: (() -> Unit)? = null,
     onToggleBleClick: (() -> Unit)? = null,
     onNfcPillClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -122,6 +151,64 @@ fun InteractiveRadarCard(
     val colors = GlasmioTheme.colors
     val semantic = ThazhTheme.semantic
     val density = LocalDensity.current
+    val view = LocalView.current
+
+    // 1. Subtle haptic feedback when a new device is discovered on the radar screen
+    val knownPeerAddresses = remember { HashSet<String>() }
+    LaunchedEffect(peers, hapticsEnabled) {
+        val currentAddresses = peers.mapTo(HashSet()) { it.deviceAddress.uppercase() }
+        val hasNewDevice = currentAddresses.any { it !in knownPeerAddresses }
+        knownPeerAddresses.retainAll(currentAddresses)
+        if (hasNewDevice) {
+            knownPeerAddresses.addAll(currentAddresses)
+            if (hapticsEnabled) {
+                runCatching {
+                    val performed = view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    if (!performed) {
+                        view.performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE)
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. 10-second pending connection visual warning overlay tracker
+    val invitedPeer = remember(peers) {
+        peers.firstOrNull { it.status == PeerStatus.INVITED }
+    }
+    val isPendingConnection = !isConnected && (
+        isConnecting ||
+            invitedPeer != null ||
+            !nfcPairingPeerName.isNullOrBlank()
+        )
+    val pendingPeerDisplayName = pendingConnectPeerName?.takeIf { it.isNotBlank() }
+        ?: invitedPeer?.deviceName?.takeIf { it.isNotBlank() }
+        ?: nfcPairingPeerName?.takeIf { it.isNotBlank() }
+    val pendingSessionKey = remember(isPendingConnection, invitedPeer?.deviceAddress, pendingPeerDisplayName) {
+        if (!isPendingConnection) null else "${invitedPeer?.deviceAddress.orEmpty()}_${pendingPeerDisplayName.orEmpty()}"
+    }
+
+    var pendingElapsedSeconds by remember { mutableIntStateOf(0) }
+    var showPendingTimeoutOverlay by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isPendingConnection, pendingSessionKey) {
+        pendingElapsedSeconds = 0
+        showPendingTimeoutOverlay = false
+        if (isPendingConnection) {
+            while (true) {
+                delay(1_000L)
+                pendingElapsedSeconds += 1
+                if (pendingElapsedSeconds >= PENDING_CONNECTION_WARNING_THRESHOLD_SEC && !showPendingTimeoutOverlay) {
+                    showPendingTimeoutOverlay = true
+                    if (hapticsEnabled) {
+                        runCatching {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     val isHidden = !isConnected && visibilityMode == DeviceVisibilityMode.HIDDEN
     val primaryAccent = when {
@@ -172,7 +259,7 @@ fun InteractiveRadarCard(
             .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Top header bar: Local device badge + Live Signal Quality / Visibility badge
+        // Top header bar: Local device badge (+ live local battery) + Live Signal Quality / Connected Peer Battery / Visibility badge
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -184,6 +271,7 @@ fun InteractiveRadarCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
+                    .weight(1f, fill = false)
                     .clip(ContinuousCapsule)
                     .background(primaryAccent.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
                     .padding(horizontal = 11.dp, vertical = 5.dp),
@@ -201,13 +289,33 @@ fun InteractiveRadarCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (localBatteryPercent != null && localBatteryPercent in 0..100) {
+                    RadarBatteryMiniBadge(
+                        percent = localBatteryPercent,
+                        isCharging = localBatteryCharging,
+                    )
+                }
             }
 
+            Spacer(modifier = Modifier.width(8.dp))
+
             if (isConnected) {
-                ConnectionQualityIndicator(
-                    quality = connectionQuality,
-                    showLabel = true,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (connectedPeerBatteryPercent != null && connectedPeerBatteryPercent in 0..100) {
+                        RadarBatteryPill(
+                            percent = connectedPeerBatteryPercent,
+                            isCharging = connectedPeerCharging,
+                            modifier = Modifier.testTag("radar_connected_peer_battery_pill"),
+                        )
+                    }
+                    ConnectionQualityIndicator(
+                        quality = connectionQuality,
+                        showLabel = true,
+                    )
+                }
             } else {
                 val visibilityBadgeText = when (visibilityMode) {
                     DeviceVisibilityMode.HIDDEN -> stringResource(R.string.visibility_mode_hidden)
@@ -242,7 +350,7 @@ fun InteractiveRadarCard(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2D Spatial Signal Radar Canvas + Interactive Peer Nodes (No distance labels, pure signal visualization)
+        // 2D Spatial Signal Radar Canvas + Interactive Peer Nodes + 10s Pending Timeout Visual Warning Overlay
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
@@ -438,7 +546,7 @@ fun InteractiveRadarCard(
                 )
             }
 
-            // Connected Peer Node (shows Connection Signal Quality instead of distance)
+            // Connected Peer Node (shows Connection Signal Quality + Live Connected Peer Battery Level)
             if (isConnected && !connectedPeerName.isNullOrBlank()) {
                 val qualityBars = connectionQuality.barsFilled.coerceAtLeast(1)
                 val signalLabel = when (connectionQuality) {
@@ -463,13 +571,17 @@ fun InteractiveRadarCard(
                     name = connectedPeerName,
                     subtitle = signalLabel,
                     signalBars = qualityBars,
+                    batteryPercent = connectedPeerBatteryPercent,
+                    isCharging = connectedPeerCharging,
                     accentColor = semantic.accentGreen,
                     iconName = ThazhSymbols.CheckCircle,
                     onClick = onCenterClick,
-                    modifier = Modifier.offset { IntOffset(offsetX, offsetY) },
+                    modifier = Modifier
+                        .offset { IntOffset(offsetX, offsetY) }
+                        .testTag("radar_connected_peer_chip"),
                 )
             } else {
-                // Orbiting Discovered Peers (positioned by signal strength tier, showing signal bars)
+                // Orbiting Discovered Peers (positioned by signal strength tier, showing signal bars + known battery)
                 val plottedPeers = peers.take(6)
                 plottedPeers.forEachIndexed { index, peer ->
                     val hashSeed = abs(peer.deviceAddress.hashCode())
@@ -511,10 +623,20 @@ fun InteractiveRadarCard(
                         else -> stringResource(R.string.quality_strong)
                     }
 
+                    val mappedBattery = peerBatteryLevels[peer.deviceAddress.uppercase()]
+                    val resolvedBatteryPercent = peer.batteryPercent ?: mappedBattery?.first
+                    val resolvedCharging = if (peer.batteryPercent != null) {
+                        peer.isCharging
+                    } else {
+                        mappedBattery?.second ?: false
+                    }
+
                     RadarPeerChip(
                         name = peer.deviceName.ifBlank { peer.deviceAddress },
                         subtitle = subLabel,
                         signalBars = signalBars,
+                        batteryPercent = resolvedBatteryPercent,
+                        isCharging = resolvedCharging,
                         accentColor = nodeColor,
                         iconName = when (peer.discoveryTransport) {
                             PeerDiscoveryTransport.BLE -> ThazhSymbols.Bluetooth
@@ -573,6 +695,31 @@ fun InteractiveRadarCard(
                         size = 28.dp,
                     )
                 }
+            }
+
+            // Visual Warning Overlay when a connection attempt stays in 'pending' state for > 10 seconds
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showPendingTimeoutOverlay && isPendingConnection,
+                enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.92f),
+                exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 0.94f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 12.dp),
+            ) {
+                PendingConnectionTimeoutOverlay(
+                    peerName = pendingPeerDisplayName,
+                    elapsedSeconds = pendingElapsedSeconds,
+                    onRetry = {
+                        showPendingTimeoutOverlay = false
+                        pendingElapsedSeconds = 0
+                        onRetryPendingConnection?.invoke()
+                    },
+                    onCancel = {
+                        showPendingTimeoutOverlay = false
+                        pendingElapsedSeconds = 0
+                        onCancelPendingConnection?.invoke()
+                    },
+                )
             }
         }
 
@@ -666,10 +813,211 @@ fun InteractiveRadarCard(
 }
 
 @Composable
+private fun PendingConnectionTimeoutOverlay(
+    peerName: String?,
+    elapsedSeconds: Int,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+    val overlayShape = ContinuousRoundedRectangle(22.dp)
+
+    Column(
+        modifier = modifier
+            .widthIn(max = 330.dp)
+            .fillMaxWidth()
+            .clip(overlayShape)
+            .background(
+                color = colors.elevatedBackground.copy(alpha = if (colors.isDark) 0.96f else 0.97f),
+            )
+            .border(
+                width = 1.4.dp,
+                color = semantic.warningOrange.copy(alpha = 0.72f),
+                shape = overlayShape,
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .testTag("radar_pending_timeout_overlay"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(semantic.warningOrange.copy(alpha = if (colors.isDark) 0.24f else 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                SfIcon(
+                    systemName = ThazhSymbols.Timer,
+                    contentDescription = null,
+                    tint = semantic.warningOrange,
+                    size = 18.dp,
+                )
+            }
+            GlasmioText(
+                text = stringResource(R.string.radar_pending_timeout_title),
+                style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.Bold),
+                color = colors.content,
+            )
+        }
+
+        GlasmioText(
+            text = if (!peerName.isNullOrBlank()) {
+                stringResource(R.string.radar_pending_timeout_body, peerName, elapsedSeconds)
+            } else {
+                stringResource(R.string.radar_pending_timeout_body_generic, elapsedSeconds)
+            },
+            style = GlasmioTheme.textStyles.caption1,
+            color = colors.secondaryContent,
+            textAlign = TextAlign.Center,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
+            GlasmioButton(
+                onClick = onCancel,
+                emphasis = GlassEmphasis.Regular,
+                destructive = true,
+                size = GlasmioButtonSize.Small,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("radar_pending_timeout_cancel_button"),
+            ) {
+                SfIcon(
+                    systemName = ThazhSymbols.Close,
+                    contentDescription = null,
+                    tint = colors.destructive,
+                    size = 14.dp,
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                GlasmioText(
+                    text = stringResource(R.string.radar_pending_timeout_cancel),
+                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.destructive,
+                )
+            }
+
+            GlasmioButton(
+                onClick = onRetry,
+                emphasis = GlassEmphasis.Prominent,
+                navigationSurfaceColor = semantic.warningOrange,
+                size = GlasmioButtonSize.Small,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("radar_pending_timeout_retry_button"),
+            ) {
+                SfIcon(
+                    systemName = ThazhSymbols.Refresh,
+                    contentDescription = null,
+                    tint = Color.White,
+                    size = 14.dp,
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                GlasmioText(
+                    text = stringResource(R.string.radar_pending_timeout_retry),
+                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadarBatteryMiniBadge(
+    percent: Int,
+    isCharging: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val semantic = ThazhTheme.semantic
+    val tint = when {
+        isCharging -> semantic.accentGreen
+        percent <= 20 -> GlasmioTheme.colors.destructive
+        percent <= 40 -> semantic.warningOrange
+        else -> semantic.accentGreen
+    }
+    Row(
+        modifier = modifier
+            .clip(ContinuousCapsule)
+            .background(tint.copy(alpha = 0.16f))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        SfIcon(
+            systemName = ThazhSymbols.BatterySaver,
+            contentDescription = null,
+            tint = tint,
+            size = 11.dp,
+        )
+        GlasmioText(
+            text = stringResource(
+                if (isCharging) R.string.radar_battery_charging else R.string.radar_battery_percent,
+                percent,
+            ),
+            style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.Bold),
+            color = tint,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun RadarBatteryPill(
+    percent: Int,
+    isCharging: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+    val tint = when {
+        isCharging -> semantic.accentGreen
+        percent <= 20 -> colors.destructive
+        percent <= 40 -> semantic.warningOrange
+        else -> semantic.accentGreen
+    }
+    Row(
+        modifier = modifier
+            .clip(ContinuousCapsule)
+            .background(tint.copy(alpha = if (colors.isDark) 0.22f else 0.14f))
+            .border(0.9.dp, tint.copy(alpha = 0.45f), ContinuousCapsule)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SfIcon(
+            systemName = ThazhSymbols.BatterySaver,
+            contentDescription = null,
+            tint = tint,
+            size = 13.dp,
+        )
+        GlasmioText(
+            text = stringResource(
+                if (isCharging) R.string.radar_battery_charging else R.string.radar_battery_percent,
+                percent,
+            ),
+            style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
+            color = tint,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 private fun RadarPeerChip(
     name: String,
     subtitle: String,
     signalBars: Int,
+    batteryPercent: Int? = null,
+    isCharging: Boolean = false,
     accentColor: Color,
     iconName: String,
     onClick: () -> Unit,
@@ -679,7 +1027,7 @@ private fun RadarPeerChip(
     Row(
         modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .widthIn(max = 158.dp)
+            .widthIn(max = 178.dp)
             .clip(ContinuousCapsule)
             .background(
                 color = colors.elevatedBackground.copy(alpha = if (colors.isDark) 0.93f else 0.96f),
@@ -704,7 +1052,7 @@ private fun RadarPeerChip(
                 size = 14.dp,
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             GlasmioText(
                 text = name,
                 style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
@@ -729,6 +1077,12 @@ private fun RadarPeerChip(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (batteryPercent != null && batteryPercent in 0..100) {
+                    RadarBatteryMiniBadge(
+                        percent = batteryPercent,
+                        isCharging = isCharging,
+                    )
+                }
             }
         }
     }

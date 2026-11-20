@@ -13,7 +13,9 @@ sealed class Frame {
     data class Hello(
         val displayName: String,
         val deviceAddress: String,
-        val protocolVersion: Int = PROTOCOL_VERSION
+        val protocolVersion: Int = PROTOCOL_VERSION,
+        val batteryPercent: Int? = null,
+        val isCharging: Boolean = false,
     ) : Frame()
 
     @Serializable
@@ -48,12 +50,22 @@ sealed class Frame {
         val newDisplayName: String
     ) : Frame()
 
-    /** Lightweight ping/pong used to measure link RTT + loss. */
+    /** Lightweight ping/pong used to measure link RTT + loss and sync real-time device battery level. */
     @Serializable
-    data class Ping(val sequence: Long, val sentAtEpochMs: Long) : Frame()
+    data class Ping(
+        val sequence: Long,
+        val sentAtEpochMs: Long,
+        val batteryPercent: Int? = null,
+        val isCharging: Boolean = false,
+    ) : Frame()
 
     @Serializable
-    data class Pong(val sequence: Long, val echoedSentAtEpochMs: Long) : Frame()
+    data class Pong(
+        val sequence: Long,
+        val echoedSentAtEpochMs: Long,
+        val batteryPercent: Int? = null,
+        val isCharging: Boolean = false,
+    ) : Frame()
 
     companion object {
         const val PROTOCOL_VERSION = 2

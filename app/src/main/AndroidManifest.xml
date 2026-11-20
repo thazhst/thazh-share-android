@@ -34,12 +34,27 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Export received files to Downloads on Android 8–9 -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+
+    <!-- Direct in-app file & media picker catalog queries -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:targetApi="33" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:targetApi="33" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_AUDIO"
+        tools:targetApi="33" />
 
     <!-- NFC Tap-to-Connect (optional hardware acceleration for instant WiFi Direct pairing) -->
     <uses-permission android:name="android.permission.NFC" />
@@ -64,8 +79,11 @@
         <package android:name="com.samsung.android.lool" />
         <package android:name="com.samsung.android.sm" />
         <package android:name="com.miui.securitycenter" />
+        <package android:name="com.miui.powerkeeper" />
         <package android:name="com.coloros.safecenter" />
+        <package android:name="com.coloros.oppoguardelf" />
         <package android:name="com.oppo.safe" />
+        <package android:name="com.oplus.battery" />
     </queries>
 
     <application

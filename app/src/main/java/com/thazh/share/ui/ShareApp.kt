@@ -62,6 +62,8 @@ import androidx.navigation.compose.rememberNavController
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.ui.components.GlasmioText
+import com.thazh.share.ui.components.InAppFileMediaPickerSheet
+import com.thazh.share.ui.components.InAppPickerTab
 import com.thazh.share.ui.components.IosSwipeBackContainer
 import com.thazh.share.ui.screens.AboutAppScreen
 import com.thazh.share.ui.screens.DiscoveryScreen
@@ -88,6 +90,11 @@ import io.github.neoruaa.glasmio.ui.GlasmioAlertDialog
 import io.github.neoruaa.glasmio.ui.GlasmioNavigationBar
 import io.github.neoruaa.glasmio.ui.GlasmioTabItem
 import io.github.neoruaa.glasmio.ui.NavigationBarSurfaceHeight
+
+private enum class ShareAppPickerContext {
+    QUICK_DISCOVERY,
+    ACTIVE_TRANSFER,
+}
 
 object ShareRoutes {
     const val MAIN_TABS = "main_tabs"
@@ -119,6 +126,8 @@ fun ShareApp(viewModel: ShareViewModel) {
     val defaultVisibilityMode by viewModel.defaultVisibilityMode.collectAsStateWithLifecycle()
     val confirmIncomingConnection by viewModel.confirmIncomingConnection.collectAsStateWithLifecycle()
     val backgroundConnectionDialog by viewModel.backgroundConnectionDialog.collectAsStateWithLifecycle()
+    val backgroundPromptMode by viewModel.backgroundPromptMode.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val autoSaveToDownloads by viewModel.autoSaveToDownloads.collectAsStateWithLifecycle()
     val soundVibrationEnabled by viewModel.soundVibrationEnabled.collectAsStateWithLifecycle()
     val incomingConnectionRequest by viewModel.incomingConnectionRequest.collectAsStateWithLifecycle()
@@ -131,6 +140,12 @@ fun ShareApp(viewModel: ShareViewModel) {
     val isSocketConnected by viewModel.isSocketConnected.collectAsStateWithLifecycle()
     val connectionQuality by viewModel.connectionQuality.collectAsStateWithLifecycle()
     val estimatedDistanceMeters by viewModel.estimatedDistanceMeters.collectAsStateWithLifecycle()
+    val localBatteryPercent by viewModel.localBatteryPercent.collectAsStateWithLifecycle()
+    val localBatteryCharging by viewModel.localBatteryCharging.collectAsStateWithLifecycle()
+    val connectedPeerBatteryPercent by viewModel.connectedPeerBatteryPercent.collectAsStateWithLifecycle()
+    val connectedPeerCharging by viewModel.connectedPeerCharging.collectAsStateWithLifecycle()
+    val peerBatteryLevels by viewModel.peerBatteryLevels.collectAsStateWithLifecycle()
+    val pendingConnectPeer by viewModel.pendingConnectPeer.collectAsStateWithLifecycle()
     val transfers by viewModel.transfers.collectAsStateWithLifecycle()
     val receivedFiles by viewModel.receivedFiles.collectAsStateWithLifecycle()
     val unseenReceivedCount by viewModel.unseenReceivedCount.collectAsStateWithLifecycle()
@@ -202,55 +217,20 @@ fun ShareApp(viewModel: ShareViewModel) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    val filesPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
-        if (uris.isNotEmpty()) viewModel.sendFilesForTransfer(uris)
-    }
-
-    val mediaPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) viewModel.sendFilesForTransfer(uris)
-    }
-
-    // Quick-send launchers for DiscoveryScreen (send immediately if connected, or queue & scan)
-    val quickFilesPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            viewModel.sendOrQueueFilesForWifiDirect(uris) { sentImmediately, count ->
-                val msgRes = if (sentImmediately) {
-                    R.string.received_files_share_wifi_direct_sending
-                } else {
-                    R.string.received_files_share_wifi_direct_queued
-                }
-                Toast.makeText(
-                    context,
-                    context.getString(msgRes, count),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+    // Switch NFC role dynamically:
+    // - On SEND tab (MAIN_TABS): SENDER_READER (NFC Reader / PCD mode)
+    // - On RECEIVE tab (or other tabs): RECEIVER_CARD_EMULATOR (HCE Card Emulation mode)
+    LaunchedEffect(selectedTab, currentRoute) {
+        val role = if (currentRoute == ShareRoutes.MAIN_TABS && selectedTab == ShareTab.SEND) {
+            com.thazh.share.network.NfcRole.SENDER_READER
+        } else {
+            com.thazh.share.network.NfcRole.RECEIVER_CARD_EMULATOR
         }
+        com.thazh.share.network.NfcConnectionCoordinator.setRole(role)
     }
 
-    val quickMediaPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            viewModel.sendOrQueueFilesForWifiDirect(uris) { sentImmediately, count ->
-                val msgRes = if (sentImmediately) {
-                    R.string.received_files_share_wifi_direct_sending
-                } else {
-                    R.string.received_files_share_wifi_direct_queued
-                }
-                Toast.makeText(
-                    context,
-                    context.getString(msgRes, count),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
+    var inAppPickerRequest by remember {
+        mutableStateOf<Pair<ShareAppPickerContext, InAppPickerTab>?>(null)
     }
 
     LaunchedEffect(nfcPairingPeerName) {
@@ -310,6 +290,13 @@ fun ShareApp(viewModel: ShareViewModel) {
             isDiscovering = isDiscovering,
             screenState = screenState,
             connectionQuality = connectionQuality,
+            localBatteryPercent = localBatteryPercent,
+            localBatteryCharging = localBatteryCharging,
+            connectedPeerBatteryPercent = connectedPeerBatteryPercent,
+            connectedPeerCharging = connectedPeerCharging,
+            peerBatteryLevels = peerBatteryLevels,
+            pendingConnectPeerName = pendingConnectPeer?.deviceName,
+            hapticsEnabled = soundVibrationEnabled,
             isBleSupported = isBleSupported,
             isBleEnabled = bleFastDiscoveryEnabled,
             isNfcSupported = isNfcSupported,
@@ -318,11 +305,11 @@ fun ShareApp(viewModel: ShareViewModel) {
             pendingWifiDirectFilesCount = pendingWifiDirectFilesCount,
             bottomBarPadding = bottomBarPadding,
             onCancelPendingFiles = { viewModel.clearPendingWifiDirectFiles() },
-            onQuickPickFiles = { quickFilesPickerLauncher.launch("*/*") },
+            onQuickPickFiles = {
+                inAppPickerRequest = ShareAppPickerContext.QUICK_DISCOVERY to InAppPickerTab.FILES
+            },
             onQuickPickMedia = {
-                quickMediaPickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                )
+                inAppPickerRequest = ShareAppPickerContext.QUICK_DISCOVERY to InAppPickerTab.MEDIA
             },
             onOpenLinkShare = { navigateToTab(ShareTab.LINK_SHARE) },
             onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(!bleFastDiscoveryEnabled) },
@@ -331,6 +318,8 @@ fun ShareApp(viewModel: ShareViewModel) {
             onStopDiscovery = { viewModel.stopDiscovery() },
             onConnectPeer = { viewModel.connectToPeer(it) },
             onConnectSavedDevice = { viewModel.connectToSavedDevice(it) },
+            onCancelPendingConnection = { viewModel.cancelPendingConnection() },
+            onRetryPendingConnection = { viewModel.retryPendingConnection() },
             onRenameSavedDevice = { address, name -> viewModel.renameSavedDevice(address, name) },
             onRemoveSavedDevice = { viewModel.removeSavedDevice(it) },
             onOpenActiveSession = {
@@ -367,11 +356,11 @@ fun ShareApp(viewModel: ShareViewModel) {
                             estimatedDistanceMeters = estimatedDistanceMeters,
                             transfers = transfers,
                             bottomBarPadding = bottomBarPadding,
-                            onPickFiles = { filesPickerLauncher.launch("*/*") },
+                            onPickFiles = {
+                                inAppPickerRequest = ShareAppPickerContext.ACTIVE_TRANSFER to InAppPickerTab.FILES
+                            },
                             onPickMedia = {
-                                mediaPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                                )
+                                inAppPickerRequest = ShareAppPickerContext.ACTIVE_TRANSFER to InAppPickerTab.MEDIA
                             },
                             onCancelTransfer = { viewModel.cancelTransfer(it) },
                             onRetryTransfer = { viewModel.retryTransfer(it) },
@@ -399,6 +388,13 @@ fun ShareApp(viewModel: ShareViewModel) {
                     connectionQuality = connectionQuality,
                     estimatedDistanceMeters = estimatedDistanceMeters,
                     peers = peers,
+                    localBatteryPercent = localBatteryPercent,
+                    localBatteryCharging = localBatteryCharging,
+                    connectedPeerBatteryPercent = connectedPeerBatteryPercent,
+                    connectedPeerCharging = connectedPeerCharging,
+                    peerBatteryLevels = peerBatteryLevels,
+                    pendingConnectPeerName = pendingConnectPeer?.deviceName,
+                    hapticsEnabled = soundVibrationEnabled,
                     transfers = transfers,
                     isBleSupported = isBleSupported,
                     isBleEnabled = bleFastDiscoveryEnabled,
@@ -409,6 +405,8 @@ fun ShareApp(viewModel: ShareViewModel) {
                     onSelectVisibilityMode = { viewModel.setVisibilityMode(it) },
                     onStartDiscovery = { viewModel.startDiscovery() },
                     onConnectPeer = { viewModel.connectToPeer(it) },
+                    onCancelPendingConnection = { viewModel.cancelPendingConnection() },
+                    onRetryPendingConnection = { viewModel.retryPendingConnection() },
                     onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(!bleFastDiscoveryEnabled) },
                     onOpenNfcSettings = { viewModel.openNfcSettings() },
                     onCancelTransfer = { viewModel.cancelTransfer(it) },
@@ -427,6 +425,7 @@ fun ShareApp(viewModel: ShareViewModel) {
                     uploadProgress = catboxUploadProgress,
                     uploadError = catboxUploadError,
                     sessionUploadedLinks = sessionCatboxLinks,
+                    inAppReceivedFiles = receivedFiles,
                     observeCloudLinks = { uid -> viewModel.observeCloudSharedLinks(uid) },
                     bottomBarPadding = bottomBarPadding,
                     onSelectExpiry = { viewModel.setCatboxExpiry(it) },
@@ -699,6 +698,8 @@ fun ShareApp(viewModel: ShareViewModel) {
                             defaultVisibilityMode = defaultVisibilityMode,
                             confirmIncomingConnection = confirmIncomingConnection,
                             backgroundConnectionDialog = backgroundConnectionDialog,
+                            backgroundPromptMode = backgroundPromptMode,
+                            appLanguage = appLanguage,
                             autoSaveToDownloads = autoSaveToDownloads,
                             soundVibrationEnabled = soundVibrationEnabled,
                             bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
@@ -717,6 +718,8 @@ fun ShareApp(viewModel: ShareViewModel) {
                             onSelectDefaultVisibilityMode = { viewModel.setDefaultVisibilityMode(it) },
                             onToggleConfirmIncomingConnection = { viewModel.setConfirmIncomingConnection(it) },
                             onToggleBackgroundConnectionDialog = { viewModel.setBackgroundConnectionDialog(it) },
+                            onSelectBackgroundPromptMode = { viewModel.setBackgroundPromptMode(it) },
+                            onSelectAppLanguage = { viewModel.setAppLanguage(it) },
                             onToggleAutoSaveToDownloads = { viewModel.setAutoSaveToDownloads(it) },
                             onToggleSoundVibration = { viewModel.setSoundVibrationEnabled(it) },
                             onToggleBleFastDiscovery = { viewModel.setBleFastDiscoveryEnabled(it) },
@@ -780,6 +783,8 @@ fun ShareApp(viewModel: ShareViewModel) {
                                 defaultVisibilityMode = defaultVisibilityMode,
                                 confirmIncomingConnection = confirmIncomingConnection,
                                 backgroundConnectionDialog = backgroundConnectionDialog,
+                                backgroundPromptMode = backgroundPromptMode,
+                                appLanguage = appLanguage,
                                 autoSaveToDownloads = autoSaveToDownloads,
                                 soundVibrationEnabled = soundVibrationEnabled,
                                 bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
@@ -798,6 +803,8 @@ fun ShareApp(viewModel: ShareViewModel) {
                                 onSelectDefaultVisibilityMode = {},
                                 onToggleConfirmIncomingConnection = {},
                                 onToggleBackgroundConnectionDialog = {},
+                                onSelectBackgroundPromptMode = {},
+                                onSelectAppLanguage = {},
                                 onToggleAutoSaveToDownloads = {},
                                 onToggleSoundVibration = {},
                                 onToggleBleFastDiscovery = {},
@@ -823,6 +830,41 @@ fun ShareApp(viewModel: ShareViewModel) {
                 }
             }
         }
+    }
+
+    // Global In-App File & Photo/Media Picker Sheet for Discovery & Active Transfer
+    val activePickerReq = inAppPickerRequest
+    if (activePickerReq != null) {
+        InAppFileMediaPickerSheet(
+            visible = true,
+            initialTab = activePickerReq.second,
+            inAppReceivedFiles = receivedFiles,
+            onConfirmSelection = { uris ->
+                if (uris.isNotEmpty()) {
+                    when (activePickerReq.first) {
+                        ShareAppPickerContext.QUICK_DISCOVERY -> {
+                            viewModel.sendOrQueueFilesForWifiDirect(uris) { sentImmediately, count ->
+                                val msgRes = if (sentImmediately) {
+                                    R.string.received_files_share_wifi_direct_sending
+                                } else {
+                                    R.string.received_files_share_wifi_direct_queued
+                                }
+                                Toast.makeText(
+                                    context,
+                                    context.getString(msgRes, count),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+
+                        ShareAppPickerContext.ACTIVE_TRANSFER -> {
+                            viewModel.sendFilesForTransfer(uris)
+                        }
+                    }
+                }
+            },
+            onDismiss = { inAppPickerRequest = null },
+        )
     }
 
     val pendingRequest = incomingConnectionRequest

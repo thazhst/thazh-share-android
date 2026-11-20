@@ -24,6 +24,8 @@ data class DiscoveredPeer(
     val discoveryTransport: PeerDiscoveryTransport = PeerDiscoveryTransport.WIFI_DIRECT,
     val rssiDbm: Int? = null,
     val estimatedDistanceMeters: Int? = null,
+    val batteryPercent: Int? = null,
+    val isCharging: Boolean = false,
 )
 
 enum class PeerStatus {

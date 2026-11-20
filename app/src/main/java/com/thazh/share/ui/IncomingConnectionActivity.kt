@@ -98,6 +98,8 @@ class IncomingConnectionActivity : ComponentActivity() {
                 .collectAsStateWithLifecycle(initialValue = false)
             val liquidGlassEnabled by app.preferencesRepository.liquidGlassEnabled
                 .collectAsStateWithLifecycle(initialValue = true)
+            val appLanguage by app.preferencesRepository.appLanguage
+                .collectAsStateWithLifecycle(initialValue = com.thazh.share.data.AppLanguage.VIETNAMESE)
             val darkTheme = when (themeMode) {
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
                 AppThemeMode.LIGHT -> false
@@ -121,54 +123,57 @@ class IncomingConnectionActivity : ComponentActivity() {
                 }
             }
 
-            GlasmioIconProvider(resolver = ThazhIconResolver) {
-                ThazhShareTheme(
-                    darkTheme = darkTheme,
-                    reduceTransparency = reduceTransparency,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                ) {
-                    IncomingConnectionOverlayDialog(
-                        request = request,
-                        visibilityMode = visibilityMode,
-                        remainingSeconds = remainingSeconds,
-                        onAccept = {
-                            val peer = request?.peerName.orEmpty()
-                            boundService?.acceptIncomingConnection()
-                            if (peer.isNotBlank()) {
+            com.thazh.share.util.ProvideAppLanguage(language = appLanguage) {
+                val localizedCtx = androidx.compose.ui.platform.LocalContext.current
+                GlasmioIconProvider(resolver = ThazhIconResolver) {
+                    ThazhShareTheme(
+                        darkTheme = darkTheme,
+                        reduceTransparency = reduceTransparency,
+                        liquidGlassEnabled = liquidGlassEnabled,
+                    ) {
+                        IncomingConnectionOverlayDialog(
+                            request = request,
+                            visibilityMode = visibilityMode,
+                            remainingSeconds = remainingSeconds,
+                            onAccept = {
+                                val peer = request?.peerName.orEmpty()
+                                boundService?.acceptIncomingConnection()
+                                if (peer.isNotBlank()) {
+                                    Toast.makeText(
+                                        this@IncomingConnectionActivity,
+                                        localizedCtx.getString(R.string.incoming_conn_accepted_toast, peer),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                                finish()
+                            },
+                            onAcceptAndOpenApp = {
+                                boundService?.acceptIncomingConnection()
+                                runCatching {
+                                    startActivity(
+                                        Intent(this@IncomingConnectionActivity, MainActivity::class.java).apply {
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                                Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                        },
+                                    )
+                                }
+                                finish()
+                            },
+                            onDecline = {
+                                boundService?.declineIncomingConnection()
                                 Toast.makeText(
                                     this@IncomingConnectionActivity,
-                                    getString(R.string.incoming_conn_accepted_toast, peer),
+                                    localizedCtx.getString(R.string.incoming_conn_declined_toast),
                                     Toast.LENGTH_SHORT,
                                 ).show()
-                            }
-                            finish()
-                        },
-                        onAcceptAndOpenApp = {
-                            boundService?.acceptIncomingConnection()
-                            runCatching {
-                                startActivity(
-                                    Intent(this@IncomingConnectionActivity, MainActivity::class.java).apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                    },
-                                )
-                            }
-                            finish()
-                        },
-                        onDecline = {
-                            boundService?.declineIncomingConnection()
-                            Toast.makeText(
-                                this@IncomingConnectionActivity,
-                                getString(R.string.incoming_conn_declined_toast),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                            finish()
-                        },
-                        onDismiss = {
-                            finish()
-                        },
-                    )
+                                finish()
+                            },
+                            onDismiss = {
+                                finish()
+                            },
+                        )
+                    }
                 }
             }
         }

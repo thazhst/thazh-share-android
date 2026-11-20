@@ -28,7 +28,8 @@ private const val ACTIVE_WIFI_KALMAN_KEY = "WIFI_P2P_ACTIVE_LINK"
 class ConnectionMonitor(
     private val connection: PeerConnection,
     private val scope: CoroutineScope,
-    private val wifiManager: WifiManager?
+    private val wifiManager: WifiManager?,
+    private val localBatteryProvider: () -> Pair<Int?, Boolean> = { null to false },
 ) {
     private val _quality = MutableStateFlow(ConnectionQuality.DISCONNECTED)
     val quality: StateFlow<ConnectionQuality> = _quality.asStateFlow()
@@ -57,7 +58,15 @@ class ConnectionMonitor(
                 val seq = sequenceCounter++
                 val sentAt = System.currentTimeMillis()
                 pendingPings[seq] = sentAt
-                val sent = connection.send(Frame.Ping(sequence = seq, sentAtEpochMs = sentAt))
+                val (batteryPct, charging) = localBatteryProvider()
+                val sent = connection.send(
+                    Frame.Ping(
+                        sequence = seq,
+                        sentAtEpochMs = sentAt,
+                        batteryPercent = batteryPct,
+                        isCharging = charging,
+                    ),
+                )
                 if (!sent) {
                     pendingPings.remove(seq)
                     recordResult(null)

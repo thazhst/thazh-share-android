@@ -94,6 +94,7 @@ object ThazhSymbols {
     const val FileArchive: String = "archivebox.fill"
     const val FileApk: String = "shippingbox.fill"
     const val FileOther: String = "doc.fill"
+    const val Globe: String = "globe"
 }
 
 /**
@@ -264,6 +265,8 @@ object ThazhIconResolver : GlasmioIconResolver {
                 SfVectorGlyphs.Checkmark
             canonical == ThazhSymbols.RadioUnchecked || canonical == "circle" ->
                 SfVectorGlyphs.CircleOutline
+            canonical == ThazhSymbols.Globe || canonical.startsWith("globe") ->
+                SfVectorGlyphs.GlobeGrid
             canonical.startsWith("exclamationmark") ->
                 SfVectorGlyphs.WarningTriangle
             else -> SfVectorGlyphs.Sparkles
@@ -1690,6 +1693,34 @@ private object SfVectorGlyphs {
                 close()
                 moveTo(12f, 9.5f); lineTo(12f, 14f)
                 moveTo(12f, 16.8f); lineTo(12.01f, 16.8f)
+            }
+        }
+    }
+
+    // 64. GlobeGrid ("globe") — Purpose: In-App Web Browser & Language Settings
+    val GlobeGrid: ImageVector by lazy {
+        sfIcon("sf_globe_grid") {
+            path(
+                stroke = strokeBrush,
+                strokeLineWidth = 1.9f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(21f, 12f)
+                curveTo(21f, 16.97f, 16.97f, 21f, 12f, 21f)
+                curveTo(7.03f, 21f, 3f, 16.97f, 3f, 12f)
+                curveTo(3f, 7.03f, 7.03f, 3f, 12f, 3f)
+                curveTo(16.97f, 3f, 21f, 7.03f, 21f, 12f)
+                close()
+                // Equator & latitude lines
+                moveTo(3.4f, 12f); lineTo(20.6f, 12f)
+                moveTo(4.6f, 8f); lineTo(19.4f, 8f)
+                moveTo(4.6f, 16f); lineTo(19.4f, 16f)
+                // Longitude curves
+                moveTo(12f, 3f)
+                curveTo(8.2f, 6.5f, 8.2f, 17.5f, 12f, 21f)
+                moveTo(12f, 3f)
+                curveTo(15.8f, 6.5f, 15.8f, 17.5f, 12f, 21f)
             }
         }
     }

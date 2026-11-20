@@ -552,6 +552,9 @@ fun ReceivedFilesScreen(
                                             } else {
                                                 selectedIds + file.id
                                             }
+                                        } else if (file.isTextTransferFile()) {
+                                            // Open the in-app text viewer & Copy to clipboard window directly
+                                            fileDetails = file
                                         } else {
                                             val f = File(file.filePath)
                                             if (!f.exists()) {
@@ -582,12 +585,21 @@ fun ReceivedFilesScreen(
                                                 Toast.LENGTH_SHORT,
                                             ).show()
                                         } else if (!FileActions.openFile(context, f, file.mimeType)) {
-                                            Toast.makeText(
-                                                context,
-                                                context.getString(R.string.received_files_cannot_open),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
+                                            if (file.isTextTransferFile()) {
+                                                fileDetails = file
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.received_files_cannot_open),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            }
                                         }
+                                    },
+                                    onCopyText = if (file.isTextTransferFile()) {
+                                        { copyReceivedTextFileToClipboard(context, file) }
+                                    } else {
+                                        null
                                     },
                                     onShareWifiDirect = { triggerShareViaWifiDirect(listOf(file)) },
                                     onShare = {
@@ -1024,6 +1036,138 @@ private fun FileDetailsBottomSheet(
                 }
             }
 
+            val isTextFile = remember(file.id, file.fileName, file.mimeType) {
+                file.isTextTransferFile()
+            }
+            var loadedTextPreview by remember(file.id) { mutableStateOf<String?>(null) }
+            var fullTextForCopy by remember(file.id) { mutableStateOf<String?>(null) }
+            var isLoadingText by remember(file.id) { mutableStateOf(isTextFile) }
+            val context = LocalContext.current
+
+            LaunchedEffect(file.id, file.filePath, isTextFile) {
+                if (!isTextFile) {
+                    isLoadingText = false
+                    loadedTextPreview = null
+                    fullTextForCopy = null
+                    return@LaunchedEffect
+                }
+                isLoadingText = true
+                val pair = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    readTextFileContentSafe(File(file.filePath))
+                }
+                loadedTextPreview = pair?.first
+                fullTextForCopy = pair?.second
+                isLoadingText = false
+            }
+
+            if (isTextFile) {
+                GlasmioCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("received_text_file_preview_card"),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                SfIcon(
+                                    systemName = ThazhSymbols.FileDocument,
+                                    contentDescription = null,
+                                    tint = semantic.accentBlue,
+                                    size = 17.dp,
+                                )
+                                GlasmioText(
+                                    text = stringResource(R.string.received_files_text_preview_title),
+                                    style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                                    color = colors.content,
+                                )
+                            }
+
+                            GlasmioButton(
+                                onClick = {
+                                    val textToCopy = fullTextForCopy ?: loadedTextPreview
+                                    if (!textToCopy.isNullOrEmpty()) {
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(file.fileName, textToCopy))
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.received_files_text_copied_toast),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    } else {
+                                        copyReceivedTextFileToClipboard(context, file)
+                                    }
+                                },
+                                emphasis = GlassEmphasis.Prominent,
+                                navigationSurfaceColor = semantic.accentBlue,
+                                size = GlasmioButtonSize.Small,
+                                modifier = Modifier.testTag("copy_text_to_clipboard_button"),
+                            ) {
+                                SfIcon(
+                                    systemName = ThazhSymbols.Copy,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    size = 14.dp,
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                GlasmioText(
+                                    text = stringResource(R.string.received_files_copy_to_clipboard),
+                                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                                    color = Color.White,
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(ContinuousRoundedRectangle(12.dp))
+                                .background(
+                                    colors.secondaryContent.copy(alpha = if (colors.isDark) 0.14f else 0.07f),
+                                )
+                                .padding(12.dp),
+                        ) {
+                            when {
+                                isLoadingText -> {
+                                    GlasmioText(
+                                        text = stringResource(R.string.received_files_text_preview_loading),
+                                        style = GlasmioTheme.textStyles.footnote,
+                                        color = colors.secondaryContent,
+                                    )
+                                }
+                                !loadedTextPreview.isNullOrBlank() -> {
+                                    GlasmioText(
+                                        text = loadedTextPreview!!,
+                                        style = GlasmioTheme.textStyles.footnote,
+                                        color = colors.content,
+                                        maxLines = 12,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                else -> {
+                                    GlasmioText(
+                                        text = stringResource(R.string.received_files_text_preview_empty),
+                                        style = GlasmioTheme.textStyles.footnote,
+                                        color = colors.secondaryContent,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             GlasmioGroupedList(modifier = Modifier.fillMaxWidth()) {
                 GlasmioListRow(
                     title = stringResource(R.string.received_files_details_name),
@@ -1057,13 +1201,52 @@ private fun FileDetailsBottomSheet(
                 )
             }
 
+            if (isTextFile) {
+                GlasmioButton(
+                    onClick = {
+                        val textToCopy = fullTextForCopy ?: loadedTextPreview
+                        if (!textToCopy.isNullOrEmpty()) {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(file.fileName, textToCopy))
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.received_files_text_copied_toast),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        } else {
+                            copyReceivedTextFileToClipboard(context, file)
+                        }
+                    },
+                    emphasis = GlassEmphasis.Prominent,
+                    navigationSurfaceColor = semantic.accentBlue,
+                    size = GlasmioButtonSize.Large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("file_details_copy_text_button"),
+                ) {
+                    SfIcon(
+                        systemName = ThazhSymbols.Copy,
+                        contentDescription = null,
+                        tint = Color.White,
+                        size = 17.dp,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    GlasmioText(
+                        text = stringResource(R.string.received_files_copy_to_clipboard),
+                        style = GlasmioTheme.textStyles.headline,
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 GlasmioButton(
                     onClick = { onOpen(file) },
-                    emphasis = GlassEmphasis.Prominent,
+                    emphasis = if (isTextFile) GlassEmphasis.Regular else GlassEmphasis.Prominent,
                     navigationSurfaceColor = semantic.accentBlue,
                     size = GlasmioButtonSize.Medium,
                     modifier = Modifier
@@ -1073,14 +1256,14 @@ private fun FileDetailsBottomSheet(
                     SfIcon(
                         systemName = ThazhSymbols.OpenInNew,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = if (isTextFile) colors.content else Color.White,
                         size = 16.dp,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     GlasmioText(
                         text = stringResource(R.string.received_files_open),
                         style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
+                        color = if (isTextFile) colors.content else Color.White,
                         maxLines = 1,
                     )
                 }
@@ -1124,6 +1307,88 @@ private fun FileDetailsBottomSheet(
     }
 }
 
+private val TEXT_FILE_EXTENSIONS = setOf(
+    "txt", "md", "markdown", "json", "xml", "csv", "tsv", "log",
+    "html", "htm", "css", "js", "ts", "jsx", "tsx", "kt", "kts",
+    "java", "py", "rb", "go", "rs", "c", "cpp", "h", "hpp",
+    "yaml", "yml", "toml", "ini", "conf", "cfg", "properties",
+    "sh", "bash", "zsh", "bat", "sql", "graphql", "gitignore",
+)
+
+fun ReceivedFile.isTextTransferFile(): Boolean {
+    if (mimeType.startsWith("text/", ignoreCase = true)) return true
+    val lowerMime = mimeType.lowercase()
+    if (lowerMime == "application/json" ||
+        lowerMime == "application/xml" ||
+        lowerMime == "application/javascript" ||
+        lowerMime == "application/x-yaml" ||
+        lowerMime == "application/x-sh"
+    ) {
+        return true
+    }
+    val ext = fileName.substringAfterLast('.', "").lowercase()
+    return ext in TEXT_FILE_EXTENSIONS
+}
+
+private fun readTextFileContentSafe(
+    file: File,
+    maxPreviewChars: Int = 4_000,
+    maxCopyBytes: Int = 512 * 1024,
+): Pair<String, String>? {
+    if (!file.isFile || !file.canRead()) return null
+    return runCatching {
+        val bytesToRead = file.length().coerceAtMost(maxCopyBytes.toLong()).toInt()
+        if (bytesToRead <= 0) return@runCatching "" to ""
+        val buffer = ByteArray(bytesToRead)
+        file.inputStream().use { input ->
+            var offset = 0
+            while (offset < bytesToRead) {
+                val read = input.read(buffer, offset, bytesToRead - offset)
+                if (read <= 0) break
+                offset += read
+            }
+            val fullText = String(buffer, 0, offset, Charsets.UTF_8)
+            val preview = if (fullText.length > maxPreviewChars) {
+                fullText.take(maxPreviewChars) + "\n…"
+            } else {
+                fullText
+            }
+            preview to fullText
+        }
+    }.getOrNull()
+}
+
+private fun copyReceivedTextFileToClipboard(
+    context: android.content.Context,
+    file: ReceivedFile,
+) {
+    val targetFile = File(file.filePath)
+    if (!targetFile.isFile) {
+        Toast.makeText(
+            context,
+            context.getString(R.string.received_files_missing),
+            Toast.LENGTH_SHORT,
+        ).show()
+        return
+    }
+    val extracted = readTextFileContentSafe(targetFile)?.second
+    if (extracted.isNullOrEmpty()) {
+        Toast.makeText(
+            context,
+            context.getString(R.string.received_files_text_preview_empty),
+            Toast.LENGTH_SHORT,
+        ).show()
+        return
+    }
+    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(file.fileName, extracted))
+    Toast.makeText(
+        context,
+        context.getString(R.string.received_files_text_copied_toast),
+        Toast.LENGTH_SHORT,
+    ).show()
+}
+
 @Composable
 private fun CenteredReceivedContent(content: @Composable () -> Unit) {
     Box(
@@ -1150,6 +1415,7 @@ private fun ReceivedFileRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onOpen: () -> Unit,
+    onCopyText: (() -> Unit)? = null,
     onShareWifiDirect: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
@@ -1244,10 +1510,24 @@ private fun ReceivedFileRow(
         }
 
         if (!inSelectionMode) {
+            if (onCopyText != null) {
+                GlasmioIconButton(
+                    onClick = onCopyText,
+                    size = 42.dp,
+                    modifier = Modifier.testTag("received_file_quick_copy_text_${file.id}"),
+                ) {
+                    SfIcon(
+                        systemName = ThazhSymbols.Copy,
+                        contentDescription = stringResource(R.string.received_files_copy_to_clipboard),
+                        tint = colors.accent,
+                        size = 18.dp,
+                    )
+                }
+            }
             GlasmioMenu(
                 expanded = menuExpanded,
                 onExpandedChange = { menuExpanded = it },
-                itemCount = 7,
+                itemCount = if (onCopyText != null) 8 else 7,
                 anchor = { onAnchorClick ->
                     GlasmioIconButton(
                         onClick = onAnchorClick,
@@ -1262,6 +1542,16 @@ private fun ReceivedFileRow(
                     }
                 },
             ) { _, close ->
+                if (onCopyText != null) {
+                    GlasmioMenuItem(
+                        title = stringResource(R.string.received_files_copy_to_clipboard),
+                        systemName = ThazhSymbols.Copy,
+                        onClick = {
+                            close()
+                            onCopyText()
+                        },
+                    )
+                }
                 GlasmioMenuItem(
                     title = stringResource(R.string.received_files_open),
                     systemName = ThazhSymbols.OpenInNew,

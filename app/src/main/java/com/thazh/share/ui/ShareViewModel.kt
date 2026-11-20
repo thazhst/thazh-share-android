@@ -3,14 +3,19 @@ package com.thazh.share.ui
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.thazh.share.ShareApplication
+import com.thazh.share.data.AppLanguage
 import com.thazh.share.data.AppThemeMode
+import com.thazh.share.data.BackgroundPromptMode
 import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
@@ -91,6 +96,12 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     val backgroundConnectionDialog: StateFlow<Boolean> = app.preferencesRepository.backgroundConnectionDialog
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val backgroundPromptMode: StateFlow<BackgroundPromptMode> = app.preferencesRepository.backgroundPromptMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BackgroundPromptMode.NOTIFICATION)
+
+    val appLanguage: StateFlow<AppLanguage> = app.preferencesRepository.appLanguage
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppLanguage.VIETNAMESE)
+
     val autoSaveToDownloads: StateFlow<Boolean> = app.preferencesRepository.autoSaveToDownloads
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -109,9 +120,50 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         restartAccountDeviceNameSync(user)
     }
 
+    private val _localBatteryPercent = MutableStateFlow<Int?>(null)
+    val localBatteryPercent: StateFlow<Int?> = _localBatteryPercent.asStateFlow()
+
+    private val _localBatteryCharging = MutableStateFlow(false)
+    val localBatteryCharging: StateFlow<Boolean> = _localBatteryCharging.asStateFlow()
+
+    private val _connectedPeerBatteryPercent = MutableStateFlow<Int?>(null)
+    val connectedPeerBatteryPercent: StateFlow<Int?> = _connectedPeerBatteryPercent.asStateFlow()
+
+    private val _connectedPeerCharging = MutableStateFlow(false)
+    val connectedPeerCharging: StateFlow<Boolean> = _connectedPeerCharging.asStateFlow()
+
+    private val _peerBatteryLevels = MutableStateFlow<Map<String, Pair<Int, Boolean>>>(emptyMap())
+    val peerBatteryLevels: StateFlow<Map<String, Pair<Int, Boolean>>> = _peerBatteryLevels.asStateFlow()
+
+    private val _pendingConnectPeer = MutableStateFlow<DiscoveredPeer?>(null)
+    val pendingConnectPeer: StateFlow<DiscoveredPeer?> = _pendingConnectPeer.asStateFlow()
+
     init {
+        sampleInitialLocalBattery()
         runCatching {
             FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
+        }
+    }
+
+    private fun sampleInitialLocalBattery() {
+        runCatching {
+            val context = getApplication<Application>()
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            val cap = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.takeIf { it in 0..100 }
+            if (cap != null) {
+                _localBatteryPercent.value = cap
+            }
+            val sticky = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (sticky != null) {
+                val level = sticky.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = sticky.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                if (level >= 0 && scale > 0) {
+                    _localBatteryPercent.value = ((level * 100f) / scale.toFloat()).toInt().coerceIn(0, 100)
+                }
+                val status = sticky.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                _localBatteryCharging.value = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == BatteryManager.BATTERY_STATUS_FULL
+            }
         }
     }
 
@@ -250,11 +302,19 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
         }
         bridgeJobs += viewModelScope.launch { s.connectionQuality.collect { _connectionQuality.value = it } }
         bridgeJobs += viewModelScope.launch { s.estimatedDistanceMeters.collect { _estimatedDistanceMeters.value = it } }
+        bridgeJobs += viewModelScope.launch { s.localBatteryPercent.collect { if (it != null) _localBatteryPercent.value = it } }
+        bridgeJobs += viewModelScope.launch { s.localBatteryCharging.collect { _localBatteryCharging.value = it } }
+        bridgeJobs += viewModelScope.launch { s.connectedPeerBatteryPercent.collect { _connectedPeerBatteryPercent.value = it } }
+        bridgeJobs += viewModelScope.launch { s.connectedPeerCharging.collect { _connectedPeerCharging.value = it } }
+        bridgeJobs += viewModelScope.launch { s.peerBatteryLevels.collect { _peerBatteryLevels.value = it } }
         bridgeJobs += viewModelScope.launch { s.transfers.collect { _transfers.value = it } }
         bridgeJobs += viewModelScope.launch { s.receivedFileEvents.collect { _receivedFileEvents.emit(it) } }
         bridgeJobs += viewModelScope.launch { s.nfcPairingPeerName.collect { _nfcPairingPeerName.value = it } }
         bridgeJobs += viewModelScope.launch {
             s.wifiDirectManager.connectionState.collect { state ->
+                if (state !is P2pConnectionState.Connecting) {
+                    _pendingConnectPeer.value = null
+                }
                 _screenState.value = when (state) {
                     is P2pConnectionState.Connecting -> ConnectScreenState.Connecting
                     is P2pConnectionState.Connected -> ConnectScreenState.Connected(_connectedPeerName.value ?: "Thiết bị")
@@ -284,6 +344,18 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     fun setBackgroundConnectionDialog(enabled: Boolean) {
         viewModelScope.launch {
             app.preferencesRepository.setBackgroundConnectionDialog(enabled)
+        }
+    }
+
+    fun setBackgroundPromptMode(mode: BackgroundPromptMode) {
+        viewModelScope.launch {
+            app.preferencesRepository.setBackgroundPromptMode(mode)
+        }
+    }
+
+    fun setAppLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            app.preferencesRepository.setAppLanguage(language)
         }
     }
 
@@ -326,22 +398,56 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectToPeer(peer: DiscoveredPeer) {
+        _pendingConnectPeer.value = peer
         _screenState.value = ConnectScreenState.Connecting
         service?.connectToPeer(peer.deviceAddress) { _, error ->
-            if (error != null) _screenState.value = ConnectScreenState.Error(error)
+            if (error != null) {
+                _pendingConnectPeer.value = null
+                _screenState.value = ConnectScreenState.Error(error)
+            }
         }
     }
 
     fun connectToSavedDevice(device: SavedDevice) {
+        _pendingConnectPeer.value = DiscoveredPeer(
+            deviceName = device.effectiveName,
+            deviceAddress = device.deviceAddress,
+            status = com.thazh.share.data.PeerStatus.INVITED,
+        )
         _screenState.value = ConnectScreenState.Connecting
         service?.connectToPeer(device.deviceAddress) { _, error ->
-            if (error != null) _screenState.value = ConnectScreenState.Error(error)
+            if (error != null) {
+                _pendingConnectPeer.value = null
+                _screenState.value = ConnectScreenState.Error(error)
+            }
+        }
+    }
+
+    fun cancelPendingConnection() {
+        _pendingConnectPeer.value = null
+        service?.disconnect()
+        _screenState.value = ConnectScreenState.Discovering
+        startDiscovery()
+    }
+
+    fun retryPendingConnection() {
+        val target = _pendingConnectPeer.value
+            ?: _peers.value.firstOrNull { it.status == com.thazh.share.data.PeerStatus.INVITED }
+        service?.disconnect()
+        if (target != null) {
+            connectToPeer(target)
+        } else {
+            _screenState.value = ConnectScreenState.Discovering
+            startDiscovery()
         }
     }
 
     fun disconnect() {
+        _pendingConnectPeer.value = null
         service?.disconnect()
         _connectedPeerName.value = null
+        _connectedPeerBatteryPercent.value = null
+        _connectedPeerCharging.value = false
         _estimatedDistanceMeters.value = null
         _transfers.value = emptyList()
         _screenState.value = ConnectScreenState.Discovering

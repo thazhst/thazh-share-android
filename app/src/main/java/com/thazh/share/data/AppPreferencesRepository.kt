@@ -31,6 +31,8 @@ class AppPreferencesRepository(private val context: Context) {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val SYNC_DEVICE_NAME_WITH_ACCOUNT = booleanPreferencesKey("sync_device_name_with_account")
+        val BACKGROUND_PROMPT_MODE = stringPreferencesKey("background_prompt_mode")
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
     }
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
@@ -182,12 +184,49 @@ class AppPreferencesRepository(private val context: Context) {
     }
 
     val backgroundConnectionDialog: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[Keys.BACKGROUND_CONNECTION_DIALOG] ?: true
+        val rawMode = prefs[Keys.BACKGROUND_PROMPT_MODE]
+        if (rawMode != null) {
+            BackgroundPromptMode.fromStorageKey(rawMode) != BackgroundPromptMode.OFF
+        } else {
+            prefs[Keys.BACKGROUND_CONNECTION_DIALOG] ?: true
+        }
     }
 
     suspend fun setBackgroundConnectionDialog(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[Keys.BACKGROUND_CONNECTION_DIALOG] = enabled
+            prefs[Keys.BACKGROUND_PROMPT_MODE] = if (enabled) {
+                BackgroundPromptMode.NOTIFICATION.storageKey
+            } else {
+                BackgroundPromptMode.OFF.storageKey
+            }
+        }
+    }
+
+    val backgroundPromptMode: Flow<BackgroundPromptMode> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.BACKGROUND_PROMPT_MODE]
+        if (raw != null) {
+            BackgroundPromptMode.fromStorageKey(raw)
+        } else {
+            val legacyEnabled = prefs[Keys.BACKGROUND_CONNECTION_DIALOG] ?: true
+            if (legacyEnabled) BackgroundPromptMode.NOTIFICATION else BackgroundPromptMode.OFF
+        }
+    }
+
+    suspend fun setBackgroundPromptMode(mode: BackgroundPromptMode) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.BACKGROUND_PROMPT_MODE] = mode.storageKey
+            prefs[Keys.BACKGROUND_CONNECTION_DIALOG] = (mode != BackgroundPromptMode.OFF)
+        }
+    }
+
+    val appLanguage: Flow<AppLanguage> = context.dataStore.data.map { prefs ->
+        AppLanguage.fromCode(prefs[Keys.APP_LANGUAGE])
+    }
+
+    suspend fun setAppLanguage(language: AppLanguage) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.APP_LANGUAGE] = language.code
         }
     }
 

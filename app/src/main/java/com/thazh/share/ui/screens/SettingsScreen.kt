@@ -66,12 +66,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
+import com.thazh.share.data.AppLanguage
 import com.thazh.share.data.AppThemeMode
+import com.thazh.share.data.BackgroundPromptMode
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.service.WifiDirectService
 import com.thazh.share.ui.auth.GoogleAuthHelper
@@ -131,6 +139,7 @@ fun SettingsScreen(
     defaultVisibilityMode: DeviceVisibilityMode,
     confirmIncomingConnection: Boolean,
     backgroundConnectionDialog: Boolean,
+    backgroundPromptMode: BackgroundPromptMode = BackgroundPromptMode.NOTIFICATION,
     autoSaveToDownloads: Boolean,
     soundVibrationEnabled: Boolean,
     bleFastDiscoveryEnabled: Boolean,
@@ -138,6 +147,7 @@ fun SettingsScreen(
     isNfcSupported: Boolean,
     isNfcEnabled: Boolean,
     themeMode: AppThemeMode,
+    appLanguage: AppLanguage = AppLanguage.VIETNAMESE,
     reduceTransparency: Boolean,
     liquidGlassEnabled: Boolean,
     receivedFilesCount: Int,
@@ -149,10 +159,12 @@ fun SettingsScreen(
     onSelectDefaultVisibilityMode: (DeviceVisibilityMode) -> Unit,
     onToggleConfirmIncomingConnection: (Boolean) -> Unit,
     onToggleBackgroundConnectionDialog: (Boolean) -> Unit,
+    onSelectBackgroundPromptMode: (BackgroundPromptMode) -> Unit = {},
     onToggleAutoSaveToDownloads: (Boolean) -> Unit,
     onToggleSoundVibration: (Boolean) -> Unit,
     onToggleBleFastDiscovery: (Boolean) -> Unit,
     onSelectThemeMode: (AppThemeMode) -> Unit,
+    onSelectAppLanguage: (AppLanguage) -> Unit = {},
     onToggleReduceTransparency: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onOpenNfcSettings: () -> Unit,
@@ -221,6 +233,7 @@ fun SettingsScreen(
             defaultVisibilityMode = defaultVisibilityMode,
             confirmIncomingConnection = confirmIncomingConnection,
             backgroundConnectionDialog = backgroundConnectionDialog,
+            backgroundPromptMode = backgroundPromptMode,
             autoSaveToDownloads = autoSaveToDownloads,
             soundVibrationEnabled = soundVibrationEnabled,
             bleFastDiscoveryEnabled = bleFastDiscoveryEnabled,
@@ -228,6 +241,7 @@ fun SettingsScreen(
             isNfcSupported = isNfcSupported,
             isNfcEnabled = isNfcEnabled,
             themeMode = themeMode,
+            appLanguage = appLanguage,
             reduceTransparency = reduceTransparency,
             liquidGlassEnabled = liquidGlassEnabled,
             receivedFilesCount = receivedFilesCount,
@@ -246,10 +260,12 @@ fun SettingsScreen(
             onSelectDefaultVisibilityMode = onSelectDefaultVisibilityMode,
             onToggleConfirmIncomingConnection = onToggleConfirmIncomingConnection,
             onToggleBackgroundConnectionDialog = onToggleBackgroundConnectionDialog,
+            onSelectBackgroundPromptMode = onSelectBackgroundPromptMode,
             onToggleAutoSaveToDownloads = onToggleAutoSaveToDownloads,
             onToggleSoundVibration = onToggleSoundVibration,
             onToggleBleFastDiscovery = onToggleBleFastDiscovery,
             onSelectThemeMode = onSelectThemeMode,
+            onSelectAppLanguage = onSelectAppLanguage,
             onToggleReduceTransparency = onToggleReduceTransparency,
             onToggleLiquidGlass = onToggleLiquidGlass,
             onOpenNfcSettings = onOpenNfcSettings,
@@ -328,10 +344,12 @@ fun SettingsScreen(
                             TransferSecuritySettingsPage(
                                 confirmIncomingConnection = confirmIncomingConnection,
                                 backgroundConnectionDialog = backgroundConnectionDialog,
+                                backgroundPromptMode = backgroundPromptMode,
                                 autoSaveToDownloads = autoSaveToDownloads,
                                 soundVibrationEnabled = soundVibrationEnabled,
                                 onToggleConfirmIncomingConnection = onToggleConfirmIncomingConnection,
                                 onToggleBackgroundConnectionDialog = onToggleBackgroundConnectionDialog,
+                                onSelectBackgroundPromptMode = onSelectBackgroundPromptMode,
                                 onToggleAutoSaveToDownloads = onToggleAutoSaveToDownloads,
                                 onToggleSoundVibration = onToggleSoundVibration,
                                 onBack = closeSubPageByButton,
@@ -341,9 +359,11 @@ fun SettingsScreen(
                         SettingsCategory.APPEARANCE -> {
                             AppearanceSettingsPage(
                                 themeMode = themeMode,
+                                appLanguage = appLanguage,
                                 reduceTransparency = reduceTransparency,
                                 liquidGlassEnabled = liquidGlassEnabled,
                                 onSelectThemeMode = onSelectThemeMode,
+                                onSelectAppLanguage = onSelectAppLanguage,
                                 onToggleReduceTransparency = onToggleReduceTransparency,
                                 onToggleLiquidGlass = onToggleLiquidGlass,
                                 onBack = closeSubPageByButton,
@@ -407,6 +427,7 @@ private fun SettingsHubPage(
     defaultVisibilityMode: DeviceVisibilityMode,
     confirmIncomingConnection: Boolean,
     backgroundConnectionDialog: Boolean,
+    backgroundPromptMode: BackgroundPromptMode,
     autoSaveToDownloads: Boolean,
     soundVibrationEnabled: Boolean,
     bleFastDiscoveryEnabled: Boolean,
@@ -414,6 +435,7 @@ private fun SettingsHubPage(
     isNfcSupported: Boolean,
     isNfcEnabled: Boolean,
     themeMode: AppThemeMode,
+    appLanguage: AppLanguage,
     reduceTransparency: Boolean,
     liquidGlassEnabled: Boolean,
     receivedFilesCount: Int,
@@ -429,10 +451,12 @@ private fun SettingsHubPage(
     onSelectDefaultVisibilityMode: (DeviceVisibilityMode) -> Unit,
     onToggleConfirmIncomingConnection: (Boolean) -> Unit,
     onToggleBackgroundConnectionDialog: (Boolean) -> Unit,
+    onSelectBackgroundPromptMode: (BackgroundPromptMode) -> Unit,
     onToggleAutoSaveToDownloads: (Boolean) -> Unit,
     onToggleSoundVibration: (Boolean) -> Unit,
     onToggleBleFastDiscovery: (Boolean) -> Unit,
     onSelectThemeMode: (AppThemeMode) -> Unit,
+    onSelectAppLanguage: (AppLanguage) -> Unit,
     onToggleReduceTransparency: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onOpenNfcSettings: () -> Unit,
@@ -460,27 +484,30 @@ private fun SettingsHubPage(
 
     val matchAccountCategory = matchesSearch(
         "tài khoản", "thiết bị", "google", "đăng nhập", "đăng xuất", "tên thiết bị",
-        "đồng bộ tên", "account", "device", currentDisplayName, currentUser?.email.orEmpty(),
+        "đồng bộ tên", "account", "device", "sign in", "sync", currentDisplayName, currentUser?.email.orEmpty(),
     )
     val matchVisibilityCategory = matchesSearch(
         "hiển thị", "kết nối", "ẩn", "10 phút", "không giới hạn", "mặc định",
         "bluetooth", "ble", "quét nhanh", "nfc", "chạm", "radar", "wifi direct",
+        "visibility", "connectivity", "hidden", "always", "startup",
     )
     val matchTransferSecurityCategory = matchesSearch(
-        "nhận tệp", "bảo mật", "xác nhận", "hộp thoại", "chạy nền",
+        "nhận tệp", "bảo mật", "xác nhận", "hộp thoại", "chạy nền", "thông báo", "pop-up", "popup",
         "tự lưu", "tải xuống", "âm báo", "rung", "chuông",
+        "receive", "security", "confirm", "background", "notification", "overlay", "auto-save", "sound", "haptics",
     )
     val matchAppearanceCategory = matchesSearch(
-        "giao diện", "chế độ màu", "sáng", "tối", "hệ thống",
-        "liquid glass", "thủy tinh", "trong suốt", "theme", "dark", "light",
+        "giao diện", "ngôn ngữ", "tiếng việt", "tiếng anh", "english", "vietnamese", "language",
+        "chế độ màu", "sáng", "tối", "hệ thống",
+        "liquid glass", "thủy tinh", "trong suốt", "theme", "dark", "light", "appearance", "transparency",
     )
     val matchDataCategory = matchesSearch(
-        "dữ liệu", "tệp đã nhận", "lưu trữ", "dọn", "bộ nhớ tạm", "cache",
-        "xóa thiết bị", "đã lưu", "chạy nền", "pin", manufacturer,
+        "dữ liệu", "bộ nhớ", "tệp đã nhận", "lưu trữ", "dọn", "bộ nhớ tạm", "cache",
+        "xóa thiết bị", "đã lưu", "chạy nền", "pin", "data", "storage", "clear", "battery", manufacturer,
     )
     val matchAboutCategory = matchesSearch(
         "giới thiệu", "thông tin", "phiên bản", "thazh share", "package",
-        "credit", "glasmio", "catbox", "giấy phép", "apache", "license",
+        "credit", "glasmio", "catbox", "giấy phép", "apache", "license", "about", "version",
     )
 
     val hasAnyResult = matchAccountCategory ||
@@ -514,6 +541,11 @@ private fun SettingsHubPage(
         AppThemeMode.SYSTEM -> stringResource(R.string.settings_theme_mode_system)
         AppThemeMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
         AppThemeMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
+    }
+
+    val languageSummary = when (appLanguage) {
+        AppLanguage.VIETNAMESE -> stringResource(R.string.settings_language_vi_short)
+        AppLanguage.ENGLISH -> stringResource(R.string.settings_language_en_short)
     }
 
     val hostBackdrop = LocalGlassBackdrop.current
@@ -667,6 +699,7 @@ private fun SettingsHubPage(
                                         description = stringResource(
                                             R.string.settings_category_appearance_desc,
                                             themeModeSummary,
+                                            languageSummary,
                                         ),
                                         symbol = ThazhSymbols.LiquidGlass,
                                         badgeColor = semantic.accentCyan,
@@ -752,10 +785,12 @@ private fun SettingsHubPage(
                                     TransferSecurityCardContent(
                                         confirmIncomingConnection = confirmIncomingConnection,
                                         backgroundConnectionDialog = backgroundConnectionDialog,
+                                        backgroundPromptMode = backgroundPromptMode,
                                         autoSaveToDownloads = autoSaveToDownloads,
                                         soundVibrationEnabled = soundVibrationEnabled,
                                         onToggleConfirmIncomingConnection = onToggleConfirmIncomingConnection,
                                         onToggleBackgroundConnectionDialog = onToggleBackgroundConnectionDialog,
+                                        onSelectBackgroundPromptMode = onSelectBackgroundPromptMode,
                                         onToggleAutoSaveToDownloads = onToggleAutoSaveToDownloads,
                                         onToggleSoundVibration = onToggleSoundVibration,
                                     )
@@ -768,9 +803,11 @@ private fun SettingsHubPage(
                                 CenteredSettingWidth {
                                     AppearanceCardContent(
                                         themeMode = themeMode,
+                                        appLanguage = appLanguage,
                                         reduceTransparency = reduceTransparency,
                                         liquidGlassEnabled = liquidGlassEnabled,
                                         onSelectThemeMode = onSelectThemeMode,
+                                        onSelectAppLanguage = onSelectAppLanguage,
                                         onToggleReduceTransparency = onToggleReduceTransparency,
                                         onToggleLiquidGlass = onToggleLiquidGlass,
                                     )
@@ -1315,10 +1352,12 @@ private fun VisibilityConnectivityCardContent(
 private fun TransferSecuritySettingsPage(
     confirmIncomingConnection: Boolean,
     backgroundConnectionDialog: Boolean,
+    backgroundPromptMode: BackgroundPromptMode,
     autoSaveToDownloads: Boolean,
     soundVibrationEnabled: Boolean,
     onToggleConfirmIncomingConnection: (Boolean) -> Unit,
     onToggleBackgroundConnectionDialog: (Boolean) -> Unit,
+    onSelectBackgroundPromptMode: (BackgroundPromptMode) -> Unit,
     onToggleAutoSaveToDownloads: (Boolean) -> Unit,
     onToggleSoundVibration: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -1343,10 +1382,12 @@ private fun TransferSecuritySettingsPage(
                 TransferSecurityCardContent(
                     confirmIncomingConnection = confirmIncomingConnection,
                     backgroundConnectionDialog = backgroundConnectionDialog,
+                    backgroundPromptMode = backgroundPromptMode,
                     autoSaveToDownloads = autoSaveToDownloads,
                     soundVibrationEnabled = soundVibrationEnabled,
                     onToggleConfirmIncomingConnection = onToggleConfirmIncomingConnection,
                     onToggleBackgroundConnectionDialog = onToggleBackgroundConnectionDialog,
+                    onSelectBackgroundPromptMode = onSelectBackgroundPromptMode,
                     onToggleAutoSaveToDownloads = onToggleAutoSaveToDownloads,
                     onToggleSoundVibration = onToggleSoundVibration,
                 )
@@ -1359,15 +1400,68 @@ private fun TransferSecuritySettingsPage(
 private fun TransferSecurityCardContent(
     confirmIncomingConnection: Boolean,
     backgroundConnectionDialog: Boolean,
+    backgroundPromptMode: BackgroundPromptMode,
     autoSaveToDownloads: Boolean,
     soundVibrationEnabled: Boolean,
     onToggleConfirmIncomingConnection: (Boolean) -> Unit,
     onToggleBackgroundConnectionDialog: (Boolean) -> Unit,
+    onSelectBackgroundPromptMode: (BackgroundPromptMode) -> Unit,
     onToggleAutoSaveToDownloads: (Boolean) -> Unit,
     onToggleSoundVibration: (Boolean) -> Unit,
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val colors = GlasmioTheme.colors
     val semantic = ThazhTheme.semantic
+
+    var canDrawOverlays by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Settings.canDrawOverlays(context)
+            } else {
+                true
+            },
+        )
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Settings.canDrawOverlays(context)
+                } else {
+                    true
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    fun requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.settings_overlay_permission_toast),
+                Toast.LENGTH_LONG,
+            ).show()
+            runCatching {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${context.packageName}"),
+                ).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }
+        }
+    }
+
+    val bgModeDescription = when (backgroundPromptMode) {
+        BackgroundPromptMode.NOTIFICATION -> stringResource(R.string.settings_bg_mode_notification_desc)
+        BackgroundPromptMode.POPUP -> stringResource(R.string.settings_bg_mode_popup_desc)
+        BackgroundPromptMode.OFF -> stringResource(R.string.settings_bg_mode_off_desc)
+    }
 
     GlasmioGroupedList {
         GlasmioSwitchPreference(
@@ -1385,21 +1479,83 @@ private fun TransferSecurityCardContent(
             modifier = Modifier.testTag("settings_confirm_incoming_toggle"),
         )
 
-        GlasmioSwitchPreference(
+        GlasmioListPreference(
             title = { GlasmioText(stringResource(R.string.settings_background_prompt)) },
-            description = stringResource(R.string.settings_background_prompt_desc),
+            description = bgModeDescription,
+            values = BackgroundPromptMode.entries,
+            selectedValue = backgroundPromptMode,
+            onValueSelected = { mode ->
+                onSelectBackgroundPromptMode(mode)
+                onToggleBackgroundConnectionDialog(mode != BackgroundPromptMode.OFF)
+                if (mode == BackgroundPromptMode.POPUP && !canDrawOverlays) {
+                    requestOverlayPermission()
+                }
+            },
+            valueText = { mode ->
+                when (mode) {
+                    BackgroundPromptMode.NOTIFICATION -> stringResource(R.string.settings_bg_mode_notification)
+                    BackgroundPromptMode.POPUP -> stringResource(R.string.settings_bg_mode_popup)
+                    BackgroundPromptMode.OFF -> stringResource(R.string.settings_bg_mode_off)
+                }
+            },
             icon = {
                 ThazhSquircleIconBox(
-                    symbol = ThazhSymbols.OverlayPrompt,
-                    accentColor = if (confirmIncomingConnection) semantic.accentBlue else colors.secondaryContent,
+                    symbol = when (backgroundPromptMode) {
+                        BackgroundPromptMode.NOTIFICATION -> ThazhSymbols.NotificationsActive
+                        BackgroundPromptMode.POPUP -> ThazhSymbols.OverlayPrompt
+                        BackgroundPromptMode.OFF -> ThazhSymbols.VisibilityOff
+                    },
+                    accentColor = if (confirmIncomingConnection && backgroundPromptMode != BackgroundPromptMode.OFF) {
+                        semantic.accentBlue
+                    } else {
+                        colors.secondaryContent
+                    },
                 )
             },
-            checked = backgroundConnectionDialog && confirmIncomingConnection,
-            onCheckedChange = onToggleBackgroundConnectionDialog,
             isEnabled = confirmIncomingConnection,
             showTopSeparator = true,
             modifier = Modifier.testTag("settings_background_prompt_toggle"),
         )
+
+        if (confirmIncomingConnection && backgroundPromptMode == BackgroundPromptMode.POPUP) {
+            GlasmioPreferenceEntry(
+                title = { GlasmioText(stringResource(R.string.settings_overlay_permission_title)) },
+                description = if (canDrawOverlays) {
+                    stringResource(R.string.settings_overlay_permission_granted)
+                } else {
+                    stringResource(R.string.settings_overlay_permission_missing)
+                },
+                icon = {
+                    ThazhSquircleIconBox(
+                        symbol = if (canDrawOverlays) ThazhSymbols.CheckCircle else ThazhSymbols.OverlayPrompt,
+                        accentColor = if (canDrawOverlays) semantic.accentGreen else semantic.warningOrange,
+                    )
+                },
+                trailingContent = if (!canDrawOverlays) {
+                    {
+                        GlasmioButton(
+                            onClick = { requestOverlayPermission() },
+                            emphasis = GlassEmphasis.Prominent,
+                            navigationSurfaceColor = semantic.warningOrange,
+                            size = GlasmioButtonSize.Small,
+                            modifier = Modifier.testTag("settings_grant_overlay_permission_button"),
+                        ) {
+                            GlasmioText(
+                                text = stringResource(R.string.settings_overlay_permission_action),
+                                style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+                onClick = if (!canDrawOverlays) ({ requestOverlayPermission() }) else null,
+                showTopSeparator = true,
+                modifier = Modifier.testTag("settings_overlay_permission_entry"),
+            )
+        }
 
         GlasmioSwitchPreference(
             title = { GlasmioText(stringResource(R.string.settings_auto_save_downloads)) },
@@ -1434,15 +1590,17 @@ private fun TransferSecurityCardContent(
 }
 
 // ============================================================================
-// 4. GIAO DIỆN SUB-PAGE
+// 4. GIAO DIỆN & NGÔN NGỮ SUB-PAGE
 // ============================================================================
 
 @Composable
 private fun AppearanceSettingsPage(
     themeMode: AppThemeMode,
+    appLanguage: AppLanguage,
     reduceTransparency: Boolean,
     liquidGlassEnabled: Boolean,
     onSelectThemeMode: (AppThemeMode) -> Unit,
+    onSelectAppLanguage: (AppLanguage) -> Unit,
     onToggleReduceTransparency: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -1466,9 +1624,11 @@ private fun AppearanceSettingsPage(
             CenteredSettingWidth {
                 AppearanceCardContent(
                     themeMode = themeMode,
+                    appLanguage = appLanguage,
                     reduceTransparency = reduceTransparency,
                     liquidGlassEnabled = liquidGlassEnabled,
                     onSelectThemeMode = onSelectThemeMode,
+                    onSelectAppLanguage = onSelectAppLanguage,
                     onToggleReduceTransparency = onToggleReduceTransparency,
                     onToggleLiquidGlass = onToggleLiquidGlass,
                 )
@@ -1480,9 +1640,11 @@ private fun AppearanceSettingsPage(
 @Composable
 private fun AppearanceCardContent(
     themeMode: AppThemeMode,
+    appLanguage: AppLanguage,
     reduceTransparency: Boolean,
     liquidGlassEnabled: Boolean,
     onSelectThemeMode: (AppThemeMode) -> Unit,
+    onSelectAppLanguage: (AppLanguage) -> Unit,
     onToggleReduceTransparency: (Boolean) -> Unit,
     onToggleLiquidGlass: (Boolean) -> Unit,
 ) {
@@ -1563,6 +1725,28 @@ private fun AppearanceCardContent(
             },
             showTopSeparator = false,
             modifier = Modifier.testTag("theme_mode_preference"),
+        )
+
+        GlasmioListPreference(
+            title = { GlasmioText(stringResource(R.string.settings_language_title)) },
+            description = stringResource(R.string.settings_language_desc),
+            values = AppLanguage.entries,
+            selectedValue = appLanguage,
+            onValueSelected = onSelectAppLanguage,
+            valueText = { lang ->
+                when (lang) {
+                    AppLanguage.VIETNAMESE -> stringResource(R.string.settings_language_vi)
+                    AppLanguage.ENGLISH -> stringResource(R.string.settings_language_en)
+                }
+            },
+            icon = {
+                ThazhSquircleIconBox(
+                    symbol = ThazhSymbols.Globe,
+                    accentColor = semantic.accentBlue,
+                )
+            },
+            showTopSeparator = true,
+            modifier = Modifier.testTag("settings_language_preference"),
         )
 
         GlasmioSwitchPreference(

@@ -71,6 +71,13 @@ fun ReceiveScreen(
     connectionQuality: ConnectionQuality,
     estimatedDistanceMeters: Int?,
     peers: List<DiscoveredPeer> = emptyList(),
+    localBatteryPercent: Int? = null,
+    localBatteryCharging: Boolean = false,
+    connectedPeerBatteryPercent: Int? = null,
+    connectedPeerCharging: Boolean = false,
+    peerBatteryLevels: Map<String, Pair<Int, Boolean>> = emptyMap(),
+    pendingConnectPeerName: String? = null,
+    hapticsEnabled: Boolean = true,
     transfers: List<TransferItem>,
     isBleSupported: Boolean = true,
     isBleEnabled: Boolean = true,
@@ -81,6 +88,8 @@ fun ReceiveScreen(
     onSelectVisibilityMode: (DeviceVisibilityMode) -> Unit,
     onStartDiscovery: () -> Unit,
     onConnectPeer: (DiscoveredPeer) -> Unit = {},
+    onCancelPendingConnection: (() -> Unit)? = null,
+    onRetryPendingConnection: (() -> Unit)? = null,
     onToggleBleFastDiscovery: (() -> Unit)? = null,
     onOpenNfcSettings: () -> Unit,
     onCancelTransfer: (String) -> Unit,
@@ -184,6 +193,13 @@ fun ReceiveScreen(
                         connectedPeerName = if (isConnected) peerDisplay else null,
                         connectionQuality = connectionQuality,
                         peers = peers,
+                        localBatteryPercent = localBatteryPercent,
+                        localBatteryCharging = localBatteryCharging,
+                        connectedPeerBatteryPercent = connectedPeerBatteryPercent,
+                        connectedPeerCharging = connectedPeerCharging,
+                        peerBatteryLevels = peerBatteryLevels,
+                        pendingConnectPeerName = pendingConnectPeerName,
+                        hapticsEnabled = hapticsEnabled,
                         isBleSupported = isBleSupported,
                         isBleEnabled = isBleEnabled,
                         isNfcSupported = isNfcSupported,
@@ -197,6 +213,8 @@ fun ReceiveScreen(
                             }
                         },
                         onPeerNodeClick = { peer -> onConnectPeer(peer) },
+                        onCancelPendingConnection = onCancelPendingConnection,
+                        onRetryPendingConnection = onRetryPendingConnection,
                         onToggleBleClick = onToggleBleFastDiscovery,
                         onNfcPillClick = onOpenNfcSettings,
                     )
@@ -246,6 +264,7 @@ fun ReceiveScreen(
                         isNfcEnabled = isNfcEnabled,
                         nfcPairingPeerName = nfcPairingPeerName,
                         onOpenNfcSettings = onOpenNfcSettings,
+                        isSendMode = false,
                     )
                 }
             }

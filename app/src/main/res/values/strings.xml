@@ -90,8 +90,8 @@
     <string name="prep_wifi_privacy_note">Không thu thập vị trí của bạn.</string>
 
     <string name="prep_ble_title">Bluetooth gần đây</string>
-    <string name="prep_ble_summary">Phát hiện nhanh và đo khoảng cách.</string>
-    <string name="prep_ble_why_body">Giúp nhận diện thiết bị gần đó tức thì và ước tính khoảng cách theo mét ngay trên màn hình Radar.</string>
+    <string name="prep_ble_summary">Phát hiện nhanh và đo tín hiệu kết nối.</string>
+    <string name="prep_ble_why_body">Giúp nhận diện thiết bị gần đó tức thì và hiển thị chất lượng tín hiệu kết nối ngay trên màn hình Radar.</string>
     <string name="prep_ble_privacy_note">Chỉ hoạt động khi bật hiển thị.</string>
 
     <string name="prep_notif_title">Thông báo</string>
@@ -119,74 +119,91 @@
     <string name="quality_poor">Kém</string>
     <string name="quality_disconnected">Ngắt kết nối</string>
 
-    <!-- Settings -->
+    <!-- Settings (Concise, professional titles) -->
     <string name="settings_title">Cài đặt</string>
-    <string name="settings_search_placeholder">Tìm kiếm cài đặt…</string>
+    <string name="settings_search_placeholder">Tìm cài đặt…</string>
     <string name="settings_search_empty">Không tìm thấy mục cài đặt phù hợp</string>
 
     <string name="settings_section_account_device">Tài khoản &amp; Thiết bị</string>
     <string name="settings_account_title">Tài khoản Google</string>
-    <string name="settings_account_signed_out_desc">Đồng bộ tên thiết bị &amp; lịch sử liên kết</string>
+    <string name="settings_account_signed_out_desc">Đồng bộ tên thiết bị &amp; lịch sử đám mây</string>
     <string name="settings_account_sign_in_short">Đăng nhập</string>
     <string name="settings_display_name">Tên thiết bị</string>
-    <string name="settings_display_name_desc">Hiển thị với thiết bị xung quanh</string>
+    <string name="settings_display_name_desc">Hiển thị trên Radar lân cận</string>
     <string name="settings_display_name_hint">Nhập tên thiết bị</string>
-    <string name="settings_sync_device_name">Đồng bộ tên với tài khoản</string>
-    <string name="settings_sync_device_name_desc">Tự động lưu tên thiết bị theo tài khoản đã đăng nhập</string>
-    <string name="settings_sync_device_name_active_desc">Đang tự động đồng bộ tên thiết bị qua đám mây</string>
-    <string name="settings_use_account_name">Đặt theo tên tài khoản (%1$s)</string>
+    <string name="settings_sync_device_name">Đồng bộ tên</string>
+    <string name="settings_sync_device_name_desc">Lưu tên thiết bị theo tài khoản</string>
+    <string name="settings_sync_device_name_active_desc">Đang tự động đồng bộ qua đám mây</string>
+    <string name="settings_use_account_name">Dùng tên tài khoản (%1$s)</string>
     <string name="settings_use_account_name_toast">Đã đặt tên thiết bị thành %1$s</string>
 
-    <string name="settings_section_visibility">Hiển thị &amp; Kết nối</string>
-    <string name="settings_current_visibility">Trạng thái hiện tại</string>
+    <string name="settings_section_visibility">Kết nối &amp; Hiển thị</string>
+    <string name="settings_current_visibility">Chế độ hiển thị</string>
     <string name="settings_default_visibility">Mặc định khi mở</string>
-    <string name="settings_visibility_footer">Tự động ẩn sau 10 phút ở chế độ tạm thời.</string>
+    <string name="settings_visibility_footer">Chế độ 10 phút sẽ tự động ẩn thiết bị khi hết giờ.</string>
     <string name="settings_ble_fast_discovery">Quét nhanh BLE</string>
-    <string name="settings_ble_fast_discovery_desc">Phát hiện nhanh và đo khoảng cách gần</string>
-    <string name="settings_ble_not_supported">Không hỗ trợ BLE</string>
+    <string name="settings_ble_fast_discovery_desc">Phát hiện tức thì qua Bluetooth LE</string>
+    <string name="settings_ble_not_supported">Thiết bị không hỗ trợ BLE</string>
 
     <string name="settings_section_transfer_security">Nhận tệp &amp; Bảo mật</string>
-    <string name="settings_confirm_incoming">Xác nhận trước khi nhận</string>
-    <string name="settings_confirm_incoming_desc">Hỏi ý kiến khi có thiết bị muốn gửi tệp</string>
+    <string name="settings_confirm_incoming">Xác nhận nhận tệp</string>
+    <string name="settings_confirm_incoming_desc">Hỏi ý kiến trước khi nhận kết nối</string>
     <string name="settings_background_prompt">Hộp thoại khi chạy nền</string>
-    <string name="settings_background_prompt_desc">Hiện yêu cầu nhận tệp khi đang mở ứng dụng khác</string>
-    <string name="settings_auto_save_downloads">Tự lưu vào Tải xuống</string>
+    <string name="settings_background_prompt_desc">Cách thông báo yêu cầu nhận tệp khi chạy nền</string>
+    <string name="settings_bg_mode_notification">Qua thông báo</string>
+    <string name="settings_bg_mode_popup">Qua pop-up</string>
+    <string name="settings_bg_mode_off">Tắt</string>
+    <string name="settings_bg_mode_notification_desc">Hiển thị thông báo kèm nút Chấp nhận / Từ chối</string>
+    <string name="settings_bg_mode_popup_desc">Bật hộp thoại nổi trực tiếp trên ứng dụng khác</string>
+    <string name="settings_bg_mode_off_desc">Không hiển thị thông báo khi đang chạy nền</string>
+    <string name="settings_overlay_permission_title">Quyền hiển thị trên ứng dụng khác</string>
+    <string name="settings_overlay_permission_granted">Đã cấp quyền • Pop-up hoạt động ổn định</string>
+    <string name="settings_overlay_permission_missing">Cần cấp quyền để hiển thị hộp thoại pop-up</string>
+    <string name="settings_overlay_permission_action">Cấp quyền</string>
+    <string name="settings_overlay_permission_toast">Vui lòng bật quyền Hiển thị trên ứng dụng khác cho Thazh Share</string>
+    <string name="settings_auto_save_downloads">Tự lưu Tải xuống</string>
     <string name="settings_auto_save_downloads_desc">Lưu bản sao vào Tải xuống/Thazh Share</string>
-    <string name="settings_sound_vibration">Âm báo &amp; rung</string>
-    <string name="settings_sound_vibration_desc">Báo hiệu khi có kết nối hoặc nhận xong tệp</string>
+    <string name="settings_sound_vibration">Âm báo &amp; Rung</string>
+    <string name="settings_sound_vibration_desc">Phản hồi âm thanh và xúc giác</string>
 
-    <string name="settings_section_appearance">Giao diện</string>
+    <string name="settings_section_appearance">Giao diện &amp; Ngôn ngữ</string>
     <string name="settings_theme_mode">Chế độ màu</string>
     <string name="settings_theme_mode_system">Hệ thống</string>
     <string name="settings_theme_mode_light">Sáng</string>
     <string name="settings_theme_mode_dark">Tối</string>
-    <string name="settings_theme_mode_desc_system">Theo hệ thống</string>
-    <string name="settings_theme_mode_desc_light">Giao diện sáng</string>
-    <string name="settings_theme_mode_desc_dark">Giao diện tối</string>
-    <string name="settings_reduce_transparency">Giảm độ trong suốt</string>
-    <string name="settings_reduce_transparency_desc">Dùng nền đặc dễ nhìn hơn</string>
+    <string name="settings_theme_mode_desc_system">Theo giao diện hệ thống</string>
+    <string name="settings_theme_mode_desc_light">Luôn dùng nền sáng</string>
+    <string name="settings_theme_mode_desc_dark">Luôn dùng nền tối</string>
+    <string name="settings_language_title">Ngôn ngữ</string>
+    <string name="settings_language_desc">Ngôn ngữ hiển thị của ứng dụng</string>
+    <string name="settings_language_vi">Tiếng Việt (Mặc định)</string>
+    <string name="settings_language_en">English (Tiếng Anh)</string>
+    <string name="settings_language_vi_short">Tiếng Việt</string>
+    <string name="settings_language_en_short">English</string>
+    <string name="settings_reduce_transparency">Giảm trong suốt</string>
+    <string name="settings_reduce_transparency_desc">Tăng độ tương phản nền</string>
     <string name="settings_liquid_glass">Hiệu ứng Liquid Glass</string>
-    <string name="settings_liquid_glass_desc">Ống kính thủy tinh lỏng trên thanh điều hướng</string>
+    <string name="settings_liquid_glass_desc">Khúc xạ thủy tinh lỏng thời gian thực</string>
 
     <string name="settings_section_device">Thiết bị</string>
     <string name="settings_section_connectivity">Kết nối</string>
-    <string name="settings_section_storage_about">Dữ liệu &amp; Hệ thống</string>
+    <string name="settings_section_storage_about">Dữ liệu &amp; Bộ nhớ</string>
     <string name="settings_section_system">Hệ thống</string>
-    <string name="settings_received_storage_title">Tệp đã nhận</string>
+    <string name="settings_received_storage_title">Kho tệp đã nhận</string>
     <string name="settings_received_storage_summary">%1$d tệp • %2$s</string>
-    <string name="settings_clear_temp_cache">Dọn bộ nhớ tạm</string>
-    <string name="settings_clear_temp_cache_desc">Xóa tệp tạm truyền dở</string>
+    <string name="settings_clear_temp_cache">Xóa bộ nhớ tạm</string>
+    <string name="settings_clear_temp_cache_desc">Dọn tệp bộ đệm truyền dở</string>
     <string name="settings_clear_temp_cache_done">Đã dọn bộ nhớ tạm</string>
     <string name="settings_clear_saved_devices">Xóa thiết bị đã lưu</string>
     <string name="settings_clear_saved_devices_desc">Đang lưu %1$d thiết bị</string>
     <string name="settings_clear_saved_devices_confirm">Xóa %1$d thiết bị đã lưu?</string>
     <string name="settings_clear_saved_devices_done">Đã xóa thiết bị đã lưu</string>
     <string name="settings_about_title">Thazh Share</string>
-    <string name="settings_about_desc">Phiên bản %1$s • Wi-Fi Direct, BLE, NFC &amp; Cloud Link</string>
+    <string name="settings_about_desc">Phiên bản %1$s • Wi-Fi Direct, BLE, NFC &amp; Cloud</string>
     <string name="settings_save">Lưu</string>
-    <string name="settings_background_optimization">Chạy nền ổn định</string>
-    <string name="settings_background_optimization_desc">Tối ưu pin trên máy %1$s</string>
-    <string name="settings_background_optimization_button">Mở cài đặt</string>
+    <string name="settings_background_optimization">Hoạt động nền</string>
+    <string name="settings_background_optimization_desc">Bỏ giới hạn pin trên máy %1$s</string>
+    <string name="settings_background_optimization_button">Thiết lập</string>
 
     <!-- Saved devices -->
     <string name="saved_device_rename">Đổi tên gợi nhớ</string>
@@ -312,11 +329,18 @@
     <string name="radar_pill_ble_idle">BLE: Tắt</string>
     <string name="radar_pill_nfc_ready">NFC</string>
     <string name="radar_pill_nfc_off">NFC: Tắt</string>
+    <string name="radar_battery_percent">%1$d%%</string>
+    <string name="radar_battery_charging">%1$d%% ⚡</string>
+    <string name="radar_pending_timeout_title">Kết nối đang chờ quá 10 giây</string>
+    <string name="radar_pending_timeout_body">Chưa nhận được phản hồi từ %1$s (%2$d giây). Vui lòng kiểm tra lời mời kết nối trên thiết bị kia hoặc thử lại.</string>
+    <string name="radar_pending_timeout_body_generic">Phiên kết nối đang ở trạng thái chờ (%1$d giây). Hãy kiểm tra lời mời trên thiết bị đích hoặc thử kết nối lại.</string>
+    <string name="radar_pending_timeout_retry">Thử lại</string>
+    <string name="radar_pending_timeout_cancel">Hủy chờ</string>
     <string name="discover_quick_actions_title">Gửi nhanh</string>
-    <string name="discover_quick_actions_subtitle">Chọn tệp trước hoặc tạo liên kết</string>
+    <string name="discover_quick_actions_subtitle">Chọn tệp, ảnh hoặc tạo liên kết ngay</string>
     <string name="discover_quick_link_share">Tạo liên kết</string>
 
-    <!-- Share via Link (Cloud Link + Cloud History) -->
+    <!-- Share via Link (Cloud Link + Cloud History + In-App Browser) -->
     <string name="link_share_title">Liên kết</string>
     <string name="link_share_subtitle">Chia sẻ nhanh qua đám mây</string>
     <string name="link_share_hero_title">Tạo liên kết tải nhanh</string>
@@ -346,19 +370,68 @@
     <string name="link_share_cloud_empty_body">Liên kết tải lên sẽ tự động lưu tại đây.</string>
     <string name="link_share_auth_info_title">Về đồng bộ tài khoản</string>
     <string name="link_share_auth_info_body">• Tạo liên kết chia sẻ không bắt buộc đăng nhập.\n• Đăng nhập Google giúp đồng bộ lịch sử liên kết và tên thiết bị qua Cloud Firestore.</string>
+    <string name="link_share_open_in_app_browser">Duyệt web</string>
+    <string name="link_share_browse_cloud_card_title">Trình duyệt trong ứng dụng</string>
+    <string name="link_share_browse_cloud_card_desc">Mở liên kết đám mây, tải tệp hoặc duyệt trang web ngay trong Thazh Share.</string>
+    <string name="link_share_browse_url_placeholder">Nhập hoặc dán liên kết (https://…)</string>
+    <string name="link_share_browse_go">Mở</string>
 
-    <!-- NFC Tap-to-Connect -->
+    <!-- In-App Web Browser -->
+    <string name="browser_title_default">Duyệt web</string>
+    <string name="browser_url_hint">Nhập địa chỉ web hoặc liên kết đám mây…</string>
+    <string name="browser_action_back">Trang trước</string>
+    <string name="browser_action_forward">Trang sau</string>
+    <string name="browser_action_reload">Tải lại</string>
+    <string name="browser_action_copy_url">Sao chép link</string>
+    <string name="browser_action_open_external">Mở trình duyệt ngoài</string>
+    <string name="browser_action_share">Chia sẻ link</string>
+    <string name="browser_loading">Đang tải trang…</string>
+    <string name="browser_secure_badge">HTTPS Bảo mật</string>
+
+    <!-- In-App File & Photo/Media Picker -->
+    <string name="picker_files_title">Chọn tệp trong ứng dụng</string>
+    <string name="picker_media_title">Chọn ảnh &amp; video</string>
+    <string name="picker_tab_files">Tệp tin</string>
+    <string name="picker_tab_media">Ảnh &amp; Video</string>
+    <string name="picker_search_placeholder">Tìm kiếm tệp hoặc ảnh…</string>
+    <string name="picker_browse_system_files">Duyệt bộ nhớ máy</string>
+    <string name="picker_browse_system_media">Thư viện hệ thống</string>
+    <string name="picker_source_in_app_section">Tệp &amp; phương tiện trên thiết bị</string>
+    <string name="picker_source_staged_section">Đã thêm từ bộ nhớ máy (%1$d)</string>
+    <string name="picker_permission_banner_title">Hiển thị toàn bộ ảnh &amp; tệp trên máy</string>
+    <string name="picker_permission_banner_body">Cấp quyền đọc phương tiện để chọn ảnh, video, âm thanh và tệp trực tiếp ngay trong ứng dụng.</string>
+    <string name="picker_empty_media_title">Không tìm thấy ảnh hoặc video phù hợp</string>
+    <string name="picker_empty_media_body">Làm mới danh sách hoặc kiểm tra bộ lọc tìm kiếm của bạn.</string>
+    <string name="picker_empty_files_title">Không tìm thấy tệp phù hợp</string>
+    <string name="picker_empty_files_body">Làm mới danh sách hoặc chọn danh mục khác ở thanh phía trên.</string>
+    <string name="picker_confirm_selection">Xác nhận (%1$d)</string>
+    <string name="picker_selected_summary">Đã chọn %1$d mục • %2$s</string>
+    <string name="picker_select_all">Chọn tất cả</string>
+    <string name="picker_clear_all">Bỏ chọn</string>
+
+    <!-- Received text file preview & Copy to clipboard -->
+    <string name="received_files_copy_to_clipboard">Sao chép vào clipboard</string>
+    <string name="received_files_text_preview_title">Nội dung văn bản</string>
+    <string name="received_files_text_preview_loading">Đang đọc nội dung văn bản…</string>
+    <string name="received_files_text_preview_empty">Tệp văn bản trống hoặc không thể trích xuất.</string>
+    <string name="received_files_text_copied_toast">Đã sao chép văn bản vào clipboard</string>
+
+    <!-- NFC Tap-to-Connect (Send Reader vs Receive HCE Card roles) -->
     <string name="nfc_service_description">Kết nối nhanh Thazh Share qua NFC</string>
     <string name="nfc_card_title">Chạm NFC</string>
+    <string name="nfc_role_badge_send">Tab Gửi • Đầu đọc NFC</string>
+    <string name="nfc_role_badge_receive">Tab Nhận • Thẻ NFC HCE</string>
     <string name="nfc_card_ready">Chạm lưng hai máy để kết nối tức thì.</string>
+    <string name="nfc_card_ready_send_tab">Đưa lưng máy chạm vào thiết bị đang mở tab Nhận (đã bật NFC) để tự động kết nối Wi-Fi Direct.</string>
+    <string name="nfc_card_ready_receive_tab">Giữ màn hình ở tab Nhận và chạm lưng với thiết bị đang ở tab Gửi để tự động nhận kết nối.</string>
     <string name="nfc_card_connecting">Đang kết nối với %1$s…</string>
-    <string name="nfc_card_disabled">Bật NFC để chạm kết nối nhanh.</string>
+    <string name="nfc_card_disabled">Bật NFC để chạm kết nối nhanh giữa máy Gửi và máy Nhận.</string>
     <string name="nfc_open_settings">Bật NFC</string>
     <string name="nfc_status_ready">Sẵn sàng</string>
-    <string name="nfc_settings_title">Chạm kết nối NFC</string>
-    <string name="nfc_settings_ready_desc">Sẵn sàng chạm hai máy</string>
+    <string name="nfc_settings_title">Kết nối chạm NFC</string>
+    <string name="nfc_settings_ready_desc">Một máy ở tab Gửi, một máy ở tab Nhận rồi chạm lưng vào nhau</string>
     <string name="nfc_settings_disabled_desc">Đang tắt trong hệ thống</string>
-    <string name="nfc_settings_unsupported_desc">Không hỗ trợ NFC</string>
+    <string name="nfc_settings_unsupported_desc">Thiết bị không hỗ trợ NFC</string>
     <string name="nfc_toast_paired">Đã chạm NFC với %1$s…</string>
 
     <!-- Receive tab -->
@@ -376,23 +449,34 @@
     <string name="receive_empty_title">Đang chờ tệp…</string>
     <string name="receive_empty_body">Tệp nhận được sẽ hiển thị tại đây.</string>
 
-    <!-- About App screen -->
+    <!-- About App screen (Redesigned) -->
     <string name="about_app_title">Giới thiệu</string>
     <string name="about_app_tagline">Chia sẻ tệp ngang hàng &amp; đám mây</string>
-    <string name="about_app_section_info">Thông tin ứng dụng</string>
+    <string name="about_app_hero_badge">Chính thức • Bản dựng v%1$s</string>
+    <string name="about_app_quick_copy_info">Sao chép thông tin</string>
+    <string name="about_app_quick_browse_github">Duyệt GitHub</string>
+    <string name="about_app_spec_protocols_title">Giao thức P2P</string>
+    <string name="about_app_spec_protocols_value">Wi-Fi Direct • BLE • NFC</string>
+    <string name="about_app_spec_engine_title">Lõi truyền tải</string>
+    <string name="about_app_spec_engine_value">C++20 NDK • Luồng 512 KB</string>
+    <string name="about_app_spec_ui_title">Thiết kế</string>
+    <string name="about_app_spec_ui_value">Glasmio Liquid Glass</string>
+    <string name="about_app_spec_cloud_title">Đám mây &amp; Web</string>
+    <string name="about_app_spec_cloud_value">QR Link • Trình duyệt tích hợp</string>
+    <string name="about_app_section_info">Thông số kỹ thuật</string>
     <string name="about_app_field_name">Tên ứng dụng</string>
     <string name="about_app_field_package">Package name</string>
     <string name="about_app_field_version">Phiên bản</string>
     <string name="about_app_copied_toast">Đã sao chép: %1$s</string>
-    <string name="about_app_section_intro">Giới thiệu ngắn</string>
-    <string name="about_app_intro_body">Thazh Share là ứng dụng chia sẻ tệp tốc độ cao dành cho Android, kết hợp Wi-Fi Direct, Bluetooth BLE và chạm NFC HCE trên giao diện Radar không gian trực quan mà không cần Internet. Ứng dụng tích hợp tạo liên kết đám mây kèm mã QR, đồng bộ lịch sử và tên thiết bị qua tài khoản Google, cùng thiết kế thủy tinh lỏng Liquid Glass hỗ trợ chế độ Sáng và Tối mượt mà.</string>
-    <string name="about_app_section_credits">Credit &amp; Giấy phép</string>
-    <string name="about_app_credit_glasmio_title">Glasmio</string>
-    <string name="about_app_credit_glasmio_desc">Giao diện Liquid Glass cho Jetpack Compose • NEORUAA</string>
-    <string name="about_app_credit_catbox_title">Catbox.moe</string>
-    <string name="about_app_credit_catbox_desc">API lưu trữ đám mây tạo liên kết chia sẻ nhanh</string>
+    <string name="about_app_section_intro">Tổng quan</string>
+    <string name="about_app_intro_body">Thazh Share là ứng dụng chia sẻ tệp tốc độ cao dành cho Android, kết hợp Wi-Fi Direct, Bluetooth BLE và chạm NFC HCE trên giao diện Radar không gian trực quan mà không cần Internet. Ứng dụng tích hợp bộ chọn tệp &amp; ảnh nội bộ, trình duyệt web đám mây kèm mã QR, đồng bộ qua tài khoản Google và ngôn ngữ thiết kế thủy tinh lỏng Liquid Glass.</string>
+    <string name="about_app_section_credits">Đối tác công nghệ &amp; Giấy phép</string>
+    <string name="about_app_credit_glasmio_title">Glasmio UI Framework</string>
+    <string name="about_app_credit_glasmio_desc">Thư viện Liquid Glass cho Jetpack Compose • NEORUAA</string>
+    <string name="about_app_credit_catbox_title">Catbox.moe Cloud</string>
+    <string name="about_app_credit_catbox_desc">Hạ tầng lưu trữ đám mây tạo liên kết chia sẻ tức thì</string>
     <string name="about_app_section_license">Giấy phép nguồn mở</string>
-    <string name="about_app_license_row_desc">Glasmio • Apache License 2.0 (Chạm để xem)</string>
+    <string name="about_app_license_row_desc">Apache License 2.0 • Chạm để xem toàn văn</string>
     <string name="about_app_license_glasmio_title">Giấy phép nguồn mở</string>
     <string name="about_app_license_glasmio_subtitle">Glasmio — Apache License 2.0 (NEORUAA)</string>
     <string name="about_app_license_github_label">GitHub Glasmio</string>
@@ -400,24 +484,24 @@
     <string name="about_app_license_file_label">Tệp Apache 2.0 (LICENSE)</string>
     <string name="about_app_license_file_url">https://github.com/NEORUAA/Glasmio/blob/main/LICENSE</string>
     <string name="about_app_license_copy_button">Sao chép</string>
-    <string name="about_app_open_github_button">Mở GitHub</string>
-    <string name="about_app_open_license_button">Mở LICENSE</string>
+    <string name="about_app_open_github_button">Duyệt GitHub</string>
+    <string name="about_app_open_license_button">Duyệt LICENSE</string>
 
-    <!-- Settings categories hub -->
-    <string name="settings_categories_header">Danh mục cài đặt</string>
+    <!-- Settings categories hub (Concise, professional) -->
+    <string name="settings_categories_header">Danh mục</string>
     <string name="settings_search_results_header">Kết quả tìm kiếm</string>
-    <string name="settings_category_account_device_title">Tài khoản &amp; thiết bị</string>
+    <string name="settings_category_account_device_title">Tài khoản &amp; Thiết bị</string>
     <string name="settings_category_account_device_desc">%1$s • %2$s</string>
-    <string name="settings_category_visibility_title">Hiển thị &amp; kết nối</string>
+    <string name="settings_category_visibility_title">Kết nối &amp; Hiển thị</string>
     <string name="settings_category_visibility_desc">%1$s • Wi-Fi Direct, BLE, NFC</string>
-    <string name="settings_category_transfer_security_title">Nhận tệp và bảo mật</string>
-    <string name="settings_category_transfer_security_desc">Xác nhận kết nối, chạy nền, tự lưu &amp; âm báo</string>
-    <string name="settings_category_appearance_title">Giao diện</string>
-    <string name="settings_category_appearance_desc">%1$s • Liquid Glass</string>
-    <string name="settings_category_data_title">Dữ liệu</string>
-    <string name="settings_category_data_desc">%1$d tệp (%2$s) • Bộ nhớ tạm &amp; chạy nền</string>
+    <string name="settings_category_transfer_security_title">Nhận tệp &amp; Bảo mật</string>
+    <string name="settings_category_transfer_security_desc">Xác nhận, thông báo/pop-up nền &amp; tự lưu</string>
+    <string name="settings_category_appearance_title">Giao diện &amp; Ngôn ngữ</string>
+    <string name="settings_category_appearance_desc">%1$s • %2$s • Liquid Glass</string>
+    <string name="settings_category_data_title">Dữ liệu &amp; Bộ nhớ</string>
+    <string name="settings_category_data_desc">%1$d tệp (%2$s) • Bộ đệm &amp; hoạt động nền</string>
     <string name="settings_category_about_title">Giới thiệu</string>
-    <string name="settings_category_about_desc">Thazh Share v%1$s • Credit &amp; Giấy phép</string>
+    <string name="settings_category_about_desc">Thazh Share v%1$s • Thông tin &amp; Giấy phép</string>
 
     <!-- Common -->
     <string name="cancel">Hủy</string>

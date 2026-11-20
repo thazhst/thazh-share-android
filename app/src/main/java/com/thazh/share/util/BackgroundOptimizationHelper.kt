@@ -30,16 +30,19 @@ import android.util.Log
 object BackgroundOptimizationHelper {
     private const val TAG = "BackgroundOptHelper"
 
-    enum class Oem { SAMSUNG, OPPO, XIAOMI, OTHER }
+    enum class Oem { GOOGLE_PIXEL, SAMSUNG, OPPO, XIAOMI_REDMI, OTHER }
 
     fun detectOem(): Oem {
         val manufacturer = Build.MANUFACTURER.lowercase()
         val brand = Build.BRAND.lowercase()
+        val model = Build.MODEL.lowercase()
         return when {
+            manufacturer.contains("google") || brand.contains("google") || model.contains("pixel") -> Oem.GOOGLE_PIXEL
             manufacturer.contains("samsung") -> Oem.SAMSUNG
-            manufacturer.contains("oppo") || brand.contains("oppo") -> Oem.OPPO
+            manufacturer.contains("oppo") || brand.contains("oppo") ||
+                brand.contains("realme") || brand.contains("oneplus") -> Oem.OPPO
             manufacturer.contains("xiaomi") || brand.contains("xiaomi") ||
-                brand.contains("redmi") || brand.contains("poco") -> Oem.XIAOMI
+                brand.contains("redmi") || brand.contains("poco") -> Oem.XIAOMI_REDMI
             else -> Oem.OTHER
         }
     }
@@ -72,18 +75,25 @@ object BackgroundOptimizationHelper {
      */
     fun openAutostartSettings(context: Context) {
         val candidates: List<Intent> = when (detectOem()) {
+            Oem.GOOGLE_PIXEL -> emptyList() // Pixel uses standard Android Adaptive Battery / unrestricted battery request
             Oem.SAMSUNG -> listOf(
                 componentIntent("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"),
-                componentIntent("com.samsung.android.sm", "com.samsung.android.sm.ui.battery.BatteryActivity")
+                componentIntent("com.samsung.android.sm", "com.samsung.android.sm.ui.battery.BatteryActivity"),
             )
-            Oem.XIAOMI -> listOf(
+            Oem.XIAOMI_REDMI -> listOf(
                 Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT),
-                componentIntent("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
+                componentIntent("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+                componentIntent("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity").apply {
+                    putExtra("package_name", context.packageName)
+                    putExtra("package_label", "Thazh Share")
+                },
             )
             Oem.OPPO -> listOf(
                 componentIntent("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
                 componentIntent("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
-                componentIntent("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity")
+                componentIntent("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity"),
+                componentIntent("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"),
+                componentIntent("com.oplus.battery", "com.oplus.powermanager.fuelgaue.PowerControlActivity"),
             )
             Oem.OTHER -> emptyList()
         }
@@ -98,9 +108,8 @@ object BackgroundOptimizationHelper {
             }
         }
 
-        // No OEM-specific screen resolved (unrecognized OEM, or the
-        // component changed on this OS version) — fall back to the
-        // standard, always-available path.
+        // No OEM-specific screen resolved (Google Pixel, Redmi A Android Go, or newer OS) —
+        // fall back to the standard, always-available unrestricted battery optimization request.
         requestIgnoreBatteryOptimizations(context)
     }
 

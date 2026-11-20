@@ -3,262 +3,373 @@ package com.thazh.share.network
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
-import android.os.Build
-import android.os.SystemClock
+import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 import java.nio.charset.StandardCharsets
-import java.util.UUID
+import java.security.SecureRandom
 
+/**
+ * Explicit NFC role based on the active tab:
+ * - [SENDER_READER]: Active when the user is on the **Send tab** (`ShareTab.SEND`).
+ *   The device acts as an NFC PCD (Reader Mode via [NfcAdapter.enableReaderMode]) to read
+ *   the Receiver's HCE card, send its own peer info, and initiate the Wi-Fi Direct connection.
+ * - [RECEIVER_CARD_EMULATOR]: Active when the user is on the **Receive tab** (`ShareTab.RECEIVE`)
+ *   or other tabs. Reader mode is disabled so Android routes the NFC field to [com.thazh.share.service.ShareNfcHceService]
+ *   (Host Card Emulation), allowing the Sender to read this device and automatically pair.
+ */
+enum class NfcRole {
+    SENDER_READER,
+    RECEIVER_CARD_EMULATOR,
+}
+
+/**
+ * Data payload exchanged over NFC ISO-DEP (APDU) between two devices:
+ * - Sender (Send tab) operates in Reader Mode (PCD).
+ * - Receiver (Receive tab) operates in Host Card Emulation Mode (HCE).
+ */
 data class NfcPeerPayload(
     val displayName: String,
     val wifiP2pName: String,
     val deviceAddress: String,
-    val nonce: String
-)
+    val nonce: Long,
+    val role: String = "ANY",
+) {
+    fun toJsonBytes(): ByteArray {
+        val obj = JSONObject()
+            .put("v", 2)
+            .put("name", displayName.take(48))
+            .put("p2p", wifiP2pName.take(48))
+            .put("mac", deviceAddress.take(32))
+            .put("n", nonce)
+            .put("role", role)
+        return obj.toString().toByteArray(StandardCharsets.UTF_8)
+    }
 
-data class NfcPeerExchange(
+    companion object {
+        fun fromJsonBytes(bytes: ByteArray): NfcPeerPayload? {
+            if (bytes.isEmpty()) return null
+            return try {
+                val obj = JSONObject(String(bytes, StandardCharsets.UTF_8))
+                val name = obj.optString("name", "").trim()
+                val p2p = obj.optString("p2p", name).trim().ifEmpty { name }
+                val mac = obj.optString("mac", "").trim()
+                val nonce = obj.optLong("n", 0L)
+                val role = obj.optString("role", "ANY").trim()
+                if (name.isEmpty() && p2p.isEmpty() && mac.isEmpty()) return null
+                NfcPeerPayload(
+                    displayName = name.ifEmpty { p2p },
+                    wifiP2pName = p2p.ifEmpty { name },
+                    deviceAddress = mac,
+                    nonce = nonce,
+                    role = role,
+                )
+            } catch (e: Exception) {
+                Log.w("NfcPeerPayload", "Invalid NFC JSON payload: ${e.message}")
+                null
+            }
+        }
+    }
+}
+
+/**
+ * Event emitted when an NFC tap completes a peer payload exchange.
+ * [initiateConnect] is `true` for the Sender device (on the Send tab in Reader Mode)
+ * and `false` for the Receiver device (on the Receive tab in HCE Card Emulation Mode).
+ */
+data class NfcHandshakeEvent(
     val peer: NfcPeerPayload,
-    val initiateConnect: Boolean
+    val initiateConnect: Boolean,
 )
 
 /**
- * Coordinates NFC Tap-to-Connect payloads and bidirectional APDU exchanges
- * between [com.thazh.share.service.ShareNfcHceService] (PICC / card emulation)
- * and foreground [NfcAdapter.enableReaderMode] (PCD / reader).
- *
- * Android Beam was removed in API 34, so HCE + IsoDep ReaderMode provides modern,
- * bi-directional Wi-Fi Direct credential exchange on a single tap across Android 8+.
+ * Process-wide singleton coordinator bridging [NfcConnectionManager] (Reader mode on Send tab),
+ * [com.thazh.share.service.ShareNfcHceService] (HCE Card Emulation on Receive tab), and
+ * [com.thazh.share.service.WifiDirectService].
  */
 object NfcConnectionCoordinator {
-    private const val TAG = "NfcCoordinator"
-    private const val EXCHANGE_DEBOUNCE_MS = 2_500L
-    private const val MAGIC = "THAZH1"
-
-    // Custom proprietary AID "THAZHS" (F0 54 48 41 5A 48 53)
+    /** Custom proprietary ISO-7816-4 Application ID (AID): F0 54 48 41 5A 48 53 48 ("THAZHSH") */
     val AID_BYTES: ByteArray = byteArrayOf(
-        0xF0.toByte(), 0x54, 0x48, 0x41, 0x5A, 0x48, 0x53
+        0xF0.toByte(),
+        0x54,
+        0x48,
+        0x41,
+        0x5A,
+        0x48,
+        0x53,
+        0x48,
     )
 
-    val SELECT_APDU: ByteArray = byteArrayOf(
-        0x00, 0xA4.toByte(), 0x04, 0x00,
-        AID_BYTES.size.toByte(),
-        *AID_BYTES,
-        0x00
-    )
+    val STATUS_OK: ByteArray = byteArrayOf(0x90.toByte(), 0x00.toByte())
+    val STATUS_FAILED: ByteArray = byteArrayOf(0x6F.toByte(), 0x00.toByte())
+    const val INS_EXCHANGE_PEER: Byte = 0xCA.toByte()
 
-    const val CLA_THAZH: Byte = 0x80.toByte()
-    const val INS_EXCHANGE: Byte = 0x10
-
-    val SW_OK: ByteArray = byteArrayOf(0x90.toByte(), 0x00)
-    val SW_UNKNOWN: ByteArray = byteArrayOf(0x6F, 0x00)
-    val SW_INS_NOT_SUPPORTED: ByteArray = byteArrayOf(0x6D, 0x00)
-
-    private val sessionNonce: String = UUID.randomUUID().toString().take(8)
+    private val localNonce: Long = kotlin.math.abs(SecureRandom().nextLong()).coerceAtLeast(1L)
 
     @Volatile
-    private var localDisplayName: String = Build.MODEL?.takeIf { it.isNotBlank() } ?: "Thazh Share"
+    private var localDisplayName: String = android.os.Build.MODEL ?: "Android"
 
     @Volatile
-    private var localWifiP2pName: String = ""
+    private var localWifiP2pName: String = localDisplayName
 
     @Volatile
     private var localDeviceAddress: String = ""
 
     @Volatile
-    private var lastExchangeNonce: String? = null
+    private var lastHandshakePeerKey: String = ""
 
     @Volatile
-    private var lastExchangeElapsedMs: Long = 0L
+    private var lastHandshakeTimestampMs: Long = 0L
 
-    private val _exchanges = MutableSharedFlow<NfcPeerExchange>(extraBufferCapacity = 4)
-    val exchanges: SharedFlow<NfcPeerExchange> = _exchanges.asSharedFlow()
+    private val _currentRole = MutableStateFlow(NfcRole.SENDER_READER)
+    val currentRole: StateFlow<NfcRole> = _currentRole.asStateFlow()
 
-    fun updateLocalIdentity(
-        displayName: String? = null,
-        wifiP2pName: String? = null,
-        deviceAddress: String? = null
-    ) {
-        if (!displayName.isNullOrBlank()) {
-            localDisplayName = sanitizeField(displayName, maxLen = 48)
-        }
-        if (!wifiP2pName.isNullOrBlank()) {
-            localWifiP2pName = sanitizeField(wifiP2pName, maxLen = 48)
-        }
-        if (!deviceAddress.isNullOrBlank()) {
-            localDeviceAddress = sanitizeField(deviceAddress, maxLen = 32)
-        }
-    }
-
-    fun currentPayloadBytes(): ByteArray {
-        val raw = listOf(
-            MAGIC,
-            sanitizeField(localDeviceAddress, 32),
-            sanitizeField(localWifiP2pName, 48),
-            sessionNonce,
-            sanitizeField(localDisplayName, 48)
-        ).joinToString("|")
-        return raw.toByteArray(StandardCharsets.UTF_8)
-    }
-
-    fun buildExchangeCommandApdu(): ByteArray {
-        val payload = currentPayloadBytes()
-        val lc = payload.size.coerceAtMost(240)
-        return ByteArray(5 + lc + 1).apply {
-            this[0] = CLA_THAZH
-            this[1] = INS_EXCHANGE
-            this[2] = 0x00
-            this[3] = 0x00
-            this[4] = lc.toByte()
-            System.arraycopy(payload, 0, this, 5, lc)
-            this[5 + lc] = 0x00
-        }
-    }
-
-    fun parsePayload(bytes: ByteArray): NfcPeerPayload? {
-        if (bytes.isEmpty()) return null
-        val text = runCatching { String(bytes, StandardCharsets.UTF_8) }.getOrNull() ?: return null
-        val parts = text.split('|', limit = 5)
-        if (parts.size < 5 || parts[0] != MAGIC) return null
-        val address = parts[1].trim()
-        val wifiName = parts[2].trim()
-        val nonce = parts[3].trim()
-        val display = parts[4].trim().ifBlank { wifiName.ifBlank { "Thazh Share" } }
-        if (nonce == sessionNonce) return null
-        return NfcPeerPayload(
-            displayName = display,
-            wifiP2pName = wifiName,
-            deviceAddress = address,
-            nonce = nonce
-        )
-    }
-
-    fun onPeerExchanged(payload: NfcPeerPayload, initiateConnect: Boolean) {
-        val now = SystemClock.elapsedRealtime()
-        if (payload.nonce.isNotBlank() &&
-            payload.nonce == lastExchangeNonce &&
-            now - lastExchangeElapsedMs < EXCHANGE_DEBOUNCE_MS
-        ) {
-            return
-        }
-        lastExchangeNonce = payload.nonce
-        lastExchangeElapsedMs = now
-        Log.i(
-            TAG,
-            "NFC exchanged peer='${payload.displayName}' p2p='${payload.wifiP2pName}' mac='${payload.deviceAddress}' initiate=$initiateConnect"
-        )
-        _exchanges.tryEmit(NfcPeerExchange(peer = payload, initiateConnect = initiateConnect))
-    }
+    private val _handshakeEvents = MutableSharedFlow<NfcHandshakeEvent>(extraBufferCapacity = 4)
+    val handshakeEvents: SharedFlow<NfcHandshakeEvent> = _handshakeEvents.asSharedFlow()
+    val exchanges: SharedFlow<NfcHandshakeEvent>
+        get() = handshakeEvents
 
     fun isValidMacAddress(mac: String?): Boolean {
         if (mac.isNullOrBlank()) return false
         val normalized = mac.trim().uppercase()
         if (normalized == "02:00:00:00:00:00" || normalized == "00:00:00:00:00:00") return false
-        return MAC_REGEX.matches(normalized)
+        return normalized.matches(Regex("^([0-9A-F]{2}:){5}[0-9A-F]{2}$"))
     }
 
-    private fun sanitizeField(value: String, maxLen: Int): String {
-        return value.replace('|', ' ').replace('\n', ' ').trim().take(maxLen)
+    fun setRole(role: NfcRole) {
+        _currentRole.value = role
     }
 
-    private val MAC_REGEX = Regex("^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
+    fun updateLocalIdentity(
+        displayName: String? = null,
+        wifiP2pName: String? = null,
+        deviceAddress: String? = null,
+    ) {
+        if (!displayName.isNullOrBlank()) {
+            localDisplayName = displayName.trim()
+        }
+        if (!wifiP2pName.isNullOrBlank()) {
+            localWifiP2pName = wifiP2pName.trim()
+        }
+        if (!deviceAddress.isNullOrBlank() && deviceAddress != "02:00:00:00:00:00") {
+            localDeviceAddress = deviceAddress.trim()
+        }
+    }
+
+    fun buildLocalPayload(role: NfcRole = _currentRole.value): NfcPeerPayload {
+        val display = localDisplayName.ifBlank { android.os.Build.MODEL ?: "Android" }
+        val p2p = localWifiP2pName.ifBlank { display }
+        return NfcPeerPayload(
+            displayName = display,
+            wifiP2pName = p2p,
+            deviceAddress = localDeviceAddress,
+            nonce = localNonce,
+            role = if (role == NfcRole.SENDER_READER) "SEND" else "RECEIVE",
+        )
+    }
+
+    fun onPeerExchanged(peer: NfcPeerPayload, initiateConnect: Boolean) {
+        val now = System.currentTimeMillis()
+        val key = "${peer.deviceAddress}|${peer.wifiP2pName}|${peer.displayName}|$initiateConnect"
+        if (key == lastHandshakePeerKey && now - lastHandshakeTimestampMs < 2_200L) {
+            return
+        }
+        lastHandshakePeerKey = key
+        lastHandshakeTimestampMs = now
+        _handshakeEvents.tryEmit(NfcHandshakeEvent(peer = peer, initiateConnect = initiateConnect))
+    }
+
+    fun buildSelectAidApdu(): ByteArray {
+        val header = byteArrayOf(
+            0x00, // CLA
+            0xA4.toByte(), // INS: SELECT
+            0x04, // P1: Select by AID
+            0x00, // P2
+            AID_BYTES.size.toByte(), // Lc
+        )
+        return header + AID_BYTES + byteArrayOf(0x00) // Le
+    }
+
+    fun buildExchangeApdu(localPayload: NfcPeerPayload): ByteArray {
+        val data = localPayload.toJsonBytes()
+        val lc = data.size.coerceAtMost(240)
+        val header = byteArrayOf(
+            0x80.toByte(), // CLA
+            INS_EXCHANGE_PEER, // INS
+            0x00, // P1
+            0x00, // P2
+            lc.toByte(), // Lc
+        )
+        return header + data.copyOfRange(0, lc) + byteArrayOf(0x00) // Le
+    }
+
+    fun isStatusOk(apduResponse: ByteArray?): Boolean {
+        if (apduResponse == null || apduResponse.size < 2) return false
+        val sw1 = apduResponse[apduResponse.size - 2]
+        val sw2 = apduResponse[apduResponse.size - 1]
+        return sw1 == STATUS_OK[0] && sw2 == STATUS_OK[1]
+    }
+
+    fun extractPayloadFromResponse(apduResponse: ByteArray): ByteArray {
+        if (apduResponse.size <= 2) return ByteArray(0)
+        return apduResponse.copyOfRange(0, apduResponse.size - 2)
+    }
 }
 
-class NfcConnectionManager(private val context: Context) {
-
-    private val nfcAdapter: NfcAdapter?
-        get() = runCatching { NfcAdapter.getDefaultAdapter(context) }.getOrNull()
-
-    fun isSupported(): Boolean {
-        return runCatching {
-            val pm = context.packageManager
-            val hasNfc = pm.hasSystemFeature(PackageManager.FEATURE_NFC)
-            hasNfc && nfcAdapter != null
-        }.getOrDefault(false)
+/**
+ * Manages NFC hardware status and dynamic switching between:
+ * - **Sender Reader Mode (PCD)** when the user is on the **Send tab**: actively polls for the
+ *   other phone's HCE service and initiates the Wi-Fi Direct connection.
+ * - **Receiver HCE Card Mode** when the user is on the **Receive tab**: disables Reader Mode so
+ *   the NFC controller routes incoming RF fields to [com.thazh.share.service.ShareNfcHceService].
+ */
+class NfcConnectionManager(context: Context) {
+    private val appContext = context.applicationContext
+    private val nfcAdapter: NfcAdapter? = try {
+        NfcAdapter.getDefaultAdapter(appContext)
+    } catch (_: Exception) {
+        null
     }
 
+    private val _isNfcEnabled = MutableStateFlow(nfcAdapter?.isEnabled == true)
+    val isNfcEnabled: StateFlow<Boolean> = _isNfcEnabled.asStateFlow()
+
+    @Volatile
+    private var readerModeActive = false
+
+    fun isSupported(): Boolean = nfcAdapter != null
+
     fun isEnabled(): Boolean {
-        return runCatching { nfcAdapter?.isEnabled == true }.getOrDefault(false)
+        val enabled = nfcAdapter?.isEnabled == true
+        _isNfcEnabled.value = enabled
+        return enabled
+    }
+
+    fun refreshState() {
+        _isNfcEnabled.value = nfcAdapter?.isEnabled == true
+    }
+
+    /**
+     * Synchronizes the NFC controller mode with the currently active role:
+     * - [NfcRole.SENDER_READER] (Send tab): enables Reader Mode (PCD) to read the Receive device's HCE card.
+     * - [NfcRole.RECEIVER_CARD_EMULATOR] (Receive tab): disables Reader Mode so this device acts as an HCE Card.
+     */
+    fun applyRoleForActivity(activity: Activity, role: NfcRole) {
+        NfcConnectionCoordinator.setRole(role)
+        refreshState()
+        when (role) {
+            NfcRole.SENDER_READER -> enableForegroundReader(activity)
+            NfcRole.RECEIVER_CARD_EMULATOR -> disableForegroundReader(activity)
+        }
     }
 
     fun enableForegroundReader(activity: Activity) {
         val adapter = nfcAdapter ?: return
-        if (!runCatching { adapter.isEnabled }.getOrDefault(false)) return
-        runCatching {
+        refreshState()
+        if (!adapter.isEnabled) return
+        try {
+            val extras = Bundle().apply {
+                // Balanced presence check delay for Pixel, Oppo, and Xiaomi/Redmi NFC controllers
+                putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 300)
+            }
             adapter.enableReaderMode(
                 activity,
-                readerCallback,
+                { tag -> handleDiscoveredTag(tag) },
                 NfcAdapter.FLAG_READER_NFC_A or
                     NfcAdapter.FLAG_READER_NFC_B or
                     NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
-                null
+                extras,
             )
-        }.onFailure {
-            Log.w(TAG, "enableReaderMode skipped: ${it.message}")
+            readerModeActive = true
+            Log.d(TAG, "NFC Reader Mode ENABLED (Send tab / PCD role)")
+        } catch (e: Exception) {
+            Log.w(TAG, "enableReaderMode failed: ${e.message}")
         }
     }
 
     fun disableForegroundReader(activity: Activity) {
         val adapter = nfcAdapter ?: return
-        runCatching {
-            adapter.disableReaderMode(activity)
-        }.onFailure {
-            Log.w(TAG, "disableReaderMode skipped: ${it.message}")
+        try {
+            if (readerModeActive) {
+                adapter.disableReaderMode(activity)
+                readerModeActive = false
+                Log.d(TAG, "NFC Reader Mode DISABLED -> HCE Card Emulation active (Receive tab)")
+            } else {
+                adapter.disableReaderMode(activity)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "disableReaderMode failed: ${e.message}")
         }
     }
 
     fun openNfcSettings() {
-        runCatching {
-            val intent = Intent(Settings.ACTION_NFC_SETTINGS).apply {
+        val intent = Intent(Settings.ACTION_NFC_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            appContext.startActivity(intent)
+        } catch (_: Exception) {
+            val fallback = Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(intent)
-        }
-    }
-
-    private val readerCallback = object : NfcAdapter.ReaderCallback {
-        override fun onTagDiscovered(tag: Tag?) {
-            if (tag != null) {
-                handleDiscoveredTag(tag)
-            }
+            runCatching { appContext.startActivity(fallback) }
         }
     }
 
     private fun handleDiscoveredTag(tag: Tag) {
         val isoDep = IsoDep.get(tag) ?: return
         try {
-            isoDep.timeout = 2_500
             isoDep.connect()
+            isoDep.timeout = 2_500
 
-            val selectResp = isoDep.transceive(NfcConnectionCoordinator.SELECT_APDU)
-            if (isSuccessSw(selectResp)) {
-                val exchangeResp = isoDep.transceive(NfcConnectionCoordinator.buildExchangeCommandApdu())
-                if (isSuccessSw(exchangeResp) && exchangeResp.size > 2) {
-                    val body = exchangeResp.copyOf(exchangeResp.size - 2)
-                    val peer = NfcConnectionCoordinator.parsePayload(body)
-                    if (peer != null) {
-                        NfcConnectionCoordinator.onPeerExchanged(peer, initiateConnect = true)
-                    }
-                }
+            // Step 1: SELECT Thazh Share HCE AID on the Receiver device
+            val selectResponse = isoDep.transceive(NfcConnectionCoordinator.buildSelectAidApdu())
+            if (!NfcConnectionCoordinator.isStatusOk(selectResponse)) {
+                Log.w(TAG, "SELECT AID rejected by peer HCE")
+                return
             }
+
+            // Step 2: Send our Sender payload and receive the Receiver's payload in one atomic APDU
+            val localPayload = NfcConnectionCoordinator.buildLocalPayload(NfcRole.SENDER_READER)
+            val exchangeResponse = isoDep.transceive(
+                NfcConnectionCoordinator.buildExchangeApdu(localPayload),
+            )
+            if (!NfcConnectionCoordinator.isStatusOk(exchangeResponse)) {
+                Log.w(TAG, "EXCHANGE_PEER failed on peer HCE")
+                return
+            }
+
+            val peerBytes = NfcConnectionCoordinator.extractPayloadFromResponse(exchangeResponse)
+            val peerPayload = NfcPeerPayload.fromJsonBytes(peerBytes)
+                ?: NfcPeerPayload.fromJsonBytes(
+                    NfcConnectionCoordinator.extractPayloadFromResponse(selectResponse),
+                )
+                ?: return
+
+            // Because we are on the Send tab (Reader/PCD), we initiate the Wi-Fi Direct connection!
+            Log.d(
+                TAG,
+                "NFC tap succeeded (Sender -> Receiver)! Connecting to ${peerPayload.displayName} (${peerPayload.wifiP2pName} / ${peerPayload.deviceAddress})",
+            )
+            NfcConnectionCoordinator.onPeerExchanged(
+                peer = peerPayload,
+                initiateConnect = true,
+            )
         } catch (e: Exception) {
-            Log.d(TAG, "NFC reader exchange ended: ${e.message}")
+            Log.w(TAG, "ISO-DEP NFC handshake error: ${e.message}")
         } finally {
             runCatching { isoDep.close() }
         }
-    }
-
-    private fun isSuccessSw(response: ByteArray): Boolean {
-        if (response.size < 2) return false
-        return response[response.size - 2] == 0x90.toByte() &&
-            response[response.size - 1] == 0x00.toByte()
     }
 
     companion object {

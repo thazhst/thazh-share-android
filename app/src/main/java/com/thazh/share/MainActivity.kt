@@ -50,23 +50,31 @@ class MainActivity : ComponentActivity() {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val reduceTransparency by viewModel.reduceTransparency.collectAsStateWithLifecycle()
             val liquidGlassEnabled by viewModel.liquidGlassEnabled.collectAsStateWithLifecycle()
+            val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
             val darkTheme = when (themeMode) {
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
                 AppThemeMode.LIGHT -> false
                 AppThemeMode.DARK -> true
             }
 
-            GlasmioIconProvider(resolver = ThazhIconResolver) {
-                ThazhShareTheme(
-                    darkTheme = darkTheme,
-                    reduceTransparency = reduceTransparency,
-                    liquidGlassEnabled = liquidGlassEnabled,
-                ) {
-                    GlasmioBackdropHost(
-                        modifier = Modifier.fillMaxSize(),
-                        sampledContent = { AmbientGlasmioBackground() },
-                        overlayContent = { AppRoot(viewModel = viewModel) },
-                    )
+            val activeNfcRole by com.thazh.share.network.NfcConnectionCoordinator.currentRole.collectAsStateWithLifecycle()
+            LaunchedEffect(activeNfcRole) {
+                nfcConnectionManager.applyRoleForActivity(this@MainActivity, activeNfcRole)
+            }
+
+            com.thazh.share.util.ProvideAppLanguage(language = appLanguage) {
+                GlasmioIconProvider(resolver = ThazhIconResolver) {
+                    ThazhShareTheme(
+                        darkTheme = darkTheme,
+                        reduceTransparency = reduceTransparency,
+                        liquidGlassEnabled = liquidGlassEnabled,
+                    ) {
+                        GlasmioBackdropHost(
+                            modifier = Modifier.fillMaxSize(),
+                            sampledContent = { AmbientGlasmioBackground() },
+                            overlayContent = { AppRoot(viewModel = viewModel) },
+                        )
+                    }
                 }
             }
         }
@@ -80,7 +88,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshNfcState()
-        nfcConnectionManager.enableForegroundReader(this)
+        nfcConnectionManager.applyRoleForActivity(
+            activity = this,
+            role = com.thazh.share.network.NfcConnectionCoordinator.currentRole.value,
+        )
     }
 
     override fun onPause() {

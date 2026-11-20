@@ -3,8 +3,6 @@ package com.thazh.share.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -12,7 +10,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,11 +18,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -42,14 +42,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +57,7 @@ import com.kyant.capsule.ContinuousRoundedRectangle
 import com.thazh.share.R
 import com.thazh.share.network.NativeCoreEngine
 import com.thazh.share.ui.components.GlasmioText
+import com.thazh.share.ui.components.InAppWebBrowserModal
 import com.thazh.share.ui.components.ThazhAppIconBadge
 import com.thazh.share.ui.components.ThazhSquircleIconBox
 import com.thazh.share.ui.theme.ThazhSymbols
@@ -108,13 +108,15 @@ fun AboutAppScreen(
     }
 
     var showApacheLicenseDialog by rememberSaveable { mutableStateOf(false) }
+    var activeBrowserUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    var activeBrowserTitle by rememberSaveable { mutableStateOf<String?>(null) }
 
     val pulseTransition = rememberInfiniteTransition(label = "about_hero_pulse")
     val haloScaleState = pulseTransition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.04f,
+        initialValue = 0.94f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2600, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 2800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "about_halo_scale",
@@ -127,26 +129,54 @@ fun AboutAppScreen(
             .testTag("about_app_screen"),
         onNavigateBack = onBack,
         navigateBackContentDescription = stringResource(R.string.back),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         backgroundColor = colors.groupedBackground.copy(
             alpha = if (appearance.reduceTransparency) 1f else 0.78f,
         ),
     ) {
-        // 1. Compact Hero Header Card showcasing Apple HIG App Icon
+        // 1. Redesigned Flagship Hero Showcase Card
         item(key = "about_hero_card") {
             CenteredAboutWidth {
                 GlasmioCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            .padding(horizontal = 20.dp, vertical = 22.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        // Top Official Build Pill
+                        Row(
+                            modifier = Modifier
+                                .clip(ContinuousCapsule)
+                                .background(semantic.accentBlue.copy(alpha = if (colors.isDark) 0.22f else 0.13f))
+                                .border(
+                                    width = 0.8.dp,
+                                    color = semantic.accentBlue.copy(alpha = 0.35f),
+                                    shape = ContinuousCapsule,
+                                )
+                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SfIcon(
+                                systemName = ThazhSymbols.LiquidGlass,
+                                contentDescription = null,
+                                tint = semantic.accentBlue,
+                                size = 13.dp,
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            GlasmioText(
+                                text = stringResource(R.string.about_app_hero_badge, versionDisplay),
+                                style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
+                                color = semantic.accentBlue,
+                            )
+                        }
+
+                        // Glowing Radial Aura + Apple HIG App Icon
                         Box(contentAlignment = Alignment.Center) {
                             Box(
                                 modifier = Modifier
-                                    .size(76.dp)
+                                    .size(110.dp)
                                     .graphicsLayer {
                                         val s = haloScaleState.value
                                         scaleX = s
@@ -156,69 +186,190 @@ fun AboutAppScreen(
                                     .background(
                                         Brush.radialGradient(
                                             colors = listOf(
-                                                semantic.accentBlue.copy(alpha = if (colors.isDark) 0.28f else 0.16f),
+                                                semantic.accentBlue.copy(alpha = if (colors.isDark) 0.34f else 0.20f),
+                                                semantic.accentCyan.copy(alpha = if (colors.isDark) 0.16f else 0.08f),
                                                 Color.Transparent,
                                             ),
                                         ),
                                     ),
                             )
                             ThazhAppIconBadge(
-                                size = 62.dp,
-                                cornerRadius = 15.dp,
+                                size = 80.dp,
+                                cornerRadius = 18.dp,
                                 contentDescription = appName,
                             )
                         }
 
+                        // App Title & Tagline
                         Column(
-                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             GlasmioText(
                                 text = appName,
-                                style = GlasmioTheme.textStyles.title3.copy(fontWeight = FontWeight.Bold),
+                                style = GlasmioTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
                                 color = colors.content,
+                                textAlign = TextAlign.Center,
                             )
                             GlasmioText(
                                 text = stringResource(R.string.about_app_tagline),
-                                style = GlasmioTheme.textStyles.footnote,
+                                style = GlasmioTheme.textStyles.subheadline,
                                 color = colors.secondaryContent,
+                                textAlign = TextAlign.Center,
                             )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                        }
+
+                        // Package Name & Version Badges
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(ContinuousCapsule)
+                                    .background(colors.secondaryContent.copy(alpha = if (colors.isDark) 0.16f else 0.09f))
+                                    .clickable(role = Role.Button) {
+                                        copyTextToClipboard(context, "Package name", packageName)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(ContinuousCapsule)
-                                        .background(semantic.accentBlue.copy(alpha = if (colors.isDark) 0.20f else 0.12f))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                                ) {
-                                    GlasmioText(
-                                        text = packageName,
-                                        style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
-                                        color = semantic.accentBlue,
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(ContinuousCapsule)
-                                        .background(semantic.accentCyan.copy(alpha = if (colors.isDark) 0.20f else 0.12f))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                                ) {
-                                    GlasmioText(
-                                        text = "v$versionDisplay",
-                                        style = GlasmioTheme.textStyles.caption2.copy(fontWeight = FontWeight.SemiBold),
-                                        color = semantic.accentCyan,
-                                    )
-                                }
+                                GlasmioText(
+                                    text = packageName,
+                                    style = GlasmioTheme.textStyles.caption1.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    color = colors.content,
+                                )
                             }
+                            Box(
+                                modifier = Modifier
+                                    .clip(ContinuousCapsule)
+                                    .background(semantic.accentGreen.copy(alpha = if (colors.isDark) 0.22f else 0.13f))
+                                    .clickable(role = Role.Button) {
+                                        copyTextToClipboard(context, "Version", versionDisplay)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                            ) {
+                                GlasmioText(
+                                    text = "v$versionDisplay",
+                                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                                    color = semantic.accentGreen,
+                                )
+                            }
+                        }
+
+                        // Quick Action Pills (Copy Build Info & Browse GitHub in In-App Browser)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            AboutQuickActionPill(
+                                label = stringResource(R.string.about_app_quick_copy_info),
+                                symbol = ThazhSymbols.Copy,
+                                accentColor = semantic.accentBlue,
+                                onClick = {
+                                    val summary = "$appName ($packageName) • v$versionDisplay"
+                                    copyTextToClipboard(context, appName, summary)
+                                },
+                                modifier = Modifier.weight(1f),
+                                tag = "about_quick_copy_info_button",
+                            )
+                            AboutQuickActionPill(
+                                label = stringResource(R.string.about_app_quick_browse_github),
+                                symbol = ThazhSymbols.Globe,
+                                accentColor = semantic.accentCyan,
+                                onClick = {
+                                    activeBrowserTitle = "Glasmio GitHub"
+                                    activeBrowserUrl = GLASMIO_GITHUB_URL
+                                },
+                                modifier = Modifier.weight(1f),
+                                tag = "about_quick_browse_github_button",
+                            )
                         }
                     }
                 }
             }
         }
 
-        // 2. Basic App Info (Tên ứng dụng, Package name, Phiên bản)
+        // 2. 2x2 Architecture & Engine Spec Bento Grid
+        item(key = "about_spec_bento_grid") {
+            CenteredAboutWidth {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AboutSpecTile(
+                            title = stringResource(R.string.about_app_spec_protocols_title),
+                            value = stringResource(R.string.about_app_spec_protocols_value),
+                            symbol = ThazhSymbols.WifiTethering,
+                            accentColor = semantic.accentBlue,
+                            modifier = Modifier.weight(1f),
+                        )
+                        AboutSpecTile(
+                            title = stringResource(R.string.about_app_spec_engine_title),
+                            value = stringResource(R.string.about_app_spec_engine_value),
+                            symbol = ThazhSymbols.BatterySaver,
+                            accentColor = semantic.accentGreen,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AboutSpecTile(
+                            title = stringResource(R.string.about_app_spec_ui_title),
+                            value = stringResource(R.string.about_app_spec_ui_value),
+                            symbol = ThazhSymbols.LiquidGlass,
+                            accentColor = semantic.accentCyan,
+                            modifier = Modifier.weight(1f),
+                        )
+                        AboutSpecTile(
+                            title = stringResource(R.string.about_app_spec_cloud_title),
+                            value = stringResource(R.string.about_app_spec_cloud_value),
+                            symbol = ThazhSymbols.Globe,
+                            accentColor = semantic.warningOrange,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. Concise Overview Card
+        item(key = "about_intro_title") {
+            CenteredAboutWidth {
+                GlasmioPreferenceGroupTitle(title = stringResource(R.string.about_app_section_intro))
+            }
+        }
+
+        item(key = "about_intro_card") {
+            CenteredAboutWidth {
+                GlasmioCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("about_app_intro_card"),
+                ) {
+                    GlasmioText(
+                        text = stringResource(R.string.about_app_intro_body),
+                        style = GlasmioTheme.textStyles.subheadline.copy(lineHeight = 21.sp),
+                        color = colors.content,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 15.dp),
+                    )
+                }
+            }
+        }
+
+        // 4. Core Specifications Group (Tên ứng dụng, Package name, Phiên bản, Lõi truyền tải)
         item(key = "about_info_title") {
             CenteredAboutWidth {
                 GlasmioPreferenceGroupTitle(title = stringResource(R.string.about_app_section_info))
@@ -235,6 +386,14 @@ fun AboutAppScreen(
                             ThazhSquircleIconBox(
                                 symbol = ThazhSymbols.SendPaperPlane,
                                 accentColor = semantic.accentBlue,
+                            )
+                        },
+                        trailingContent = {
+                            SfIcon(
+                                systemName = ThazhSymbols.Copy,
+                                contentDescription = null,
+                                tint = colors.tertiaryContent,
+                                size = 16.dp,
                             )
                         },
                         onClick = { copyTextToClipboard(context, appName, appName) },
@@ -288,7 +447,7 @@ fun AboutAppScreen(
 
                     val engineDesc = remember { NativeCoreEngine.engineDescriptor }
                     GlasmioPreferenceEntry(
-                        title = { GlasmioText("Lõi truyền tải & Tín hiệu") },
+                        title = { GlasmioText(stringResource(R.string.about_app_spec_engine_title)) },
                         description = engineDesc,
                         icon = {
                             ThazhSquircleIconBox(
@@ -312,33 +471,7 @@ fun AboutAppScreen(
             }
         }
 
-        // 3. Concise Introduction
-        item(key = "about_intro_title") {
-            CenteredAboutWidth {
-                GlasmioPreferenceGroupTitle(title = stringResource(R.string.about_app_section_intro))
-            }
-        }
-
-        item(key = "about_intro_card") {
-            CenteredAboutWidth {
-                GlasmioCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("about_app_intro_card"),
-                ) {
-                    GlasmioText(
-                        text = stringResource(R.string.about_app_intro_body),
-                        style = GlasmioTheme.textStyles.subheadline.copy(lineHeight = 21.sp),
-                        color = colors.content,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    )
-                }
-            }
-        }
-
-        // 4. Credit & Open Source License Row (tapping opens Apache 2.0 Dialog)
+        // 5. Credits & Open Source License Row (opens in-app browser or Apache 2.0 Dialog)
         item(key = "about_credits_title") {
             CenteredAboutWidth {
                 GlasmioPreferenceGroupTitle(title = stringResource(R.string.about_app_section_credits))
@@ -359,13 +492,16 @@ fun AboutAppScreen(
                         },
                         trailingContent = {
                             SfIcon(
-                                systemName = ThazhSymbols.OpenInNew,
+                                systemName = ThazhSymbols.Globe,
                                 contentDescription = null,
-                                tint = colors.tertiaryContent,
+                                tint = semantic.accentCyan,
                                 size = 18.dp,
                             )
                         },
-                        onClick = { openExternalLink(context, GLASMIO_GITHUB_URL) },
+                        onClick = {
+                            activeBrowserTitle = "Glasmio"
+                            activeBrowserUrl = GLASMIO_GITHUB_URL
+                        },
                         showTopSeparator = false,
                         modifier = Modifier.testTag("about_credit_glasmio_row"),
                     )
@@ -381,13 +517,16 @@ fun AboutAppScreen(
                         },
                         trailingContent = {
                             SfIcon(
-                                systemName = ThazhSymbols.OpenInNew,
+                                systemName = ThazhSymbols.Globe,
                                 contentDescription = null,
-                                tint = colors.tertiaryContent,
+                                tint = semantic.accentBlue,
                                 size = 18.dp,
                             )
                         },
-                        onClick = { openExternalLink(context, CATBOX_URL) },
+                        onClick = {
+                            activeBrowserTitle = "Catbox.moe"
+                            activeBrowserUrl = CATBOX_URL
+                        },
                         showTopSeparator = true,
                         modifier = Modifier.testTag("about_credit_catbox_row"),
                     )
@@ -427,7 +566,11 @@ fun AboutAppScreen(
         buttons = listOf(
             GlasmioAlertButtonSpec(
                 label = stringResource(R.string.about_app_open_github_button),
-                onClick = { openExternalLink(context, GLASMIO_GITHUB_URL) },
+                onClick = {
+                    showApacheLicenseDialog = false
+                    activeBrowserTitle = "Glasmio GitHub"
+                    activeBrowserUrl = GLASMIO_GITHUB_URL
+                },
                 role = GlasmioAlertButtonRole.Default,
             ),
             GlasmioAlertButtonSpec(
@@ -454,7 +597,11 @@ fun AboutAppScreen(
                 label = stringResource(R.string.about_app_license_github_label),
                 url = GLASMIO_GITHUB_URL,
                 accentColor = semantic.accentBlue,
-                onClick = { openExternalLink(context, GLASMIO_GITHUB_URL) },
+                onClick = {
+                    showApacheLicenseDialog = false
+                    activeBrowserTitle = "Glasmio GitHub"
+                    activeBrowserUrl = GLASMIO_GITHUB_URL
+                },
                 onCopy = { copyTextToClipboard(context, "Glasmio GitHub", GLASMIO_GITHUB_URL) },
                 testTag = "about_glasmio_github_link",
             )
@@ -463,7 +610,11 @@ fun AboutAppScreen(
                 label = stringResource(R.string.about_app_license_file_label),
                 url = GLASMIO_LICENSE_URL,
                 accentColor = semantic.accentCyan,
-                onClick = { openExternalLink(context, GLASMIO_LICENSE_URL) },
+                onClick = {
+                    showApacheLicenseDialog = false
+                    activeBrowserTitle = "Apache License 2.0"
+                    activeBrowserUrl = GLASMIO_LICENSE_URL
+                },
                 onCopy = { copyTextToClipboard(context, "Glasmio LICENSE URL", GLASMIO_LICENSE_URL) },
                 testTag = "about_glasmio_license_link",
             )
@@ -486,15 +637,116 @@ fun AboutAppScreen(
                     .horizontalScroll(horizontalScrollState)
                     .testTag("about_attached_apache_license_box"),
             ) {
-            GlasmioText(
-                text = attachedApacheLicenseText,
-                style = GlasmioTheme.textStyles.caption2.copy(
-                    fontFamily = FontFamily.Monospace,
-                    lineHeight = 15.sp,
-                ),
-                color = colors.secondaryContent,
-            )
+                GlasmioText(
+                    text = attachedApacheLicenseText,
+                    style = GlasmioTheme.textStyles.caption2.copy(
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 15.sp,
+                    ),
+                    color = colors.secondaryContent,
+                )
+            }
         }
+    }
+
+    // In-App Web Browser Modal for browsing GitHub, Catbox, or LICENSE directly inside Thazh Share
+    val browserUrl = activeBrowserUrl
+    if (browserUrl != null) {
+        InAppWebBrowserModal(
+            initialUrl = browserUrl,
+            initialTitle = activeBrowserTitle,
+            onDismiss = {
+                activeBrowserUrl = null
+                activeBrowserTitle = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun AboutQuickActionPill(
+    label: String,
+    symbol: String,
+    accentColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tag: String,
+) {
+    val colors = GlasmioTheme.colors
+    val shape = ContinuousRoundedRectangle(14.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(accentColor.copy(alpha = if (colors.isDark) 0.20f else 0.12f))
+            .border(
+                width = 0.8.dp,
+                color = accentColor.copy(alpha = 0.35f),
+                shape = shape,
+            )
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .testTag(tag),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SfIcon(
+            systemName = symbol,
+            contentDescription = null,
+            tint = accentColor,
+            size = 15.dp,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        GlasmioText(
+            text = label,
+            style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+            color = accentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun AboutSpecTile(
+    title: String,
+    value: String,
+    symbol: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val colors = GlasmioTheme.colors
+    GlasmioCard(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ThazhSquircleIconBox(
+                symbol = symbol,
+                accentColor = accentColor,
+                boxSize = 36.dp,
+                iconSize = 18.dp,
+                cornerRadius = 11.dp,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                GlasmioText(
+                    text = title,
+                    style = GlasmioTheme.textStyles.caption2,
+                    color = colors.secondaryContent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                GlasmioText(
+                    text = value,
+                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.content,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -521,7 +773,7 @@ private fun LicenseUrlPill(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SfIcon(
-            systemName = ThazhSymbols.Link,
+            systemName = ThazhSymbols.Globe,
             contentDescription = null,
             tint = accentColor,
             size = 15.dp,
@@ -587,15 +839,6 @@ private fun copyTextToClipboard(context: Context, label: String, value: String) 
         context.getString(R.string.about_app_copied_toast, value.take(48)),
         Toast.LENGTH_SHORT,
     ).show()
-}
-
-private fun openExternalLink(context: Context, url: String) {
-    runCatching {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-    }
 }
 
 private const val FALLBACK_APACHE_2_LICENSE = """Apache License

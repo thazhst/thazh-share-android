@@ -102,6 +102,7 @@ class WifiDirectManager(
         val manager = wifiP2pManager ?: return onResult(false, "Thiết bị không hỗ trợ WiFi Direct")
         if (channel == null) initialize()
         val ch = channel ?: return onResult(false, "Thiết bị không hỗ trợ WiFi Direct")
+        val profile = com.thazh.share.util.DeviceOptimizationManager.getProfile(context)
         try {
             manager.discoverPeers(ch, object : WifiP2pManager.ActionListener {
                 override fun onSuccess() {
@@ -111,7 +112,29 @@ class WifiDirectManager(
 
                 override fun onFailure(reasonCode: Int) {
                     val reason = reasonToString(reasonCode)
-                    Log.w(TAG, "discoverPeers: onFailure $reason")
+                    Log.w(TAG, "discoverPeers: onFailure $reason (tier=${profile.tier})")
+                    if (reasonCode == WifiP2pManager.BUSY) {
+                        android.os.Handler(context.mainLooper).postDelayed(
+                            {
+                                val retryCh = channel ?: run {
+                                    initialize()
+                                    channel
+                                } ?: return@postDelayed
+                                runCatching {
+                                    manager.discoverPeers(retryCh, object : WifiP2pManager.ActionListener {
+                                        override fun onSuccess() {
+                                            Log.d(TAG, "discoverPeers BUSY retry: onSuccess")
+                                        }
+
+                                        override fun onFailure(retryReason: Int) {
+                                            Log.w(TAG, "discoverPeers BUSY retry failed: ${reasonToString(retryReason)}")
+                                        }
+                                    })
+                                }
+                            },
+                            profile.p2pDiscoveryRetryDelayMs,
+                        )
+                    }
                     onResult(false, reason)
                 }
             })

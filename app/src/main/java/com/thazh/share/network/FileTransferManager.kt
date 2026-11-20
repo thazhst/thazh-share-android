@@ -103,8 +103,10 @@ class FileTransferManager(
                 return@withContext false
             }
 
+            val deviceProfile = com.thazh.share.util.DeviceOptimizationManager.getProfile(context)
+            val maxSlabForDevice = minOf(ChunkBufferPool.DEFAULT_SLAB_BYTES, deviceProfile.optimalSocketChunkBytes)
             val adaptiveChunkSize = NativeCoreEngine.recommendChunkSize(fileSizeBytes)
-                .coerceIn(64 * 1024, ChunkBufferPool.DEFAULT_SLAB_BYTES)
+                .coerceIn(64 * 1024, maxSlabForDevice)
             currentSlab = ChunkBufferPool.acquire(adaptiveChunkSize)
             nextSlab = ChunkBufferPool.acquire(adaptiveChunkSize)
 

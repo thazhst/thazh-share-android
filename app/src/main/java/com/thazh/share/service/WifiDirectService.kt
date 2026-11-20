@@ -4,10 +4,13 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -18,6 +21,7 @@ import androidx.core.app.NotificationCompat
 import com.thazh.share.MainActivity
 import com.thazh.share.R
 import com.thazh.share.ShareApplication
+import com.thazh.share.data.BackgroundPromptMode
 import com.thazh.share.data.ConnectionQuality
 import com.thazh.share.data.DeviceVisibilityMode
 import com.thazh.share.data.DiscoveredPeer
@@ -37,7 +41,6 @@ import com.thazh.share.network.FileTransferManager
 import com.thazh.share.network.Frame
 import com.thazh.share.network.NativeCoreEngine
 import com.thazh.share.network.NfcConnectionCoordinator
-import com.thazh.share.network.NfcPeerExchange
 import com.thazh.share.network.P2pConnectionState
 import com.thazh.share.network.PeerConnection
 import com.thazh.share.network.SocketConnectionEvent
@@ -85,6 +88,7 @@ class WifiDirectService : Service() {
     private var bleFastDiscoveryEnabled = true
     private var confirmIncomingConnectionEnabled = true
     private var backgroundConnectionDialogEnabled = true
+    private var backgroundPromptMode = BackgroundPromptMode.NOTIFICATION
     private var autoSaveToDownloadsEnabled = false
     private var soundVibrationEnabled = true
     private var isDiscoveryActive = false
@@ -138,9 +142,34 @@ class WifiDirectService : Service() {
     private val _incomingConnectionRequest = MutableStateFlow<IncomingConnectionRequest?>(null)
     val incomingConnectionRequest: StateFlow<IncomingConnectionRequest?> = _incomingConnectionRequest.asStateFlow()
 
+    private val _localBatteryPercent = MutableStateFlow<Int?>(null)
+    val localBatteryPercent: StateFlow<Int?> = _localBatteryPercent.asStateFlow()
+
+    private val _localBatteryCharging = MutableStateFlow(false)
+    val localBatteryCharging: StateFlow<Boolean> = _localBatteryCharging.asStateFlow()
+
+    private val _connectedPeerBatteryPercent = MutableStateFlow<Int?>(null)
+    val connectedPeerBatteryPercent: StateFlow<Int?> = _connectedPeerBatteryPercent.asStateFlow()
+
+    private val _connectedPeerCharging = MutableStateFlow(false)
+    val connectedPeerCharging: StateFlow<Boolean> = _connectedPeerCharging.asStateFlow()
+
+    private val _peerBatteryLevels = MutableStateFlow<Map<String, Pair<Int, Boolean>>>(emptyMap())
+    val peerBatteryLevels: StateFlow<Map<String, Pair<Int, Boolean>>> = _peerBatteryLevels.asStateFlow()
+
+    private var isBatteryReceiverRegistered = false
+    private val batteryBroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
+                updateLocalBatteryFromIntent(intent)
+            }
+        }
+    }
+
     private data class PendingNfcMatch(
         val displayName: String,
         val wifiP2pName: String,
+        val deviceAddress: String = "",
         val expiresAtElapsedMs: Long,
     )
 
@@ -152,6 +181,7 @@ class WifiDirectService : Service() {
     }
 
     private var pendingNfcMatch: PendingNfcMatch? = null
+    private var nfcTrustedWindowExpiresElapsedMs: Long = 0L
     private var localDisplayName: String = Build.MODEL?.takeIf { it.isNotBlank() } ?: "Thiết bị"
     private var currentGroupOwnerAddress: String? = null
     private var currentDeviceAddress: String? = null
@@ -181,6 +211,7 @@ class WifiDirectService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        registerLocalBatteryMonitor()
         wifiDirectManager = WifiDirectManager(applicationContext)
         wifiDirectManager.initialize()
         observeP2pConnectionState()
@@ -194,6 +225,66 @@ class WifiDirectService : Service() {
             val initialMode = runCatching { app.preferencesRepository.defaultVisibilityMode.first() }
                 .getOrDefault(DeviceVisibilityMode.TEMPORARY_10_MIN)
             setVisibilityMode(initialMode)
+        }
+    }
+
+    private fun registerLocalBatteryMonitor() {
+        runCatching {
+            val bm = applicationContext.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            val initialCapacity = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                ?.takeIf { it in 0..100 }
+            if (initialCapacity != null) {
+                _localBatteryPercent.value = initialCapacity
+            }
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val sticky = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                applicationContext.registerReceiver(batteryBroadcastReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                applicationContext.registerReceiver(batteryBroadcastReceiver, filter)
+            }
+            isBatteryReceiverRegistered = true
+            if (sticky != null) {
+                updateLocalBatteryFromIntent(sticky)
+            }
+        }
+    }
+
+    private fun unregisterLocalBatteryMonitor() {
+        if (!isBatteryReceiverRegistered) return
+        runCatching {
+            applicationContext.unregisterReceiver(batteryBroadcastReceiver)
+        }
+        isBatteryReceiverRegistered = false
+    }
+
+    private fun updateLocalBatteryFromIntent(intent: Intent) {
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        if (level >= 0 && scale > 0) {
+            val pct = ((level * 100f) / scale.toFloat()).toInt().coerceIn(0, 100)
+            _localBatteryPercent.value = pct
+        }
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
+        _localBatteryCharging.value = isCharging
+    }
+
+    private fun recordPeerBatteryTelemetry(
+        peerAddress: String?,
+        batteryPercent: Int?,
+        isCharging: Boolean,
+    ) {
+        val validPct = batteryPercent?.takeIf { it in 0..100 } ?: return
+        _connectedPeerBatteryPercent.value = validPct
+        _connectedPeerCharging.value = isCharging
+        val normalizedAddr = peerAddress?.trim()?.uppercase().orEmpty()
+        if (normalizedAddr.isNotEmpty()) {
+            val currentMap = _peerBatteryLevels.value
+            val previous = currentMap[normalizedAddr]
+            if (previous?.first != validPct || previous.second != isCharging) {
+                _peerBatteryLevels.value = currentMap + (normalizedAddr to (validPct to isCharging))
+            }
         }
     }
 
@@ -236,6 +327,7 @@ class WifiDirectService : Service() {
     }
 
     override fun onDestroy() {
+        unregisterLocalBatteryMonitor()
         ShareQuickSettingsTileService.notifyVisibilityChanged(
             context = applicationContext,
             mode = _visibilityMode.value,
@@ -414,8 +506,9 @@ class WifiDirectService : Service() {
                 }
             }
             launch {
-                app.preferencesRepository.backgroundConnectionDialog.collect { enabled ->
-                    backgroundConnectionDialogEnabled = enabled
+                app.preferencesRepository.backgroundPromptMode.collect { mode ->
+                    backgroundPromptMode = mode
+                    backgroundConnectionDialogEnabled = (mode != BackgroundPromptMode.OFF)
                 }
             }
             launch {
@@ -449,45 +542,74 @@ class WifiDirectService : Service() {
     private fun observeNfcExchanges() {
         nfcExchangeJob?.cancel()
         nfcExchangeJob = serviceScope.launch {
-            NfcConnectionCoordinator.exchanges.collect { exchange ->
+            NfcConnectionCoordinator.handshakeEvents.collect { exchange ->
                 handleNfcPeerExchange(exchange)
             }
         }
     }
 
-    private fun handleNfcPeerExchange(exchange: NfcPeerExchange) {
+    private fun handleNfcPeerExchange(exchange: com.thazh.share.network.NfcHandshakeEvent) {
         val currentP2pState = wifiDirectManager.connectionState.value
         if (currentP2pState is P2pConnectionState.Connected || currentP2pState is P2pConnectionState.Connecting) {
             return
         }
 
+        val nowElapsed = SystemClock.elapsedRealtime()
+        nfcTrustedWindowExpiresElapsedMs = nowElapsed + 30_000L
+
+        // If the Receiver was in HIDDEN mode when the user tapped NFC on the Receive tab,
+        // automatically enable temporary 10-minute visibility so Wi-Fi Direct group formation succeeds.
+        if (_visibilityMode.value == DeviceVisibilityMode.HIDDEN) {
+            setVisibilityMode(DeviceVisibilityMode.TEMPORARY_10_MIN)
+        }
+
         _nfcPairingPeerName.value = exchange.peer.displayName
         nfcTimeoutJob?.cancel()
         nfcTimeoutJob = serviceScope.launch {
-            delay(15_000L)
+            // Re-trigger Wi-Fi Direct discovery every 2.5s while waiting for the peer to appear
+            repeat(6) { step ->
+                if (step > 0 && pendingNfcMatch != null) {
+                    val state = wifiDirectManager.connectionState.value
+                    if (state !is P2pConnectionState.Connected && state !is P2pConnectionState.Connecting) {
+                        wifiDirectManager.startDiscovery { _, _ -> }
+                        tryCompletePendingNfcMatch(_peers.value)
+                    }
+                }
+                delay(2_500L)
+            }
             _nfcPairingPeerName.value = null
             pendingNfcMatch = null
         }
 
         startDiscovery { _, _ -> }
 
+        // Receiver role (Receive tab / HCE Card Emulation): wait for Sender's incoming Wi-Fi Direct invite
         if (!exchange.initiateConnect) {
             return
         }
 
+        // Sender role (Send tab / NFC Reader PCD): register PendingNfcMatch fallback AND attempt direct connect if MAC is valid
         val peerAddress = exchange.peer.deviceAddress
-        if (NfcConnectionCoordinator.isValidMacAddress(peerAddress)) {
-            connectToPeer(peerAddress) { _, _ -> }
-            return
-        }
-
         val match = PendingNfcMatch(
             displayName = exchange.peer.displayName,
             wifiP2pName = exchange.peer.wifiP2pName,
-            expiresAtElapsedMs = SystemClock.elapsedRealtime() + 15_000L,
+            deviceAddress = peerAddress,
+            expiresAtElapsedMs = nowElapsed + 16_000L,
         )
         pendingNfcMatch = match
-        tryCompletePendingNfcMatch(wifiDirectManager.peers.value)
+
+        if (NfcConnectionCoordinator.isValidMacAddress(peerAddress)) {
+            connectToPeer(peerAddress) { ok, _ ->
+                if (ok) {
+                    pendingNfcMatch = null
+                } else {
+                    tryCompletePendingNfcMatch(_peers.value)
+                }
+            }
+            return
+        }
+
+        tryCompletePendingNfcMatch(_peers.value)
     }
 
     private fun tryCompletePendingNfcMatch(availablePeers: List<DiscoveredPeer>) {
@@ -496,37 +618,79 @@ class WifiDirectService : Service() {
             pendingNfcMatch = null
             return
         }
+        val state = wifiDirectManager.connectionState.value
+        if (state is P2pConnectionState.Connected || state is P2pConnectionState.Connecting) {
+            pendingNfcMatch = null
+            return
+        }
+
+        // Only match peers that have a real Wi-Fi P2P address (not BLE-only synthetic MAC unless matched in wifiDirectManager.peers)
+        val wifiPeers = wifiDirectManager.peers.value.ifEmpty { availablePeers }
         val candidates = listOf(match.wifiP2pName, match.displayName)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        val found = availablePeers.firstOrNull { peer ->
+
+        val found = wifiPeers.firstOrNull { peer ->
+            val addrMatch = NfcConnectionCoordinator.isValidMacAddress(match.deviceAddress) &&
+                peer.deviceAddress.equals(match.deviceAddress, ignoreCase = true)
             val pName = peer.deviceName.trim()
-            candidates.any { candidate -> pName.equals(candidate, ignoreCase = true) }
+            val exactNameMatch = candidates.any { candidate -> pName.equals(candidate, ignoreCase = true) }
+            val fuzzyNameMatch = candidates.any { candidate ->
+                candidate.length >= 3 && (
+                    pName.contains(candidate, ignoreCase = true) ||
+                        candidate.contains(pName, ignoreCase = true)
+                    )
+            }
+            addrMatch || exactNameMatch || fuzzyNameMatch
         } ?: return
 
         pendingNfcMatch = null
-        connectToPeer(found.deviceAddress) { _, _ -> }
+        connectToPeer(found.deviceAddress) { ok, _ ->
+            if (!ok) {
+                // Restore match if connect failed immediately (e.g. framework BUSY on ColorOS/MIUI) so the next retry succeeds
+                pendingNfcMatch = match
+            }
+        }
     }
 
     private fun observeMergedPeers() {
         peersJob?.cancel()
         peersJob = serviceScope.launch {
-            combine(wifiDirectManager.peers, bleDiscoveryManager.discoveredBeacons) { wifiPeers, bleBeacons ->
+            combine(
+                wifiDirectManager.peers,
+                bleDiscoveryManager.discoveredBeacons,
+                _peerBatteryLevels,
+                _connectedPeerAddress,
+                _connectedPeerBatteryPercent,
+            ) { wifiPeers, bleBeacons, batteryMap, activePeerAddr, activePeerBattery ->
+                val activeCharging = _connectedPeerCharging.value
                 val enrichedWifi = wifiPeers.map { peer ->
-                    val matchingBeacon = bleBeacons[peer.deviceAddress.uppercase()]
+                    val normalizedAddr = peer.deviceAddress.uppercase()
+                    val matchingBeacon = bleBeacons[normalizedAddr]
                         ?: bleBeacons.values.firstOrNull { beacon ->
                             !beacon.displayName.isNullOrBlank() &&
                                 peer.deviceName.contains(beacon.displayName, ignoreCase = true)
                         }
-                    if (matchingBeacon != null) {
-                        peer.copy(
-                            discoveryTransport = PeerDiscoveryTransport.WIFI_AND_BLE,
-                            rssiDbm = matchingBeacon.rssiDbm,
-                            estimatedDistanceMeters = matchingBeacon.estimatedDistanceMeters,
-                        )
-                    } else {
-                        peer
-                    }
+                    val batteryInfo = batteryMap[normalizedAddr]
+                        ?: if (
+                            (!activePeerAddr.isNullOrBlank() && normalizedAddr == activePeerAddr.uppercase()) ||
+                            peer.status == PeerStatus.CONNECTED
+                        ) {
+                            activePeerBattery?.let { it to activeCharging }
+                        } else {
+                            null
+                        }
+                    peer.copy(
+                        discoveryTransport = if (matchingBeacon != null) {
+                            PeerDiscoveryTransport.WIFI_AND_BLE
+                        } else {
+                            peer.discoveryTransport
+                        },
+                        rssiDbm = matchingBeacon?.rssiDbm ?: peer.rssiDbm,
+                        estimatedDistanceMeters = matchingBeacon?.estimatedDistanceMeters ?: peer.estimatedDistanceMeters,
+                        batteryPercent = batteryInfo?.first ?: peer.batteryPercent,
+                        isCharging = batteryInfo?.second ?: peer.isCharging,
+                    )
                 }
                 val alreadyKnownAddresses = wifiPeers.map { it.deviceAddress.uppercase() }.toSet()
                 val alreadyKnownNames = wifiPeers.map { it.deviceName.lowercase() }.toSet()
@@ -536,6 +700,7 @@ class WifiDirectService : Service() {
                 }.map { beacon ->
                     val label = beacon.displayName?.takeIf { it.isNotBlank() }
                         ?: getString(R.string.ble_nearby_device)
+                    val batteryInfo = batteryMap[beacon.deviceAddress.uppercase()]
                     DiscoveredPeer(
                         deviceName = label,
                         deviceAddress = beacon.deviceAddress,
@@ -543,6 +708,8 @@ class WifiDirectService : Service() {
                         discoveryTransport = PeerDiscoveryTransport.BLE,
                         rssiDbm = beacon.rssiDbm,
                         estimatedDistanceMeters = beacon.estimatedDistanceMeters,
+                        batteryPercent = batteryInfo?.first,
+                        isCharging = batteryInfo?.second ?: false,
                     )
                 }
                 enrichedWifi + bleOnly
@@ -606,14 +773,20 @@ class WifiDirectService : Service() {
             return
         }
 
-        // Reject passive incoming connections if the user deliberately set visibility to Hidden.
-        if (!hasInitiatedOutgoingConnect && _visibilityMode.value == DeviceVisibilityMode.HIDDEN) {
+        val isNfcTrustedSession = SystemClock.elapsedRealtime() <= nfcTrustedWindowExpiresElapsedMs
+        if (isNfcTrustedSession) {
+            nfcTrustedWindowExpiresElapsedMs = 0L
+        }
+
+        // Reject passive incoming connections if the user deliberately set visibility to Hidden (unless just tapped via NFC).
+        if (!hasInitiatedOutgoingConnect && !isNfcTrustedSession && _visibilityMode.value == DeviceVisibilityMode.HIDDEN) {
             Log.i(TAG, "Ignoring incoming P2P connection while device visibility is HIDDEN")
             wifiDirectManager.disconnect()
             return
         }
 
-        val shouldGateIncoming = !hasInitiatedOutgoingConnect && (
+        // Auto-approve when the user physically tapped devices via NFC!
+        val shouldGateIncoming = !hasInitiatedOutgoingConnect && !isNfcTrustedSession && (
             confirmIncomingConnectionEnabled ||
                 (!isUiInForeground && _visibilityMode.value.isVisible && backgroundConnectionDialogEnabled)
             )
@@ -632,7 +805,12 @@ class WifiDirectService : Service() {
         val connection = PeerConnection(serviceScope)
         peerConnection = connection
         fileTransferManager = FileTransferManager(applicationContext, connection, outputDir)
-        connectionMonitor = ConnectionMonitor(connection, serviceScope, wifiManager)
+        connectionMonitor = ConnectionMonitor(
+            connection = connection,
+            scope = serviceScope,
+            wifiManager = wifiManager,
+            localBatteryProvider = { _localBatteryPercent.value to _localBatteryCharging.value },
+        )
 
         observeSocketEvents(connection)
         observeTransferProgress()
@@ -677,12 +855,21 @@ class WifiDirectService : Service() {
                         _isSocketConnected.value = true
                         connectionMonitor?.start()
                         connectionMonitor?.onConnectionStateHint(true)
-                        connection.send(Frame.Hello(localDisplayName, currentDeviceAddress.orEmpty()))
+                        connection.send(
+                            Frame.Hello(
+                                displayName = localDisplayName,
+                                deviceAddress = currentDeviceAddress.orEmpty(),
+                                batteryPercent = _localBatteryPercent.value,
+                                isCharging = _localBatteryCharging.value,
+                            ),
+                        )
                         updateNotification(getString(R.string.notif_connected, _connectedPeerName.value ?: ""))
                     }
 
                     is SocketConnectionEvent.Disconnected -> {
                         _isSocketConnected.value = false
+                        _connectedPeerBatteryPercent.value = null
+                        _connectedPeerCharging.value = false
                         connectionMonitor?.onConnectionStateHint(false)
                         updateNotification(defaultVisibilityNotificationText())
                         if (peerConnection === connection) {
@@ -708,16 +895,22 @@ class WifiDirectService : Service() {
     private fun handleIncomingFrame(frame: Frame) {
         when (frame) {
             is Frame.Hello -> {
+                val resolvedAddr = frame.deviceAddress.ifBlank { currentDeviceAddress.orEmpty() }
                 _connectedPeerName.value = frame.displayName
-                _connectedPeerAddress.value = frame.deviceAddress.ifBlank { currentDeviceAddress }
-                persistSavedDevice(frame.deviceAddress.ifBlank { currentDeviceAddress.orEmpty() }, frame.displayName)
+                _connectedPeerAddress.value = resolvedAddr.ifBlank { currentDeviceAddress }
+                recordPeerBatteryTelemetry(
+                    peerAddress = resolvedAddr,
+                    batteryPercent = frame.batteryPercent,
+                    isCharging = frame.isCharging,
+                )
+                persistSavedDevice(resolvedAddr, frame.displayName)
                 if (_isSocketConnected.value) {
                     updateNotification(getString(R.string.notif_connected, frame.displayName))
                 }
                 if (incomingGateState == IncomingGateState.WAITING_DECISION) {
                     triggerIncomingConnectionPrompt(
                         peerName = frame.displayName.ifBlank { getString(R.string.transfer_unknown_peer) },
-                        peerAddress = frame.deviceAddress.ifBlank { currentDeviceAddress.orEmpty() },
+                        peerAddress = resolvedAddr,
                     )
                 }
             }
@@ -775,11 +968,32 @@ class WifiDirectService : Service() {
                 onTransferAckReceived(transfer, frame)
             }
 
-            is Frame.Ping -> serviceScope.launch {
-                peerConnection?.send(Frame.Pong(frame.sequence, frame.sentAtEpochMs))
+            is Frame.Ping -> {
+                recordPeerBatteryTelemetry(
+                    peerAddress = _connectedPeerAddress.value ?: currentDeviceAddress,
+                    batteryPercent = frame.batteryPercent,
+                    isCharging = frame.isCharging,
+                )
+                serviceScope.launch {
+                    peerConnection?.send(
+                        Frame.Pong(
+                            sequence = frame.sequence,
+                            echoedSentAtEpochMs = frame.sentAtEpochMs,
+                            batteryPercent = _localBatteryPercent.value,
+                            isCharging = _localBatteryCharging.value,
+                        ),
+                    )
+                }
             }
 
-            is Frame.Pong -> connectionMonitor?.onPongReceived(frame)
+            is Frame.Pong -> {
+                recordPeerBatteryTelemetry(
+                    peerAddress = _connectedPeerAddress.value ?: currentDeviceAddress,
+                    batteryPercent = frame.batteryPercent,
+                    isCharging = frame.isCharging,
+                )
+                connectionMonitor?.onPongReceived(frame)
+            }
         }
     }
 
@@ -821,9 +1035,17 @@ class WifiDirectService : Service() {
             }
         }
 
-        if (!isUiInForeground && _visibilityMode.value.isVisible && backgroundConnectionDialogEnabled) {
-            showIncomingConnectionNotification(request, isInitialPrompt = true)
-            launchIncomingConnectionActivity()
+        if (!isUiInForeground && _visibilityMode.value.isVisible) {
+            when (backgroundPromptMode) {
+                BackgroundPromptMode.NOTIFICATION -> {
+                    showIncomingConnectionNotification(request, isInitialPrompt = true, useFullScreenIntent = false)
+                }
+                BackgroundPromptMode.POPUP -> {
+                    showIncomingConnectionNotification(request, isInitialPrompt = true, useFullScreenIntent = true)
+                    launchIncomingConnectionActivity()
+                }
+                BackgroundPromptMode.OFF -> Unit
+            }
         }
     }
 
@@ -1260,6 +1482,8 @@ class WifiDirectService : Service() {
         connectionMonitor = null
         fileTransferManager = null
         _isSocketConnected.value = false
+        _connectedPeerBatteryPercent.value = null
+        _connectedPeerCharging.value = false
         _connectionQuality.value = ConnectionQuality.DISCONNECTED
         _estimatedDistanceMeters.value = null
     }
@@ -1334,6 +1558,7 @@ class WifiDirectService : Service() {
     private fun showIncomingConnectionNotification(
         request: IncomingConnectionRequest,
         isInitialPrompt: Boolean = false,
+        useFullScreenIntent: Boolean = (backgroundPromptMode == BackgroundPromptMode.POPUP),
     ) {
         runCatching {
             val openDialogIntent = PendingIntent.getActivity(
@@ -1372,12 +1597,15 @@ class WifiDirectService : Service() {
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(openDialogIntent)
-                .setFullScreenIntent(openDialogIntent, true)
                 .addAction(0, getString(R.string.incoming_conn_accept), acceptIntent)
                 .addAction(0, getString(R.string.incoming_conn_decline), declineIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(!isInitialPrompt)
                 .setAutoCancel(false)
+
+            if (useFullScreenIntent) {
+                builder.setFullScreenIntent(openDialogIntent, true)
+            }
 
             if (!soundVibrationEnabled) {
                 builder.setSilent(true)
