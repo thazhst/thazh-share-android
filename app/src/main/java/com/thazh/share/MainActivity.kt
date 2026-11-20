@@ -59,7 +59,9 @@ class MainActivity : ComponentActivity() {
 
             val activeNfcRole by com.thazh.share.network.NfcConnectionCoordinator.currentRole.collectAsStateWithLifecycle()
             LaunchedEffect(activeNfcRole) {
-                nfcConnectionManager.applyRoleForActivity(this@MainActivity, activeNfcRole)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    nfcConnectionManager.applyRoleForActivity(this@MainActivity, activeNfcRole)
+                }
             }
 
             com.thazh.share.util.ProvideAppLanguage(language = appLanguage) {
@@ -88,14 +90,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshNfcState()
-        nfcConnectionManager.applyRoleForActivity(
-            activity = this,
-            role = com.thazh.share.network.NfcConnectionCoordinator.currentRole.value,
-        )
     }
 
     override fun onPause() {
-        nfcConnectionManager.disableForegroundReader(this)
         super.onPause()
     }
 

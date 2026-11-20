@@ -110,12 +110,14 @@ class FileTransferManager(
             currentSlab = ChunkBufferPool.acquire(adaptiveChunkSize)
             nextSlab = ChunkBufferPool.acquire(adaptiveChunkSize)
 
+            val progressIntervalMs = if (deviceProfile.isLowRamDevice) 64L else 32L
             BufferedInputStream(rawInput, DISK_IO_BUFFER_BYTES).use { stream ->
                 var current = currentSlab!!
                 var next = nextSlab!!
                 var currentLength = stream.readUpTo(current, adaptiveChunkSize)
                 var chunkIndex = 0
                 var totalSent = 0L
+                var lastProgressEmitMs = 0L
 
                 while (currentLength > 0) {
                     if (cancelledOutgoing.remove(messageId)) {
@@ -140,7 +142,11 @@ class FileTransferManager(
 
                     totalSent += currentLength
                     chunkIndex++
-                    _progressEvents.tryEmit(TransferProgressEvent.Progress(messageId, totalSent, fileSizeBytes))
+                    val nowMs = android.os.SystemClock.elapsedRealtime()
+                    if (isLast || nowMs - lastProgressEmitMs >= progressIntervalMs) {
+                        lastProgressEmitMs = nowMs
+                        _progressEvents.tryEmit(TransferProgressEvent.Progress(messageId, totalSent, fileSizeBytes))
+                    }
 
                     val swap = current
                     current = next

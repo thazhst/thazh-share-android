@@ -59,9 +59,20 @@ class SocketFrameCodec(
     }
 
     /**
-     * Coalesces the [Frame.FileChunkHeader] and its raw file chunk payload into a single
-     * synchronized buffered write, flushing only when [flushImmediately] or [Frame.FileChunkHeader.isLastChunk]
-     * is true. Avoids splitting header and payload across separate TCP packets.
+     * Negative magic marker distinguishing binary-encoded [Frame.FileChunkHeader] frames
+     * from positive-length UTF-8 JSON control frames.
+     */
+    private val binaryChunkHeaderMagic = -0x2b475abd // 0xD4B8A543
+
+    /** Cached messageId UTF-8 bytes so consecutive chunks of the same file do zero String->ByteArray conversions. */
+    private var cachedMessageId: String? = null
+    private var cachedMessageIdBytes: ByteArray = ByteArray(0)
+
+    /**
+     * Coalesces the [Frame.FileChunkHeader] (in compact binary wire format) and its raw file chunk
+     * payload into a single synchronized buffered write, flushing only when [flushImmediately] or
+     * [Frame.FileChunkHeader.isLastChunk] is true. Eliminates per-chunk JSON serialization and
+     * avoids splitting header and payload across separate TCP packets.
      */
     @Synchronized
     @Throws(Exception::class)
@@ -71,9 +82,20 @@ class SocketFrameCodec(
         length: Int,
         flushImmediately: Boolean = true,
     ) {
-        val headerPayload = json.encodeToString<Frame>(header).toByteArray(Charsets.UTF_8)
-        dataOut.writeInt(headerPayload.size)
-        dataOut.write(headerPayload)
+        val idBytes = if (header.messageId == cachedMessageId) {
+            cachedMessageIdBytes
+        } else {
+            header.messageId.toByteArray(Charsets.UTF_8).also {
+                cachedMessageId = header.messageId
+                cachedMessageIdBytes = it
+            }
+        }
+        dataOut.writeInt(binaryChunkHeaderMagic)
+        dataOut.writeShort(idBytes.size)
+        dataOut.write(idBytes)
+        dataOut.writeInt(header.chunkIndex)
+        dataOut.writeInt(header.chunkSizeBytes)
+        dataOut.writeByte(if (header.isLastChunk) 1 else 0)
         dataOut.writeInt(length)
         dataOut.write(bytes, 0, length)
         if (flushImmediately || header.isLastChunk) {
@@ -83,7 +105,26 @@ class SocketFrameCodec(
 
     @Throws(Exception::class)
     fun readFrame(): Frame {
-        val length = dataIn.readInt()
+        val lengthOrMagic = dataIn.readInt()
+        if (lengthOrMagic == binaryChunkHeaderMagic) {
+            val idLen = dataIn.readUnsignedShort()
+            if (idLen <= 0 || idLen > 1024) {
+                throw IllegalStateException("Invalid binary chunk header messageId length: $idLen")
+            }
+            val idBuf = if (idLen <= jsonReadScratch.size) jsonReadScratch else ByteArray(idLen)
+            dataIn.readFully(idBuf, 0, idLen)
+            val messageId = String(idBuf, 0, idLen, Charsets.UTF_8)
+            val chunkIndex = dataIn.readInt()
+            val chunkSizeBytes = dataIn.readInt()
+            val isLastChunk = dataIn.readByte().toInt() != 0
+            return Frame.FileChunkHeader(
+                messageId = messageId,
+                chunkIndex = chunkIndex,
+                chunkSizeBytes = chunkSizeBytes,
+                isLastChunk = isLastChunk,
+            )
+        }
+        val length = lengthOrMagic
         if (length <= 0 || length > maxJsonFrameBytes) {
             throw IllegalStateException("Invalid frame length: $length")
         }

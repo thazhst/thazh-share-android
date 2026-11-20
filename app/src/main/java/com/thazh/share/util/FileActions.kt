@@ -117,7 +117,24 @@ object FileActions {
         val target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return false
         return try {
             val output = resolver.openOutputStream(target) ?: throw IOException("Không mở được tệp đích")
-            output.use { out -> source.inputStream().use { input -> input.copyTo(out) } }
+            output.use { out ->
+                val outChannel = (out as? java.io.FileOutputStream)?.channel
+                if (outChannel != null) {
+                    java.io.FileInputStream(source).channel.use { inChannel ->
+                        var position = 0L
+                        val size = inChannel.size()
+                        while (position < size) {
+                            val transferred = inChannel.transferTo(position, size - position, outChannel)
+                            if (transferred <= 0L) break
+                            position += transferred
+                        }
+                    }
+                } else {
+                    source.inputStream().buffered(SIZE_PROBE_BUFFER_BYTES).use { input ->
+                        input.copyTo(out, SIZE_PROBE_BUFFER_BYTES)
+                    }
+                }
+            }
 
             val done = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
             resolver.update(target, done, null, null)
@@ -134,12 +151,40 @@ object FileActions {
         val folder = File(downloads, EXPORT_FOLDER)
         if (!folder.exists() && !folder.mkdirs()) return false
         val target = FileNameUtils.uniqueFile(folder, name)
-        source.copyTo(target, overwrite = false)
+        java.io.FileInputStream(source).channel.use { inChannel ->
+            java.io.FileOutputStream(target).channel.use { outChannel ->
+                var position = 0L
+                val size = inChannel.size()
+                while (position < size) {
+                    val transferred = inChannel.transferTo(position, size - position, outChannel)
+                    if (transferred <= 0L) break
+                    position += transferred
+                }
+            }
+        }
         MediaScannerConnection.scanFile(context, arrayOf(target.absolutePath), arrayOf(mime), null)
         return true
     }
 
     fun queryPickedFile(context: Context, uri: Uri): PickedFile {
+        // Fast-path O(1) resolution for direct file:// URIs from InAppFileMediaPickerSheet
+        if (uri.scheme == "file") {
+            val filePath = uri.path
+            if (!filePath.isNullOrBlank()) {
+                val localFile = File(filePath)
+                if (localFile.exists()) {
+                    val name = FileNameUtils.sanitize(localFile.name)
+                    val mime = FileNameUtils.guessMimeType(name)
+                    return PickedFile(
+                        uri = uri,
+                        name = name,
+                        sizeBytes = localFile.length().coerceAtLeast(0L),
+                        mimeType = mime,
+                    )
+                }
+            }
+        }
+
         val resolver = context.contentResolver
         var displayName: String? = null
         var reportedSize = 0L

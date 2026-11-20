@@ -139,9 +139,13 @@ class ShareViewModel(application: Application) : AndroidViewModel(application) {
     val pendingConnectPeer: StateFlow<DiscoveredPeer?> = _pendingConnectPeer.asStateFlow()
 
     init {
-        sampleInitialLocalBattery()
-        runCatching {
-            FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
+        viewModelScope.launch(Dispatchers.IO) {
+            sampleInitialLocalBattery()
+        }
+        viewModelScope.launch {
+            runCatching {
+                FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
+            }
         }
     }
 

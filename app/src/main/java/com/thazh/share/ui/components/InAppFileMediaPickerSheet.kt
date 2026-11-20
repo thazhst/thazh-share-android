@@ -3,17 +3,21 @@ package com.thazh.share.ui.components
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +37,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,6 +64,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.kyant.capsule.ContinuousCapsule
@@ -69,6 +78,7 @@ import com.thazh.share.data.ReceivedFile
 import com.thazh.share.ui.theme.ThazhSymbols
 import com.thazh.share.ui.theme.ThazhTheme
 import com.thazh.share.util.FileActions
+import com.thazh.share.util.FileNameUtils
 import com.thazh.share.util.FormatUtils
 import io.github.neoruaa.glasmio.core.GlasmioTheme
 import io.github.neoruaa.glasmio.glass.GlassEmphasis
@@ -91,6 +101,7 @@ import java.io.File
 enum class InAppPickerTab {
     FILES,
     MEDIA,
+    FOLDERS,
 }
 
 private data class SelectablePickerEntry(
@@ -101,7 +112,47 @@ private data class SelectablePickerEntry(
     val mimeType: String,
     val category: FileCategory,
     val modifiedAtEpochSec: Long,
+    val parentFolderName: String = "",
 )
+
+private data class DirectoryNodeEntry(
+    val file: File,
+    val name: String,
+    val isDirectory: Boolean,
+    val sizeBytes: Long,
+    val childCount: Int,
+    val mimeType: String,
+    val category: FileCategory,
+    val modifiedAtEpochSec: Long,
+)
+
+/**
+ * Checks whether the application holds full **"Truy cập vào mọi tệp" (All Files Access)** on the device:
+ * - On Android 11+ (API 30+): [Environment.isExternalStorageManager] (`MANAGE_EXTERNAL_STORAGE`)
+ * - On Android 10 and below: `READ_EXTERNAL_STORAGE`
+ */
+private fun hasAllFilesAccessPermission(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        Environment.isExternalStorageManager()
+    } else {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
+private fun hasAnyMediaCatalogPermission(context: Context): Boolean {
+    if (hasAllFilesAccessPermission(context)) return true
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val img = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        val vid = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+        val aud = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+        img || vid || aud
+    } else {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    }
+}
 
 private fun requiredMediaCatalogPermissions(): Array<String> {
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -115,84 +166,165 @@ private fun requiredMediaCatalogPermissions(): Array<String> {
     }
 }
 
-private fun hasAnyMediaCatalogPermission(context: Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val img = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
-        val vid = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
-        val aud = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
-        img || vid || aud
+private fun buildManageAllFilesAccessIntent(context: Context): Intent {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        Intent(
+            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+            Uri.parse("package:${context.packageName}"),
+        )
     } else {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:${context.packageName}"),
+        )
     }
 }
 
+@Suppress("DEPRECATION")
+private fun resolveStorageRootDir(context: Context): File {
+    val extRoot = runCatching { Environment.getExternalStorageDirectory() }.getOrNull()
+    if (extRoot != null && extRoot.exists()) return extRoot
+    return File(context.filesDir, "share_files").apply { mkdirs() }
+}
+
 /**
- * Queries on-device media, documents, downloads, archives, APKs, and in-app received files
- * directly inside the application so the user can pick files and photos in-app without
- * redirecting to an external system picker activity.
+ * Loads files inside a specific directory for the in-app folder explorer (`InAppPickerTab.FOLDERS`).
  */
+private fun listDirectoryNodes(directory: File): List<DirectoryNodeEntry> {
+    val children = runCatching { directory.listFiles() }.getOrNull() ?: return emptyList()
+    return children
+        .filter { !it.name.startsWith(".") && (it.isDirectory || it.length() > 0L) }
+        .map { child ->
+            if (child.isDirectory) {
+                val subCount = runCatching {
+                    child.list()?.count { !it.startsWith(".") } ?: 0
+                }.getOrDefault(0)
+                DirectoryNodeEntry(
+                    file = child,
+                    name = child.name,
+                    isDirectory = true,
+                    sizeBytes = 0L,
+                    childCount = subCount,
+                    mimeType = "resource/folder",
+                    category = FileCategory.OTHER,
+                    modifiedAtEpochSec = child.lastModified() / 1000L,
+                )
+            } else {
+                val mime = FileNameUtils.guessMimeType(child.name)
+                DirectoryNodeEntry(
+                    file = child,
+                    name = child.name,
+                    isDirectory = false,
+                    sizeBytes = child.length(),
+                    childCount = 0,
+                    mimeType = mime,
+                    category = FileCategory.from(mime, child.name),
+                    modifiedAtEpochSec = child.lastModified() / 1000L,
+                )
+            }
+        }
+        .sortedWith(
+            compareByDescending<DirectoryNodeEntry> { it.isDirectory }
+                .thenBy { it.name.lowercase() },
+        )
+}
+
+/**
+ * Recursively walks primary user folders on external storage when "All files access"
+ * (`MANAGE_EXTERNAL_STORAGE`) is granted, combined with `MediaStore` and in-app received files,
+ * so every document, APK, ZIP, PDF, TXT, audio, photo, and video on the device is displayed in-app.
+ */
+@Suppress("DEPRECATION")
 private fun loadOnDeviceCatalogEntries(
     context: Context,
     inAppReceivedFiles: List<ReceivedFile>,
 ): List<SelectablePickerEntry> {
-    val entriesMap = LinkedHashMap<String, SelectablePickerEntry>()
+    val entriesMap = LinkedHashMap<String, SelectablePickerEntry>(256)
+    val canonicalSeenPaths = HashSet<String>(256)
+
+    fun putFileEntry(file: File, overrideCategory: FileCategory? = null, overrideMime: String? = null) {
+        if (!file.isFile || file.length() <= 0L || file.name.startsWith(".")) return
+        val absPath = file.absolutePath
+        if (!canonicalSeenPaths.add(absPath)) return
+        val uri = Uri.fromFile(file)
+        val key = uri.toString()
+        val mime = overrideMime?.takeIf { it.isNotBlank() } ?: FileNameUtils.guessMimeType(file.name)
+        val category = overrideCategory ?: FileCategory.from(mime, file.name)
+        entriesMap[key] = SelectablePickerEntry(
+            key = key,
+            uri = uri,
+            name = file.name,
+            sizeBytes = file.length(),
+            mimeType = mime,
+            category = category,
+            modifiedAtEpochSec = file.lastModified() / 1000L,
+            parentFolderName = file.parentFile?.name.orEmpty(),
+        )
+    }
 
     // 1. In-app received files on disk
     inAppReceivedFiles.forEach { rf ->
         val f = File(rf.filePath)
         if (f.isFile && f.length() > 0L) {
-            val uri = Uri.fromFile(f)
-            val key = uri.toString()
-            entriesMap[key] = SelectablePickerEntry(
-                key = key,
-                uri = uri,
-                name = rf.fileName,
-                sizeBytes = f.length().coerceAtLeast(rf.sizeBytes),
-                mimeType = rf.mimeType,
-                category = rf.category,
-                modifiedAtEpochSec = (rf.receivedAtEpochMs / 1000L).coerceAtLeast(f.lastModified() / 1000L),
-            )
+            putFileEntry(f, overrideCategory = rf.category, overrideMime = rf.mimeType)
         }
     }
 
-    // 2. App-owned directories & public Downloads/Documents directories accessible via File API
-    val candidateFolders = buildList {
-        add(File(context.filesDir, "share_files"))
-        context.getExternalFilesDir(null)?.let { add(it) }
-        runCatching {
-            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
-            add(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Thazh Share"))
-            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS))
-            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES))
-            add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM))
+    // 2. App-owned share_files directory
+    val appShareDir = File(context.filesDir, "share_files")
+    runCatching {
+        if (appShareDir.isDirectory && appShareDir.canRead()) {
+            appShareDir.listFiles()?.take(80)?.forEach { f -> putFileEntry(f) }
         }
     }
-    candidateFolders.forEach { folder ->
-        runCatching {
-            if (folder.isDirectory && folder.canRead()) {
-                folder.listFiles()?.take(80)?.forEach { f ->
-                    if (f.isFile && f.length() > 0L && !f.name.startsWith(".")) {
-                        val uri = Uri.fromFile(f)
-                        val key = uri.toString()
-                        if (!entriesMap.containsKey(key)) {
-                            val mime = com.thazh.share.util.FileNameUtils.guessMimeType(f.name)
-                            entriesMap[key] = SelectablePickerEntry(
-                                key = key,
-                                uri = uri,
-                                name = f.name,
-                                sizeBytes = f.length(),
-                                mimeType = mime,
-                                category = FileCategory.from(mime, f.name),
-                                modifiedAtEpochSec = f.lastModified() / 1000L,
-                            )
-                        }
+
+    // 3. When All Files Access (MANAGE_EXTERNAL_STORAGE) or storage permission is granted,
+    // traverse real device storage directories directly (Download, Documents, DCIM, Pictures, Music, Movies, Root)
+    if (hasAllFilesAccessPermission(context)) {
+        val extRoot = runCatching { Environment.getExternalStorageDirectory() }.getOrNull()
+        val targetDirs = buildList {
+            if (extRoot != null && extRoot.isDirectory) {
+                add(extRoot to 1) // Top-level files in /storage/emulated/0
+            }
+            runCatching {
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) to 3)
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) to 3)
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) to 2)
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) to 2)
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC) to 2)
+                add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) to 2)
+            }
+        }
+
+        var scannedFilesCount = 0
+        val maxScannedFiles = 360
+
+        fun scanDirRecursive(dir: File, depthRemaining: Int) {
+            if (scannedFilesCount >= maxScannedFiles || depthRemaining < 0) return
+            val children = runCatching { dir.listFiles() }.getOrNull() ?: return
+            for (child in children) {
+                if (scannedFilesCount >= maxScannedFiles) break
+                val name = child.name
+                if (name.startsWith(".") || name.equals("Android", ignoreCase = true)) continue
+                if (child.isFile) {
+                    if (child.length() > 0L) {
+                        putFileEntry(child)
+                        scannedFilesCount++
                     }
+                } else if (child.isDirectory && depthRemaining > 0) {
+                    scanDirRecursive(child, depthRemaining - 1)
                 }
+            }
+        }
+
+        for ((dir, maxDepth) in targetDirs) {
+            if (dir.isDirectory && dir.canRead()) {
+                scanDirRecursive(dir, maxDepth)
             }
         }
     }
 
-    // 3. MediaStore queries (Photos, Videos, Audio, Downloads, and General Files)
+    // 4. MediaStore queries (Photos, Videos, Audio, Downloads, and External Files table)
     val resolver = context.contentResolver
     val projection = arrayOf(
         MediaStore.MediaColumns._ID,
@@ -200,6 +332,7 @@ private fun loadOnDeviceCatalogEntries(
         MediaStore.MediaColumns.SIZE,
         MediaStore.MediaColumns.MIME_TYPE,
         MediaStore.MediaColumns.DATE_MODIFIED,
+        MediaStore.MediaColumns.DATA,
     )
     val sortOrder = "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
 
@@ -217,6 +350,7 @@ private fun loadOnDeviceCatalogEntries(
                 val sizeCol = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
                 val mimeCol = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
                 val dateCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
+                val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
 
                 var count = 0
                 while (cursor.moveToNext() && count < limit) {
@@ -225,15 +359,24 @@ private fun loadOnDeviceCatalogEntries(
                     val size = if (sizeCol >= 0) cursor.getLong(sizeCol) else 0L
                     if (size <= 0L || rawName.isNullOrBlank() || rawName.startsWith(".")) continue
 
+                    val diskPath = if (dataCol >= 0) cursor.getString(dataCol) else null
+                    if (!diskPath.isNullOrBlank() && canonicalSeenPaths.contains(diskPath)) {
+                        continue
+                    }
+
                     val rawMime = if (mimeCol >= 0) cursor.getString(mimeCol) else null
                     val mime = rawMime?.takeIf { it.isNotBlank() }
                         ?: defaultMimePrefix
-                        ?: com.thazh.share.util.FileNameUtils.guessMimeType(rawName)
+                        ?: FileNameUtils.guessMimeType(rawName)
                     val modifiedSec = if (dateCol >= 0) cursor.getLong(dateCol) else 0L
+                    val parentFolder = diskPath?.let { File(it).parentFile?.name }.orEmpty()
 
                     val contentUri = ContentUris.withAppendedId(collectionUri, id)
                     val key = contentUri.toString()
                     if (!entriesMap.containsKey(key)) {
+                        if (!diskPath.isNullOrBlank()) {
+                            canonicalSeenPaths.add(diskPath)
+                        }
                         entriesMap[key] = SelectablePickerEntry(
                             key = key,
                             uri = contentUri,
@@ -242,6 +385,7 @@ private fun loadOnDeviceCatalogEntries(
                             mimeType = mime,
                             category = FileCategory.from(mime, rawName),
                             modifiedAtEpochSec = modifiedSec,
+                            parentFolderName = parentFolder,
                         )
                         count++
                     }
@@ -250,13 +394,17 @@ private fun loadOnDeviceCatalogEntries(
         }
     }
 
-    queryCollection(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*", limit = 120)
-    queryCollection(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video/*", limit = 80)
-    queryCollection(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, "audio/*", limit = 80)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        queryCollection(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null, limit = 100)
+    if (hasAnyMediaCatalogPermission(context)) {
+        queryCollection(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*", limit = 100)
+        queryCollection(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video/*", limit = 60)
+        queryCollection(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, "audio/*", limit = 60)
     }
-    queryCollection(MediaStore.Files.getContentUri("external"), null, limit = 140)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        queryCollection(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null, limit = 80)
+    }
+    if (hasAllFilesAccessPermission(context)) {
+        queryCollection(MediaStore.Files.getContentUri("external"), null, limit = 140)
+    }
 
     return entriesMap.values.sortedByDescending { it.modifiedAtEpochSec }
 }
@@ -272,6 +420,7 @@ fun InAppFileMediaPickerSheet(
     if (!visible) return
 
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val colors = GlasmioTheme.colors
     val semantic = ThazhTheme.semantic
     val scope = rememberCoroutineScope()
@@ -282,33 +431,77 @@ fun InAppFileMediaPickerSheet(
     var selectedCategory by remember { mutableStateOf<FileCategory?>(null) }
 
     var catalogRefreshTick by remember { mutableIntStateOf(0) }
+    var hasAllFilesAccess by remember {
+        mutableStateOf(hasAllFilesAccessPermission(context))
+    }
     var hasMediaPermission by remember {
         mutableStateOf(hasAnyMediaCatalogPermission(context))
     }
+
     var isLoadingCatalog by remember { mutableStateOf(true) }
     var deviceCatalogEntries by remember { mutableStateOf<List<SelectablePickerEntry>>(emptyList()) }
+
+    // Direct in-app Folder Browser state (for InAppPickerTab.FOLDERS)
+    val storageRootDir = remember(context, hasAllFilesAccess) {
+        resolveStorageRootDir(context)
+    }
+    var currentFolder by remember(storageRootDir) { mutableStateOf(storageRootDir) }
+    var currentFolderNodes by remember { mutableStateOf<List<DirectoryNodeEntry>>(emptyList()) }
+    var isLoadingFolder by remember { mutableStateOf(false) }
 
     val stagedSystemEntries = remember { mutableStateListOf<SelectablePickerEntry>() }
     val selectedKeys = remember { mutableStateListOf<String>() }
 
-    val mediaPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-    ) { _ ->
+    // Re-check All Files Access when user returns from Settings (ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+    val allFilesSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        hasAllFilesAccess = hasAllFilesAccessPermission(context)
         hasMediaPermission = hasAnyMediaCatalogPermission(context)
         catalogRefreshTick++
     }
 
-    // Request media read permissions automatically on first open if not yet granted
-    // so photos, videos, audio, and files appear right inside the in-app picker.
-    LaunchedEffect(Unit) {
-        if (!hasMediaPermission) {
-            runCatching {
-                mediaPermissionLauncher.launch(requiredMediaCatalogPermissions())
+    val mediaPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { _ ->
+        hasAllFilesAccess = hasAllFilesAccessPermission(context)
+        hasMediaPermission = hasAnyMediaCatalogPermission(context)
+        catalogRefreshTick++
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val latestAllFiles = hasAllFilesAccessPermission(context)
+                val latestMedia = hasAnyMediaCatalogPermission(context)
+                if (latestAllFiles != hasAllFilesAccess || latestMedia != hasMediaPermission) {
+                    hasAllFilesAccess = latestAllFiles
+                    hasMediaPermission = latestMedia
+                    catalogRefreshTick++
+                }
             }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
-    LaunchedEffect(inAppReceivedFiles, hasMediaPermission, catalogRefreshTick) {
+    val requestAllFilesAccess: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                allFilesSettingsLauncher.launch(buildManageAllFilesAccessIntent(context))
+            }.onFailure {
+                runCatching {
+                    allFilesSettingsLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                }
+            }
+        } else {
+            mediaPermissionLauncher.launch(requiredMediaCatalogPermissions())
+        }
+    }
+
+    LaunchedEffect(inAppReceivedFiles, hasAllFilesAccess, hasMediaPermission, catalogRefreshTick) {
         isLoadingCatalog = true
         val loaded = withContext(Dispatchers.IO) {
             loadOnDeviceCatalogEntries(context, inAppReceivedFiles)
@@ -317,7 +510,23 @@ fun InAppFileMediaPickerSheet(
         isLoadingCatalog = false
     }
 
-    // Optional secondary fallback system picker in top bar only if user wants external SAF provider
+    LaunchedEffect(currentFolder, hasAllFilesAccess, catalogRefreshTick) {
+        isLoadingFolder = true
+        val nodes = withContext(Dispatchers.IO) {
+            listDirectoryNodes(currentFolder)
+        }
+        currentFolderNodes = nodes
+        isLoadingFolder = false
+    }
+
+    // Back handler when navigating inside subdirectories in FOLDERS tab
+    val canNavigateUpInFolder = activeTab == InAppPickerTab.FOLDERS &&
+        currentFolder.absolutePath != storageRootDir.absolutePath &&
+        currentFolder.parentFile != null
+    BackHandler(enabled = canNavigateUpInFolder) {
+        currentFolder.parentFile?.let { parent -> currentFolder = parent }
+    }
+
     val systemFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
     ) { uris ->
@@ -380,10 +589,26 @@ fun InAppFileMediaPickerSheet(
         }
     }
 
-    val allEntries = remember(deviceCatalogEntries, stagedSystemEntries.toList()) {
+    val allEntries = remember(deviceCatalogEntries, stagedSystemEntries.toList(), currentFolderNodes) {
         val map = LinkedHashMap<String, SelectablePickerEntry>()
         stagedSystemEntries.forEach { map[it.key] = it }
         deviceCatalogEntries.forEach { if (!map.containsKey(it.key)) map[it.key] = it }
+        currentFolderNodes.filter { !it.isDirectory }.forEach { node ->
+            val uri = Uri.fromFile(node.file)
+            val key = uri.toString()
+            if (!map.containsKey(key)) {
+                map[key] = SelectablePickerEntry(
+                    key = key,
+                    uri = uri,
+                    name = node.name,
+                    sizeBytes = node.sizeBytes,
+                    mimeType = node.mimeType,
+                    category = node.category,
+                    modifiedAtEpochSec = node.modifiedAtEpochSec,
+                    parentFolderName = node.file.parentFile?.name.orEmpty(),
+                )
+            }
+        }
         map.values.toList()
     }
 
@@ -393,10 +618,19 @@ fun InAppFileMediaPickerSheet(
             val matchesTab = when (activeTab) {
                 InAppPickerTab.MEDIA -> entry.category == FileCategory.IMAGE || entry.category == FileCategory.VIDEO
                 InAppPickerTab.FILES -> selectedCategory == null || entry.category == selectedCategory
+                InAppPickerTab.FOLDERS -> true
             }
-            val matchesQuery = q.isEmpty() || entry.name.lowercase().contains(q)
+            val matchesQuery = q.isEmpty() ||
+                entry.name.lowercase().contains(q) ||
+                entry.parentFolderName.lowercase().contains(q)
             matchesTab && matchesQuery
         }
+    }
+
+    val visibleFolderNodes = remember(currentFolderNodes, searchQuery.text) {
+        val q = searchQuery.text.trim().lowercase()
+        if (q.isEmpty()) currentFolderNodes
+        else currentFolderNodes.filter { it.name.lowercase().contains(q) }
     }
 
     val selectedEntries = remember(allEntries, selectedKeys.toList()) {
@@ -406,16 +640,10 @@ fun InAppFileMediaPickerSheet(
         selectedEntries.sumOf { it.sizeBytes.coerceAtLeast(0L) }
     }
 
-    val sheetTitle = if (activeTab == InAppPickerTab.MEDIA) {
-        stringResource(R.string.picker_media_title)
-    } else {
-        stringResource(R.string.picker_files_title)
-    }
-
-    val categoryTabItems = remember(
-        stringResource(R.string.received_files_filter_all),
-    ) {
-        null
+    val sheetTitle = when (activeTab) {
+        InAppPickerTab.MEDIA -> stringResource(R.string.picker_media_title)
+        InAppPickerTab.FOLDERS -> stringResource(R.string.picker_tab_folders)
+        InAppPickerTab.FILES -> stringResource(R.string.picker_files_title)
     }
 
     val filterTabs = listOf<Pair<FileCategory?, String>>(
@@ -445,6 +673,18 @@ fun InAppFileMediaPickerSheet(
                     }
                 },
                 actions = {
+                    if (!hasAllFilesAccess) {
+                        GlasmioSheetToolbarButton(
+                            onClick = requestAllFilesAccess,
+                            modifier = Modifier.testTag("in_app_picker_top_grant_all_files_button"),
+                        ) {
+                            SfIcon(
+                                systemName = ThazhSymbols.ShieldCheck,
+                                contentDescription = stringResource(R.string.picker_all_files_permission_title),
+                                tint = semantic.warningOrange,
+                            )
+                        }
+                    }
                     GlasmioSheetToolbarButton(
                         onClick = {
                             if (activeTab == InAppPickerTab.MEDIA) {
@@ -482,7 +722,7 @@ fun InAppFileMediaPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 450.dp, max = 610.dp)
+                .heightIn(min = 470.dp, max = 630.dp)
                 .padding(
                     top = sheetPadding.calculateTopPadding() + 8.dp,
                     bottom = sheetPadding.calculateBottomPadding() + 16.dp,
@@ -491,10 +731,11 @@ fun InAppFileMediaPickerSheet(
                 .testTag("in_app_file_media_picker_sheet"),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // 1. GlasmioSegmentedControl: Files vs Photos & Videos
+            // 1. GlasmioSegmentedControl: All Files vs Folders vs Photos & Videos
             GlasmioSegmentedControl(
                 items = listOf(
                     InAppPickerTab.FILES to stringResource(R.string.picker_tab_files),
+                    InAppPickerTab.FOLDERS to stringResource(R.string.picker_tab_folders),
                     InAppPickerTab.MEDIA to stringResource(R.string.picker_tab_media),
                 ),
                 selected = activeTab,
@@ -505,28 +746,30 @@ fun InAppFileMediaPickerSheet(
             ) { tab, isSelected ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     SfIcon(
-                        systemName = if (tab == InAppPickerTab.MEDIA) {
-                            ThazhSymbols.PhotoLibrary
-                        } else {
-                            ThazhSymbols.AttachFile
+                        systemName = when (tab) {
+                            InAppPickerTab.MEDIA -> ThazhSymbols.PhotoLibrary
+                            InAppPickerTab.FOLDERS -> ThazhSymbols.FolderOpen
+                            InAppPickerTab.FILES -> ThazhSymbols.AttachFile
                         },
                         contentDescription = null,
                         tint = if (isSelected) colors.accent else colors.secondaryContent,
-                        size = 15.dp,
+                        size = 14.dp,
                     )
                     GlasmioText(
-                        text = if (tab == InAppPickerTab.MEDIA) {
-                            stringResource(R.string.picker_tab_media)
-                        } else {
-                            stringResource(R.string.picker_tab_files)
+                        text = when (tab) {
+                            InAppPickerTab.MEDIA -> stringResource(R.string.picker_tab_media)
+                            InAppPickerTab.FOLDERS -> stringResource(R.string.picker_tab_folders)
+                            InAppPickerTab.FILES -> stringResource(R.string.picker_tab_files)
                         },
-                        style = GlasmioTheme.textStyles.footnote.copy(
+                        style = GlasmioTheme.textStyles.caption1.copy(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         ),
                         color = if (isSelected) colors.content else colors.secondaryContent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -550,50 +793,42 @@ fun InAppFileMediaPickerSheet(
                     .testTag("in_app_picker_search_input"),
             )
 
-            // 3. Authentic GlasmioScrollableTabRow for File Category filtering
-            if (activeTab == InAppPickerTab.FILES) {
-                GlasmioScrollableTabRow(
-                    items = filterTabs,
-                    selected = selectedCategory,
-                    onSelected = { cat ->
-                        selectedCategory = if (selectedCategory == cat) null else cat
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            // 4. Inline Media Permission Banner if permission not yet granted
-            if (!hasMediaPermission) {
+            // 3. Prominent "Truy cập vào mọi tệp" (All Files Access) Permission Banner when not yet granted
+            if (!hasAllFilesAccess) {
                 GlasmioCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .background(
+                                semantic.accentBlue.copy(alpha = if (colors.isDark) 0.18f else 0.10f),
+                            )
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        SfIcon(
-                            systemName = ThazhSymbols.PhotoLibrary,
-                            contentDescription = null,
-                            tint = semantic.accentBlue,
-                            size = 20.dp,
+                        ThazhSquircleIconBox(
+                            symbol = ThazhSymbols.FolderOpen,
+                            accentColor = semantic.accentBlue,
+                            boxSize = 38.dp,
+                            iconSize = 19.dp,
+                            cornerRadius = 11.dp,
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             GlasmioText(
-                                text = stringResource(R.string.picker_permission_banner_title),
-                                style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.SemiBold),
+                                text = stringResource(R.string.picker_all_files_permission_title),
+                                style = GlasmioTheme.textStyles.footnote.copy(fontWeight = FontWeight.Bold),
                                 color = colors.content,
                             )
                             GlasmioText(
-                                text = stringResource(R.string.picker_permission_banner_body),
+                                text = stringResource(R.string.picker_all_files_permission_body),
                                 style = GlasmioTheme.textStyles.caption2,
                                 color = colors.secondaryContent,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         GlasmioButton(
-                            onClick = {
-                                mediaPermissionLauncher.launch(requiredMediaCatalogPermissions())
-                            },
+                            onClick = requestAllFilesAccess,
                             emphasis = GlassEmphasis.Prominent,
                             navigationSurfaceColor = semantic.accentBlue,
                             size = GlasmioButtonSize.Small,
@@ -609,8 +844,31 @@ fun InAppFileMediaPickerSheet(
                 }
             }
 
+            // 4. Category filter bar (FILES tab) OR Breadcrumb bar (FOLDERS tab)
+            if (activeTab == InAppPickerTab.FILES) {
+                GlasmioScrollableTabRow(
+                    items = filterTabs,
+                    selected = selectedCategory,
+                    onSelected = { cat ->
+                        selectedCategory = if (selectedCategory == cat) null else cat
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else if (activeTab == InAppPickerTab.FOLDERS) {
+                FolderBreadcrumbStrip(
+                    rootDir = storageRootDir,
+                    currentDir = currentFolder,
+                    onSelectDir = { target -> currentFolder = target },
+                )
+            }
+
             // 5. Quick Select All / Clear Row
-            if (visibleEntries.isNotEmpty()) {
+            val activeSelectableCount = if (activeTab == InAppPickerTab.FOLDERS) {
+                visibleFolderNodes.count { !it.isDirectory }
+            } else {
+                visibleEntries.size
+            }
+            if (activeSelectableCount > 0) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -619,18 +877,27 @@ fun InAppFileMediaPickerSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     GlasmioText(
-                        text = "${stringResource(R.string.picker_source_in_app_section)} (${visibleEntries.size})",
+                        text = if (activeTab == InAppPickerTab.FOLDERS) {
+                            "${currentFolder.name.ifBlank { stringResource(R.string.picker_folder_root_label) }} (${visibleFolderNodes.size})"
+                        } else {
+                            "${stringResource(R.string.picker_source_in_app_section)} (${visibleEntries.size})"
+                        },
                         style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
                         color = colors.secondaryContent,
                     )
-                    val allVisibleSelected = visibleEntries.all { it.key in selectedKeys }
+                    val targetFileKeys = if (activeTab == InAppPickerTab.FOLDERS) {
+                        visibleFolderNodes.filter { !it.isDirectory }.map { Uri.fromFile(it.file).toString() }
+                    } else {
+                        visibleEntries.map { it.key }
+                    }
+                    val allVisibleSelected = targetFileKeys.isNotEmpty() && targetFileKeys.all { it in selectedKeys }
                     GlasmioButton(
                         onClick = {
                             if (allVisibleSelected) {
-                                visibleEntries.forEach { selectedKeys.remove(it.key) }
+                                targetFileKeys.forEach { selectedKeys.remove(it) }
                             } else {
-                                visibleEntries.forEach {
-                                    if (it.key !in selectedKeys) selectedKeys.add(it.key)
+                                targetFileKeys.forEach { key ->
+                                    if (key !in selectedKeys) selectedKeys.add(key)
                                 }
                             }
                         },
@@ -650,70 +917,161 @@ fun InAppFileMediaPickerSheet(
                 }
             }
 
-            // 6. Content area: In-app Grid for MEDIA, In-app List for FILES
+            // 6. Content area: In-app Folder Explorer, In-app Grid for MEDIA, or In-app List for FILES
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
             ) {
-                if (isLoadingCatalog && visibleEntries.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        GlasmioActivityIndicator(
-                            size = 28.dp,
-                            strokeWidth = 2.6.dp,
-                            color = semantic.accentBlue,
-                        )
-                    }
-                } else if (visibleEntries.isEmpty()) {
-                    PickerEmptyStateCard(
-                        isMediaMode = activeTab == InAppPickerTab.MEDIA,
-                        hasPermission = hasMediaPermission,
-                        onGrantPermission = {
-                            mediaPermissionLauncher.launch(requiredMediaCatalogPermissions())
-                        },
-                        onRefreshInApp = {
-                            catalogRefreshTick++
-                        },
-                    )
-                } else if (activeTab == InAppPickerTab.MEDIA) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 104.dp),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(visibleEntries, key = { it.key }) { entry ->
-                            val isSelected = entry.key in selectedKeys
-                            MediaGridThumbnailCell(
-                                entry = entry,
-                                isSelected = isSelected,
-                                onToggle = {
-                                    if (isSelected) selectedKeys.remove(entry.key)
-                                    else selectedKeys.add(entry.key)
-                                },
+                when (activeTab) {
+                    InAppPickerTab.FOLDERS -> {
+                        if (isLoadingFolder && visibleFolderNodes.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                GlasmioActivityIndicator(
+                                    size = 28.dp,
+                                    strokeWidth = 2.6.dp,
+                                    color = semantic.accentBlue,
+                                )
+                            }
+                        } else if (visibleFolderNodes.isEmpty()) {
+                            PickerEmptyStateCard(
+                                isMediaMode = false,
+                                hasAllFilesPermission = hasAllFilesAccess,
+                                onGrantAllFilesPermission = requestAllFilesAccess,
+                                onRefreshInApp = { catalogRefreshTick++ },
                             )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (canNavigateUpInFolder) {
+                                    item(key = "parent_dir_up") {
+                                        ParentFolderUpRow(
+                                            parentName = currentFolder.parentFile?.name
+                                                ?.takeIf { it.isNotBlank() }
+                                                ?: stringResource(R.string.picker_folder_root_label),
+                                            onClick = {
+                                                currentFolder.parentFile?.let { currentFolder = it }
+                                            },
+                                        )
+                                    }
+                                }
+                                items(visibleFolderNodes, key = { it.file.absolutePath }) { node ->
+                                    if (node.isDirectory) {
+                                        DirectoryFolderItemRow(
+                                            node = node,
+                                            onClick = { currentFolder = node.file },
+                                        )
+                                    } else {
+                                        val fileKey = Uri.fromFile(node.file).toString()
+                                        val isSelected = fileKey in selectedKeys
+                                        FilePickerListItemRow(
+                                            entry = SelectablePickerEntry(
+                                                key = fileKey,
+                                                uri = Uri.fromFile(node.file),
+                                                name = node.name,
+                                                sizeBytes = node.sizeBytes,
+                                                mimeType = node.mimeType,
+                                                category = node.category,
+                                                modifiedAtEpochSec = node.modifiedAtEpochSec,
+                                                parentFolderName = currentFolder.name,
+                                            ),
+                                            isSelected = isSelected,
+                                            onToggle = {
+                                                if (isSelected) selectedKeys.remove(fileKey)
+                                                else selectedKeys.add(fileKey)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(visibleEntries, key = { it.key }) { entry ->
-                            val isSelected = entry.key in selectedKeys
-                            FilePickerListItemRow(
-                                entry = entry,
-                                isSelected = isSelected,
-                                onToggle = {
-                                    if (isSelected) selectedKeys.remove(entry.key)
-                                    else selectedKeys.add(entry.key)
-                                },
+
+                    InAppPickerTab.MEDIA -> {
+                        if (isLoadingCatalog && visibleEntries.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                GlasmioActivityIndicator(
+                                    size = 28.dp,
+                                    strokeWidth = 2.6.dp,
+                                    color = semantic.accentBlue,
+                                )
+                            }
+                        } else if (visibleEntries.isEmpty()) {
+                            PickerEmptyStateCard(
+                                isMediaMode = true,
+                                hasAllFilesPermission = hasAllFilesAccess,
+                                onGrantAllFilesPermission = requestAllFilesAccess,
+                                onRefreshInApp = { catalogRefreshTick++ },
                             )
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 104.dp),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(visibleEntries, key = { it.key }) { entry ->
+                                    val isSelected = entry.key in selectedKeys
+                                    MediaGridThumbnailCell(
+                                        entry = entry,
+                                        isSelected = isSelected,
+                                        onToggle = {
+                                            if (isSelected) selectedKeys.remove(entry.key)
+                                            else selectedKeys.add(entry.key)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    InAppPickerTab.FILES -> {
+                        if (isLoadingCatalog && visibleEntries.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                GlasmioActivityIndicator(
+                                    size = 28.dp,
+                                    strokeWidth = 2.6.dp,
+                                    color = semantic.accentBlue,
+                                )
+                            }
+                        } else if (visibleEntries.isEmpty()) {
+                            PickerEmptyStateCard(
+                                isMediaMode = false,
+                                hasAllFilesPermission = hasAllFilesAccess,
+                                onGrantAllFilesPermission = requestAllFilesAccess,
+                                onRefreshInApp = { catalogRefreshTick++ },
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(visibleEntries, key = { it.key }) { entry ->
+                                    val isSelected = entry.key in selectedKeys
+                                    FilePickerListItemRow(
+                                        entry = entry,
+                                        isSelected = isSelected,
+                                        onToggle = {
+                                            if (isSelected) selectedKeys.remove(entry.key)
+                                            else selectedKeys.add(entry.key)
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -778,6 +1136,176 @@ fun InAppFileMediaPickerSheet(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FolderBreadcrumbStrip(
+    rootDir: File,
+    currentDir: File,
+    onSelectDir: (File) -> Unit,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+    val scrollState = rememberScrollState()
+
+    val segments = remember(rootDir, currentDir) {
+        val list = mutableListOf<File>()
+        var cursor: File? = currentDir
+        val rootPath = rootDir.absolutePath
+        while (cursor != null) {
+            list.add(0, cursor)
+            if (cursor.absolutePath == rootPath) break
+            cursor = cursor.parentFile
+        }
+        if (list.isEmpty()) list.add(rootDir)
+        list
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        segments.forEachIndexed { index, dir ->
+            val isLast = index == segments.lastIndex
+            val label = if (index == 0) {
+                stringResource(R.string.picker_folder_root_label)
+            } else {
+                dir.name.ifBlank { dir.absolutePath }
+            }
+            Box(
+                modifier = Modifier
+                    .clip(ContinuousCapsule)
+                    .background(
+                        if (isLast) {
+                            semantic.accentBlue.copy(alpha = if (colors.isDark) 0.24f else 0.14f)
+                        } else {
+                            colors.secondaryContent.copy(alpha = if (colors.isDark) 0.16f else 0.09f)
+                        },
+                    )
+                    .clickable(
+                        role = Role.Button,
+                        onClick = { onSelectDir(dir) },
+                    )
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            ) {
+                GlasmioText(
+                    text = label,
+                    style = GlasmioTheme.textStyles.caption1.copy(
+                        fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Medium,
+                    ),
+                    color = if (isLast) semantic.accentBlue else colors.secondaryContent,
+                    maxLines = 1,
+                )
+            }
+            if (!isLast) {
+                SfIcon(
+                    systemName = ThazhSymbols.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.tertiaryContent,
+                    size = 12.dp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParentFolderUpRow(
+    parentName: String,
+    onClick: () -> Unit,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+
+    GlasmioCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ThazhSquircleIconBox(
+                symbol = ThazhSymbols.Back,
+                accentColor = semantic.accentCyan,
+                boxSize = 40.dp,
+                iconSize = 18.dp,
+                cornerRadius = 12.dp,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                GlasmioText(
+                    text = stringResource(R.string.picker_folder_up_label),
+                    style = GlasmioTheme.textStyles.body.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.content,
+                )
+                GlasmioText(
+                    text = parentName,
+                    style = GlasmioTheme.textStyles.caption1,
+                    color = colors.secondaryContent,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DirectoryFolderItemRow(
+    node: DirectoryNodeEntry,
+    onClick: () -> Unit,
+) {
+    val colors = GlasmioTheme.colors
+    val semantic = ThazhTheme.semantic
+
+    GlasmioCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ThazhSquircleIconBox(
+                symbol = ThazhSymbols.FolderOpen,
+                accentColor = semantic.accentBlue,
+                boxSize = 42.dp,
+                iconSize = 20.dp,
+                cornerRadius = 12.dp,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                GlasmioText(
+                    text = node.name,
+                    style = GlasmioTheme.textStyles.body.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.content,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                GlasmioText(
+                    text = stringResource(R.string.picker_folder_items_count, node.childCount),
+                    style = GlasmioTheme.textStyles.caption1,
+                    color = colors.secondaryContent,
+                )
+            }
+            SfIcon(
+                systemName = ThazhSymbols.ChevronRight,
+                contentDescription = null,
+                tint = colors.tertiaryContent,
+                size = 16.dp,
+            )
         }
     }
 }
@@ -927,11 +1455,13 @@ private fun FilePickerListItemRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
+                val folderPart = entry.parentFolderName.takeIf { it.isNotBlank() }?.let { " • $it" }.orEmpty()
                 GlasmioText(
-                    text = "${stringResource(entry.category.labelRes())} • ${FormatUtils.formatFileSize(entry.sizeBytes)}",
+                    text = "${stringResource(entry.category.labelRes())} • ${FormatUtils.formatFileSize(entry.sizeBytes)}$folderPart",
                     style = GlasmioTheme.textStyles.caption1,
                     color = colors.secondaryContent,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
@@ -948,8 +1478,8 @@ private fun FilePickerListItemRow(
 @Composable
 private fun PickerEmptyStateCard(
     isMediaMode: Boolean,
-    hasPermission: Boolean,
-    onGrantPermission: () -> Unit,
+    hasAllFilesPermission: Boolean,
+    onGrantAllFilesPermission: () -> Unit,
     onRefreshInApp: () -> Unit,
 ) {
     val colors = GlasmioTheme.colors
@@ -964,7 +1494,13 @@ private fun PickerEmptyStateCard(
             verticalArrangement = Arrangement.Center,
         ) {
             ThazhSquircleIconBox(
-                symbol = if (isMediaMode) ThazhSymbols.PhotoLibrary else ThazhSymbols.AttachFile,
+                symbol = if (!hasAllFilesPermission) {
+                    ThazhSymbols.FolderOpen
+                } else if (isMediaMode) {
+                    ThazhSymbols.PhotoLibrary
+                } else {
+                    ThazhSymbols.AttachFile
+                },
                 accentColor = semantic.accentBlue,
                 boxSize = 54.dp,
                 iconSize = 26.dp,
@@ -973,8 +1509,8 @@ private fun PickerEmptyStateCard(
             Spacer(modifier = Modifier.height(12.dp))
             GlasmioText(
                 text = stringResource(
-                    if (!hasPermission) {
-                        R.string.picker_permission_banner_title
+                    if (!hasAllFilesPermission) {
+                        R.string.picker_all_files_permission_title
                     } else if (isMediaMode) {
                         R.string.picker_empty_media_title
                     } else {
@@ -988,8 +1524,8 @@ private fun PickerEmptyStateCard(
             Spacer(modifier = Modifier.height(6.dp))
             GlasmioText(
                 text = stringResource(
-                    if (!hasPermission) {
-                        R.string.picker_permission_banner_body
+                    if (!hasAllFilesPermission) {
+                        R.string.picker_all_files_permission_body
                     } else if (isMediaMode) {
                         R.string.picker_empty_media_body
                     } else {
@@ -1002,14 +1538,14 @@ private fun PickerEmptyStateCard(
             )
             Spacer(modifier = Modifier.height(16.dp))
             GlasmioButton(
-                onClick = if (!hasPermission) onGrantPermission else onRefreshInApp,
+                onClick = if (!hasAllFilesPermission) onGrantAllFilesPermission else onRefreshInApp,
                 emphasis = GlassEmphasis.Prominent,
                 navigationSurfaceColor = semantic.accentBlue,
                 size = GlasmioButtonSize.Medium,
                 modifier = Modifier.testTag("in_app_picker_empty_action_button"),
             ) {
                 SfIcon(
-                    systemName = if (!hasPermission) ThazhSymbols.ShieldCheck else ThazhSymbols.Refresh,
+                    systemName = if (!hasAllFilesPermission) ThazhSymbols.ShieldCheck else ThazhSymbols.Refresh,
                     contentDescription = null,
                     tint = Color.White,
                     size = 16.dp,
@@ -1017,9 +1553,13 @@ private fun PickerEmptyStateCard(
                 Spacer(modifier = Modifier.width(6.dp))
                 GlasmioText(
                     text = stringResource(
-                        if (!hasPermission) R.string.permission_grant else R.string.browser_action_reload,
+                        if (!hasAllFilesPermission) {
+                            R.string.picker_all_files_permission_button
+                        } else {
+                            R.string.browser_action_reload
+                        },
                     ),
-                    style = GlasmioTheme.textStyles.callout.copy(fontWeight = FontWeight.SemiBold),
+                    style = GlasmioTheme.textStyles.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     color = Color.White,
                 )
             }

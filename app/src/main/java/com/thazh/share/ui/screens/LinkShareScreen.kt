@@ -146,15 +146,6 @@ fun LinkShareScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (currentUser == null) {
-            runCatching {
-                val activity = context.findActivity()
-                GoogleAuthHelper.attemptAutoSignIn(activity)
-            }
-        }
-    }
-
     var uploadNoteDraft by remember { mutableStateOf("") }
     var qrPreviewTarget by remember { mutableStateOf<Pair<String, String>?>(null) } // (fileName, url)
     var lastQrTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -172,7 +163,6 @@ fun LinkShareScreen(
     // In-app file/media picker & in-app web browser states
     var activePickerTab by remember { mutableStateOf<InAppPickerTab?>(null) }
     var inAppBrowserTarget by remember { mutableStateOf<Pair<String, String?>?>(null) } // (url, title)
-    var cloudUrlInput by remember { mutableStateOf("") }
 
     val cardShape = ContinuousRoundedRectangle(GlasmioTheme.dimensions.regularCornerRadius)
 
@@ -396,113 +386,6 @@ fun LinkShareScreen(
                                 style = GlasmioTheme.textStyles.footnote,
                                 color = colors.destructive,
                             )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 1b. In-App Web Browser Card (Browse Cloud Links & Web URLs directly inside the app)
-        item(key = "in_app_cloud_browser_card") {
-            CenteredLinkContent {
-                GlasmioCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(ContinuousRoundedRectangle(13.dp))
-                                    .background(semantic.accentCyan.copy(alpha = if (colors.isDark) 0.22f else 0.14f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                SfIcon(
-                                    systemName = ThazhSymbols.Globe,
-                                    contentDescription = null,
-                                    tint = semantic.accentCyan,
-                                    size = 22.dp,
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                GlasmioText(
-                                    text = stringResource(R.string.link_share_browse_cloud_card_title),
-                                    style = GlasmioTheme.textStyles.headline.copy(fontWeight = FontWeight.Bold),
-                                    color = colors.content,
-                                )
-                                GlasmioText(
-                                    text = stringResource(R.string.link_share_browse_cloud_card_desc),
-                                    style = GlasmioTheme.textStyles.footnote,
-                                    color = colors.secondaryContent,
-                                )
-                            }
-                        }
-
-                        var isBrowserInputActive by remember { mutableStateOf(false) }
-                        var cloudUrlQuery by remember(cloudUrlInput) {
-                            mutableStateOf(TextFieldValue(cloudUrlInput))
-                        }
-
-                        val launchBrowserWithInput: (String) -> Unit = { raw ->
-                            val urlToOpen = normalizeWebUrl(raw)
-                            isBrowserInputActive = false
-                            inAppBrowserTarget = urlToOpen to null
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            io.github.neoruaa.glasmio.ui.GlasmioSearchBar(
-                                query = cloudUrlQuery,
-                                onQueryChange = {
-                                    cloudUrlQuery = it
-                                    cloudUrlInput = it.text
-                                },
-                                active = isBrowserInputActive,
-                                onActiveChange = { isBrowserInputActive = it },
-                                onClose = {
-                                    cloudUrlQuery = TextFieldValue("")
-                                    cloudUrlInput = ""
-                                    isBrowserInputActive = false
-                                },
-                                onSearch = { entered -> launchBrowserWithInput(entered) },
-                                placeholder = stringResource(R.string.link_share_browse_url_placeholder),
-                                closeContentDescription = stringResource(R.string.close),
-                                controlHeight = 42.dp,
-                                searchIconSize = 18.dp,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("link_share_in_app_browser_url_input"),
-                            )
-
-                            GlasmioButton(
-                                onClick = { launchBrowserWithInput(cloudUrlQuery.text) },
-                                emphasis = GlassEmphasis.Prominent,
-                                navigationSurfaceColor = semantic.accentBlue,
-                                size = GlasmioButtonSize.Small,
-                                modifier = Modifier.testTag("link_share_open_in_app_browser_button"),
-                            ) {
-                                SfIcon(
-                                    systemName = ThazhSymbols.Globe,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    size = 15.dp,
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                GlasmioText(
-                                    text = stringResource(R.string.link_share_browse_go),
-                                    style = GlasmioTheme.textStyles.caption1.copy(fontWeight = FontWeight.SemiBold),
-                                    color = Color.White,
-                                )
-                            }
                         }
                     }
                 }

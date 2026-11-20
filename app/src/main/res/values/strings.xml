@@ -382,28 +382,36 @@
     <string name="browser_action_back">Trang trước</string>
     <string name="browser_action_forward">Trang sau</string>
     <string name="browser_action_reload">Tải lại</string>
-    <string name="browser_action_copy_url">Sao chép link</string>
-    <string name="browser_action_open_external">Mở trình duyệt ngoài</string>
-    <string name="browser_action_share">Chia sẻ link</string>
+    <string name="browser_action_menu">Tùy chọn trang</string>
+    <string name="browser_action_copy_url">Sao chép liên kết</string>
+    <string name="browser_action_open_external">Mở bằng trình duyệt ngoài</string>
+    <string name="browser_action_share">Chia sẻ liên kết</string>
     <string name="browser_loading">Đang tải trang…</string>
     <string name="browser_secure_badge">HTTPS Bảo mật</string>
 
-    <!-- In-App File & Photo/Media Picker -->
+    <!-- In-App File & Photo/Media Picker (All Files Access + Directory Explorer) -->
     <string name="picker_files_title">Chọn tệp trong ứng dụng</string>
     <string name="picker_media_title">Chọn ảnh &amp; video</string>
-    <string name="picker_tab_files">Tệp tin</string>
+    <string name="picker_tab_files">Tất cả tệp</string>
+    <string name="picker_tab_folders">Thư mục máy</string>
     <string name="picker_tab_media">Ảnh &amp; Video</string>
-    <string name="picker_search_placeholder">Tìm kiếm tệp hoặc ảnh…</string>
+    <string name="picker_search_placeholder">Tìm kiếm tệp, thư mục hoặc ảnh…</string>
     <string name="picker_browse_system_files">Duyệt bộ nhớ máy</string>
     <string name="picker_browse_system_media">Thư viện hệ thống</string>
     <string name="picker_source_in_app_section">Tệp &amp; phương tiện trên thiết bị</string>
     <string name="picker_source_staged_section">Đã thêm từ bộ nhớ máy (%1$d)</string>
-    <string name="picker_permission_banner_title">Hiển thị toàn bộ ảnh &amp; tệp trên máy</string>
-    <string name="picker_permission_banner_body">Cấp quyền đọc phương tiện để chọn ảnh, video, âm thanh và tệp trực tiếp ngay trong ứng dụng.</string>
+    <string name="picker_all_files_permission_title">Quyền Truy cập vào mọi tệp</string>
+    <string name="picker_all_files_permission_body">Cấp quyền \"Truy cập vào mọi tệp\" để hiển thị và chọn trực tiếp toàn bộ tệp, thư mục, tài liệu, APK, tệp nén và ảnh ngay trong ứng dụng.</string>
+    <string name="picker_all_files_permission_button">Cấp quyền mọi tệp</string>
+    <string name="picker_permission_banner_title">Quyền Truy cập vào mọi tệp</string>
+    <string name="picker_permission_banner_body">Cho phép Thazh Share truy cập vào mọi tệp để duyệt toàn bộ thư mục và tệp trên bộ nhớ máy ngay trong ứng dụng.</string>
+    <string name="picker_folder_root_label">Bộ nhớ trong</string>
+    <string name="picker_folder_up_label">Lên thư mục cha</string>
+    <string name="picker_folder_items_count">%1$d mục</string>
     <string name="picker_empty_media_title">Không tìm thấy ảnh hoặc video phù hợp</string>
     <string name="picker_empty_media_body">Làm mới danh sách hoặc kiểm tra bộ lọc tìm kiếm của bạn.</string>
     <string name="picker_empty_files_title">Không tìm thấy tệp phù hợp</string>
-    <string name="picker_empty_files_body">Làm mới danh sách hoặc chọn danh mục khác ở thanh phía trên.</string>
+    <string name="picker_empty_files_body">Làm mới danh sách hoặc chọn thư mục / danh mục khác ở phía trên.</string>
     <string name="picker_confirm_selection">Xác nhận (%1$d)</string>
     <string name="picker_selected_summary">Đã chọn %1$d mục • %2$s</string>
     <string name="picker_select_all">Chọn tất cả</string>
